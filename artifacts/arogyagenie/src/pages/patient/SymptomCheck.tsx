@@ -187,18 +187,51 @@ export function PatientSymptomCheck() {
                 <div className="p-6">
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleInitialSubmit)} className="space-y-4">
+                      {/* Body Area Selector (Matching Reference SYMPTOM CHECKER UI) */}
+                      <div className="space-y-2 mb-4">
+                        <label className="font-semibold text-slate-900 text-xs uppercase tracking-wider block">
+                          Where is the problem? Select area:
+                        </label>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                          {[
+                            { label: "Head", icon: "🧠" },
+                            { label: "Chest", icon: "🫁" },
+                            { label: "Stomach", icon: "🤢" },
+                            { label: "Back", icon: "🦴" },
+                            { label: "Arms", icon: "💪" },
+                            { label: "Legs", icon: "🦵" },
+                          ].map((area) => (
+                            <button
+                              key={area.label}
+                              type="button"
+                              onClick={() => {
+                                const current = form.getValues("symptoms");
+                                const prefix = current ? `${current}, ` : "";
+                                form.setValue("symptoms", `${prefix}Pain/Discomfort in ${area.label.toLowerCase()}`, {
+                                  shouldValidate: true,
+                                });
+                              }}
+                              className="flex flex-col items-center justify-center p-3 rounded-xl border border-violet-100 bg-violet-50/50 hover:bg-violet-600 hover:text-white transition-all text-xs font-semibold text-violet-900 shadow-2xs group"
+                            >
+                              <span className="text-lg mb-1">{area.icon}</span>
+                              <span>{area.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <FormField
                         control={form.control}
                         name="symptoms"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="font-semibold text-slate-900 text-sm">
-                              What symptoms are you experiencing?
+                              Describe your symptoms in detail:
                             </FormLabel>
                             <FormControl>
                               <Textarea
                                 placeholder="e.g. I have had a high fever, dry cough, and mild body aches for 2 days..."
-                                className="min-h-[110px] rounded-xl resize-none focus-visible:ring-indigo-500"
+                                className="min-h-[100px] rounded-xl resize-none focus-visible:ring-violet-500"
                                 {...field}
                               />
                             </FormControl>

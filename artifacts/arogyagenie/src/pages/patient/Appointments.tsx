@@ -147,22 +147,22 @@ export function PatientAppointments() {
         {/* ── Page Header ──────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Appointments</h1>
-            <p className="text-sm text-slate-500 mt-1">Manage your upcoming and past doctor visits.</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">My Appointments</h1>
+            <p className="text-sm text-slate-500 mt-1">Manage your upcoming, completed, and cancelled visits.</p>
           </div>
 
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
               <Button
-                className="gap-2 rounded-xl font-semibold shadow-sm"
+                className="gap-2 rounded-xl font-semibold shadow-sm text-sm h-11 px-5"
                 style={{
-                  background: "linear-gradient(135deg, hsl(243,75%,59%), hsl(260,70%,58%))",
+                  background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)",
                   border: "none",
                   color: "white",
                 }}
               >
                 <Plus className="h-4 w-4" />
-                Book Appointment
+                Book New Appointment
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] rounded-2xl">

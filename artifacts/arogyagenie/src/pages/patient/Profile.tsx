@@ -121,30 +121,30 @@ export function PatientProfile() {
           <p className="text-sm text-slate-500 mt-1">Manage your personal details, contact preferences, and medical background.</p>
         </div>
 
-        {/* ── Profile Hero Card ────────────────────────────────────────────── */}
+        {/* ── Profile Hero Card (Matching Reference PROFILE UI) ───────────────────── */}
         <div 
-          className="bg-white rounded-2xl border border-slate-100/90 shadow-sm p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 overflow-hidden relative"
+          className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 overflow-hidden relative"
         >
           <div 
-            className="absolute top-0 right-0 h-32 w-64 opacity-30 pointer-events-none rounded-full"
-            style={{ background: "radial-gradient(circle, hsl(243,75%,90%), transparent)" }}
+            className="absolute top-0 right-0 h-32 w-64 opacity-20 pointer-events-none rounded-full"
+            style={{ background: "radial-gradient(circle, #6C63FF 0%, transparent 70%)" }}
           />
 
-          <div className="flex items-center gap-4 relative">
+          <div className="flex items-center gap-5 relative">
             <div 
-              className="h-16 w-16 rounded-2xl flex items-center justify-center text-xl font-bold text-white shrink-0 shadow-xs"
-              style={{ background: "linear-gradient(135deg, hsl(243,75%,59%), hsl(260,70%,58%))" }}
+              className="h-16 w-16 rounded-full flex items-center justify-center text-xl font-black text-white shrink-0 shadow-md"
+              style={{ background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)" }}
             >
               {initials}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">{fullName}</h2>
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <ShieldCheck className="h-3 w-3" /> Patient
+                <h2 className="text-xl font-bold text-slate-900">{fullName}</h2>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-200">
+                  <ShieldCheck className="h-3 w-3 text-violet-600" /> Premium Member
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                 <Mail className="h-3.5 w-3.5 text-slate-400" />
                 {user?.email || "patient@arogyagenie.com"}
               </p>
@@ -156,7 +156,7 @@ export function PatientProfile() {
             disabled={updateMe.isPending}
             className="rounded-xl gap-2 font-semibold text-xs h-10 px-5 shadow-xs w-full sm:w-auto"
             style={{
-              background: "linear-gradient(135deg, hsl(243,75%,59%), hsl(260,70%,58%))",
+              background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)",
               border: "none",
               color: "white",
             }}

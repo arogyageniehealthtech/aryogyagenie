@@ -181,42 +181,122 @@ export function PatientDashboard() {
     <DashboardLayout>
       <div className="space-y-6">
 
-        {/* ── Welcome Hero Banner ──────────────────────────────────────────── */}
+        {/* ── Welcome Hero & Health Score Banner ─────────────────────────────── */}
         <div
-          className="relative rounded-2xl overflow-hidden px-7 py-6"
+          className="relative rounded-3xl overflow-hidden p-6 lg:p-8 text-white"
           style={{
-            background: "linear-gradient(135deg, hsl(238,58%,38%) 0%, hsl(238,52%,28%) 50%, hsl(244,55%,24%) 100%)",
-            boxShadow: "0 8px 28px rgba(59,63,191,0.3), 0 2px 8px rgba(59,63,191,0.2)",
+            background: "linear-gradient(135deg, #18103A 0%, #20144F 50%, #2A1768 100%)",
+            boxShadow: "0 10px 30px rgba(24, 16, 58, 0.4)",
           }}
         >
-          {/* Background orbs for depth */}
-          <div
-            className="absolute -top-12 -right-12 h-48 w-48 rounded-full opacity-10"
-            style={{ background: "radial-gradient(circle, white, transparent)" }}
-          />
-          <div
-            className="absolute -bottom-8 left-20 h-32 w-32 rounded-full opacity-10"
-            style={{ background: "radial-gradient(circle, hsl(207,90%,70%), transparent)" }}
-          />
+          {/* Subtle background glow elements */}
+          <div className="absolute top-0 right-0 h-64 w-64 rounded-full opacity-20 pointer-events-none" style={{ background: "radial-gradient(circle, #6C63FF 0%, transparent 70%)" }} />
+          <div className="absolute -bottom-10 left-1/3 h-48 w-48 rounded-full opacity-15 pointer-events-none" style={{ background: "radial-gradient(circle, #00D2FF 0%, transparent 70%)" }} />
 
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium mb-1" style={{ color: "rgba(255,255,255,0.6)" }}>
+          <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            
+            {/* Left Col: Greeting & Quick Actions */}
+            <div className="lg:col-span-7 space-y-4">
+              <p className="text-xs font-semibold tracking-wider uppercase text-violet-300/70">
                 {dateStr}
               </p>
-              <h1 className="text-2xl font-bold tracking-tight mb-1" style={{ color: "rgba(255,255,255,0.97)" }}>
-                Hello, {firstName} 👋
+              <h1 className="text-3xl font-extrabold tracking-tight text-white">
+                Good Morning, {firstName} 👋
               </h1>
-              <p className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
-                Here's your health overview and longitudinal AI insights.
+              <p className="text-sm text-violet-200/80 leading-relaxed max-w-xl">
+                Here is your health overview, live vitals tracking, and longitudinal AI medical insights.
               </p>
 
               {/* Quick Actions */}
-              <div className="flex flex-wrap gap-2 mt-4">
-                <QuickAction label="Book Appointment" icon={Calendar}  href="/patient/appointments" color="blue" />
-                <QuickAction label="Find a Doctor"    icon={Stethoscope} href="/patient/doctors" color="teal" />
-                <QuickAction label="Symptom Check"    icon={Activity}   href="/patient/symptom-check" color="purple" />
-                <QuickAction label="Book a Test"      icon={TestTube}   href="/patient/diagnostic-bookings" color="orange" />
+              <div className="flex flex-wrap gap-2.5 pt-2">
+                <QuickAction label="Book Visit" icon={Calendar} href="/patient/appointments" color="purple" />
+                <QuickAction label="Find Doctor" icon={Stethoscope} href="/patient/doctors" color="blue" />
+                <QuickAction label="Symptom AI" icon={Activity} href="/patient/symptom-check" color="teal" />
+                <QuickAction label="Book Test" icon={TestTube} href="/patient/diagnostic-bookings" color="orange" />
+              </div>
+            </div>
+
+            {/* Right Col: Health Score Ring Widget (Matching reference screenshot) */}
+            <div className="lg:col-span-5 flex justify-center lg:justify-end">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/15 flex items-center gap-5 shadow-xl w-full max-w-xs">
+                {/* Gauge Ring SVG */}
+                <div className="relative h-24 w-24 shrink-0 flex items-center justify-center">
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-white/10"
+                      strokeWidth="3.5"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-emerald-400"
+                      strokeDasharray="85, 100"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span className="text-2xl font-black text-white leading-none">85</span>
+                    <span className="text-[10px] text-emerald-300 font-semibold mt-0.5">/ 100</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-400/30 mb-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Good Health
+                  </div>
+                  <h4 className="text-sm font-bold text-white">Health Score</h4>
+                  <p className="text-[11px] text-violet-200/70 mt-0.5">Vitals & records within normal clinical range</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom Vitals Strip (Matching reference screenshot) */}
+          <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-red-500/20 border border-red-400/30 flex items-center justify-center text-red-400 shrink-0">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[10px] text-violet-200/60 uppercase font-semibold">Heart Rate</p>
+                <p className="text-sm font-bold text-white">72 <span className="text-[10px] font-normal text-violet-200/60">bpm</span></p>
+              </div>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+                <Clock className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[10px] text-violet-200/60 uppercase font-semibold">Sleep</p>
+                <p className="text-sm font-bold text-white">7h 30m</p>
+              </div>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-300 shrink-0">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[10px] text-violet-200/60 uppercase font-semibold">Steps</p>
+                <p className="text-sm font-bold text-white">7,842</p>
+              </div>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-orange-500/20 border border-orange-400/30 flex items-center justify-center text-orange-300 shrink-0">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[10px] text-violet-200/60 uppercase font-semibold">Calories</p>
+                <p className="text-sm font-bold text-white">1,650 <span className="text-[10px] font-normal text-violet-200/60">kcal</span></p>
               </div>
             </div>
           </div>

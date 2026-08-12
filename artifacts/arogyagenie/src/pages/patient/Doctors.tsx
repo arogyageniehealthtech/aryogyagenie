@@ -61,29 +61,52 @@ export function PatientDoctors() {
         </div>
 
         {/* ── Search & Filter Bar ───────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Search by doctor name, specialty, clinic..." 
-              className="pl-10 h-11 rounded-xl bg-white border-slate-200/80 shadow-xs focus-visible:ring-indigo-500"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
+              <Input 
+                placeholder="Search by doctor name, specialty, clinic..." 
+                className="pl-10 h-11 rounded-xl bg-white border-slate-200/80 shadow-xs focus-visible:ring-violet-500"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={specialty} onValueChange={setSpecialty}>
+              <SelectTrigger className="w-full sm:w-[240px] h-11 rounded-xl bg-white border-slate-200/80 shadow-xs">
+                <SelectValue placeholder="All Specialties" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px] rounded-xl">
+                <SelectItem value="all">All Specialties</SelectItem>
+                {DOCTOR_SPECIALTIES.map((spec) => (
+                  <SelectItem key={spec} value={spec}>
+                    {spec}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={specialty} onValueChange={setSpecialty}>
-            <SelectTrigger className="w-full sm:w-[240px] h-11 rounded-xl bg-white border-slate-200/80 shadow-xs">
-              <SelectValue placeholder="All Specialties" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px] rounded-xl">
-              <SelectItem value="all">All Specialties</SelectItem>
-              {DOCTOR_SPECIALTIES.map((spec) => (
-                <SelectItem key={spec} value={spec}>
-                  {spec}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+          {/* Specialty Filter Chips (Matching Reference FIND DOCTORS UI) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
+            {["all", "General Physician", "Cardiologist", "Dermatologist", "Neurologist", "Pediatrician", "Orthopedist"].map((chip) => {
+              const isSelected = specialty.toLowerCase() === chip.toLowerCase();
+              return (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => setSpecialty(chip)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold shrink-0 transition-all ${
+                    isSelected
+                      ? "bg-violet-600 text-white shadow-xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:border-violet-300 hover:text-violet-700"
+                  }`}
+                >
+                  {chip === "all" ? "All" : chip}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Content Grid ──────────────────────────────────────────────────── */}

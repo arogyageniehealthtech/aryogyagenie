@@ -95,15 +95,15 @@ export function Sidebar() {
     <div
       className="w-64 flex flex-col h-full shrink-0 overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, hsl(238, 55%, 14%) 0%, hsl(238, 50%, 18%) 50%, hsl(244, 48%, 16%) 100%)",
-        borderRight: "1px solid rgba(255,255,255,0.07)",
+        background: "linear-gradient(180deg, #18103A 0%, #120A2D 50%, #0E0724 100%)",
+        borderRight: "1px solid rgba(255,255,255,0.06)",
       }}
     >
       {/* Logo Area */}
       <div className="px-5 py-5 flex items-center gap-3">
         <div
-          className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 shadow-md"
-          style={{ background: "linear-gradient(135deg, hsl(238,70%,62%), hsl(207,90%,60%))" }}
+          className="h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 shadow-md"
+          style={{ background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)" }}
         >
           <img
             src={`${basePath}/logo.png`}
@@ -114,27 +114,27 @@ export function Sidebar() {
         </div>
         <div>
           <span
-            className="font-bold text-lg tracking-tight"
-            style={{ color: "rgba(255,255,255,0.95)" }}
+            className="font-extrabold text-lg tracking-tight"
+            style={{ color: "rgba(255,255,255,0.97)" }}
           >
             ArogyaGenie
           </span>
-          <p className="text-[10px] font-medium tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.38)" }}>
-            Health Platform
+          <p className="text-[10px] font-semibold tracking-widest uppercase text-violet-300/60">
+            Health Portal
           </p>
         </div>
       </div>
 
       {/* Divider */}
-      <div className="mx-4 mb-3" style={{ height: "1px", background: "rgba(255,255,255,0.07)" }} />
+      <div className="mx-4 mb-3" style={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />
 
       {/* Nav label */}
-      <p className="px-5 mb-2 text-[10px] font-semibold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.3)" }}>
+      <p className="px-5 mb-2 text-[10px] font-semibold tracking-widest uppercase text-violet-200/40">
         Navigation
       </p>
 
       {/* Nav Items */}
-      <div className="flex-1 overflow-y-auto px-3 space-y-0.5 pb-2">
+      <div className="flex-1 overflow-y-auto px-3 space-y-1 pb-2">
         {navItems.map((item) => {
           const isActive = location === item.href;
           return (
@@ -145,25 +145,25 @@ export function Sidebar() {
               style={
                 isActive
                   ? {
-                      background: "linear-gradient(135deg, hsl(238,65%,55%), hsl(238,60%,48%))",
-                      color: "rgba(255,255,255,0.97)",
-                      boxShadow: "0 0 0 1px rgba(255,255,255,0.1) inset, 0 2px 10px rgba(59,63,191,0.4)",
+                      background: "linear-gradient(135deg, #6C63FF 0%, #5247E6 100%)",
+                      color: "#FFFFFF",
+                      boxShadow: "0 4px 14px rgba(108, 99, 255, 0.4)",
                     }
                   : {
-                      color: "rgba(255,255,255,0.58)",
+                      color: "rgba(255,255,255,0.65)",
                       background: "transparent",
                     }
               }
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)";
-                  (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.85)";
+                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)";
+                  (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.95)";
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isActive) {
                   (e.currentTarget as HTMLElement).style.background = "transparent";
-                  (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.58)";
+                  (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.65)";
                 }
               }}
             >
@@ -171,8 +171,7 @@ export function Sidebar() {
               <span>{item.label}</span>
               {isActive && (
                 <div
-                  className="ml-auto h-1.5 w-1.5 rounded-full"
-                  style={{ background: "rgba(255,255,255,0.7)" }}
+                  className="ml-auto h-2 w-2 rounded-full bg-white shadow-xs"
                 />
               )}
             </Link>

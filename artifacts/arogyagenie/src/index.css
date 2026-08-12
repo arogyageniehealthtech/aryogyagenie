@@ -80,57 +80,57 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  --background: 250 33% 97%;
+  --background: 252 30% 98%;
   --foreground: 222 47% 11%;
   
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
-  --card-border: 214.3 31.8% 91.4%;
+  --card-border: 252 30% 92%;
   
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
-  --popover-border: 214.3 31.8% 91.4%;
+  --popover-border: 252 30% 92%;
   
-  /* Primary: Cobalt Blue #3B3FBF => 238 53% 49% */
-  --primary: 238 53% 49%;
+  /* Primary: Vibrant Violet #6C63FF => 248 95% 65% */
+  --primary: 248 95% 65%;
   --primary-foreground: 210 40% 98%;
   
-  /* Secondary: Sky Blue #2196F3 => 207 90% 54% */
-  --secondary: 207 90% 54%;
-  --secondary-foreground: 210 40% 98%;
+  /* Secondary: Bright Sky/Teal #00D2FF => 191 100% 50% */
+  --secondary: 191 100% 50%;
+  --secondary-foreground: 222 47% 11%;
   
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted: 252 20% 96%;
+  --muted-foreground: 248 20% 50%;
   
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222 47% 11%;
+  --accent: 252 80% 96%;
+  --accent-foreground: 248 95% 65%;
   
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 238 53% 49%;
+  --border: 252 30% 92%;
+  --input: 252 30% 92%;
+  --ring: 248 95% 65%;
 
-  --sidebar: 238 60% 18%;
-  --sidebar-foreground: 210 40% 92%;
-  --sidebar-border: 238 40% 25%;
-  --sidebar-primary: 238 53% 49%;
+  --sidebar: 252 70% 16%;
+  --sidebar-foreground: 252 30% 94%;
+  --sidebar-border: 252 50% 24%;
+  --sidebar-primary: 248 95% 65%;
   --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent: 238 40% 25%;
+  --sidebar-accent: 252 50% 24%;
   --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 238 53% 49%;
+  --sidebar-ring: 248 95% 65%;
 
-  --chart-1: 238 53% 49%;
-  --chart-2: 207 90% 54%;
-  --chart-3: 173 58% 39%;
+  --chart-1: 248 95% 65%;
+  --chart-2: 191 100% 50%;
+  --chart-3: 162 90% 45%;
   --chart-4: 346 87% 60%;
   --chart-5: 43 74% 66%;
 
   --app-font-sans: 'Inter', system-ui, sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0.625rem; 
+  --radius: 0.875rem; 
 
   /* Fixed shadows (were all 0px — now real depth) */
   --shadow-2xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.04);
