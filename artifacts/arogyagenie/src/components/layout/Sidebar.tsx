@@ -102,13 +102,12 @@ export function Sidebar() {
       {/* Logo Area */}
       <div className="px-5 py-5 flex items-center gap-3">
         <div
-          className="h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 shadow-md"
-          style={{ background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)" }}
+          className="h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 shadow-md bg-white p-2"
         >
           <img
             src={`${basePath}/logo.png`}
             alt="ArogyaGenie"
-            className="h-5 w-5 object-contain"
+            className="h-6 w-6 object-contain"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
         </div>
@@ -214,18 +213,18 @@ export function Sidebar() {
         <div className="px-3 pb-4">
           <button
             onClick={() => signOut({ redirectUrl: basePath || "/" })}
-            className="flex w-full items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-150"
-            style={{ color: "rgba(255,255,255,0.45)" }}
+            className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-all duration-200"
+            style={{ background: "#EF4444", color: "#FFFFFF" }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.12)";
-              (e.currentTarget as HTMLElement).style.color = "rgba(248,113,113,0.9)";
+              (e.currentTarget as HTMLElement).style.background = "#FFFFFF";
+              (e.currentTarget as HTMLElement).style.color = "#EF4444";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "transparent";
-              (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.45)";
+              (e.currentTarget as HTMLElement).style.background = "#EF4444";
+              (e.currentTarget as HTMLElement).style.color = "#FFFFFF";
             }}
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4 shrink-0 transition-colors" />
             <span>Sign out</span>
           </button>
         </div>
