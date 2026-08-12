@@ -1,0 +1,46 @@
+{
+  "milestones": [
+    {
+      "id": "M1",
+      "title": "Milestone 1 — Patient Portal UI & Ollama AI Gateway",
+      "status": "COMPLETED",
+      "completedDate": "2026-08-09"
+    },
+    {
+      "id": "M2",
+      "title": "Milestone 2 — Doctor Portal UI & Dashboard",
+      "status": "COMPLETED",
+      "completedDate": "2026-08-09"
+    },
+    {
+      "id": "M3",
+      "title": "Milestone 3 — Diagnostic Center & Pharmacy Portals",
+      "status": "COMPLETED",
+      "completedDate": "2026-08-09"
+    },
+    {
+      "id": "M4",
+      "title": "Milestone 4 — Admin Portal & AI Medical Report Analysis",
+      "status": "COMPLETED",
+      "completedDate": "2026-08-09"
+    },
+    {
+      "id": "M5",
+      "title": "Milestone 5 — Medical RAG & Prescription OCR",
+      "status": "COMPLETED",
+      "completedDate": "2026-08-09"
+    },
+    {
+      "id": "M6",
+      "title": "Milestone 6 — Longitudinal AI Health Intelligence",
+      "status": "COMPLETED",
+      "completedDate": "2026-08-09"
+    },
+    {
+      "id": "M7",
+      "title": "Milestone 7 — Prototype Hardening & Demo Readiness",
+      "status": "COMPLETED",
+      "completedDate": "2026-08-09"
+    }
+  ]
+}

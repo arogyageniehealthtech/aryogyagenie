@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": ["node"],
+    "paths": {
+      "@workspace/db": ["../lib/db/src/index.ts"],
+      "@workspace/api-server/*": ["../artifacts/api-server/src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../lib/db"
+    }
+  ]
+}

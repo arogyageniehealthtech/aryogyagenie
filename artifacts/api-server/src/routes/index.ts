@@ -1,0 +1,40 @@
+import { Router } from "express";
+import healthRouter from "./health";
+import usersRouter from "./users";
+import doctorsRouter from "./doctors";
+import appointmentsRouter from "./appointments";
+import prescriptionsRouter from "./prescriptions";
+import labReportsRouter from "./labReports";
+import diagnosticCentersRouter from "./diagnosticCenters";
+import diagnosticBookingsRouter from "./diagnosticBookings";
+import medicineRemindersRouter from "./medicineReminders";
+import timelineRouter from "./timeline";
+import symptomAssessmentsRouter from "./symptomAssessments";
+import pharmaciesRouter from "./pharmacies";
+import adminRouter from "./admin";
+import medicalKnowledgeRouter from "./medicalKnowledge";
+import ocrRouter from "./ocr";
+import healthIntelligenceRouter from "./healthIntelligence";
+import providerApplicationsRouter from "./providerApplications";
+
+const router = Router();
+
+router.use(healthRouter);
+router.use(usersRouter);
+router.use(doctorsRouter);
+router.use(appointmentsRouter);
+router.use(prescriptionsRouter);
+router.use(labReportsRouter);
+router.use(diagnosticCentersRouter);
+router.use(diagnosticBookingsRouter);
+router.use(medicineRemindersRouter);
+router.use(timelineRouter);
+router.use(symptomAssessmentsRouter);
+router.use(pharmaciesRouter);
+router.use(adminRouter);
+router.use(medicalKnowledgeRouter);
+router.use(ocrRouter);
+router.use(healthIntelligenceRouter);
+router.use(providerApplicationsRouter);
+
+export default router;

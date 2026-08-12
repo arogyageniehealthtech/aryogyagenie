@@ -1,0 +1,98 @@
+{
+  "tables": [
+    {
+      "name": "users",
+      "file": "lib/db/src/schema/users.ts",
+      "columns": [
+        "id (serial PK)", "clerkId (text unique)", "email (text unique)",
+        "firstName", "lastName", "phone", "role (enum)", "status (enum)",
+        "avatarUrl", "dateOfBirth", "gender", "address", "city", "state",
+        "bloodGroup", "allergies", "emergencyContact", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "doctors",
+      "file": "lib/db/src/schema/doctors.ts",
+      "columns": [
+        "id (serial PK)", "userId (FK -> users.id)", "specialty", "qualification",
+        "licenseNumber", "clinicName", "clinicAddress", "consultationFee",
+        "experience", "bio", "rating", "reviewCount", "status", "availableDays",
+        "availableHours", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "appointments",
+      "file": "lib/db/src/schema/appointments.ts",
+      "columns": [
+        "id (serial PK)", "patientId (FK)", "doctorId (FK)", "appointmentDate",
+        "appointmentTime", "type (enum)", "status (enum)", "symptoms", "notes",
+        "consultationFee", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "prescriptions",
+      "file": "lib/db/src/schema/prescriptions.ts",
+      "columns": [
+        "id (serial PK)", "patientId (FK)", "doctorId (FK)", "appointmentId (FK)",
+        "medicines", "diagnosis", "instructions", "fileUrl", "status (enum)",
+        "prescribedDate", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "lab_reports",
+      "file": "lib/db/src/schema/lab_reports.ts",
+      "columns": [
+        "id (serial PK)", "patientId (FK)", "diagnosticCenterId (FK)", "testName",
+        "testDate", "fileUrl", "aiSummary", "results", "status (enum)", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "symptom_assessments",
+      "file": "lib/db/src/schema/symptom_assessments.ts",
+      "columns": [
+        "id (serial PK)", "patientId (FK)", "symptoms", "severity (enum)",
+        "duration", "aiResponse", "possibleConditions", "recommendedAction", "createdAt"
+      ]
+    },
+    {
+      "name": "diagnostic_centers",
+      "file": "lib/db/src/schema/diagnostic_centers.ts",
+      "columns": [
+        "id (serial PK)", "userId (FK)", "name", "phone", "address", "city",
+        "accreditation", "services", "openingHours", "rating", "status", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "diagnostic_bookings",
+      "file": "lib/db/src/schema/diagnostic_bookings.ts",
+      "columns": [
+        "id (serial PK)", "patientId (FK)", "diagnosticCenterId (FK)", "testName",
+        "bookingDate", "bookingTime", "status (enum)", "notes", "price", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "pharmacies",
+      "file": "lib/db/src/schema/pharmacies.ts",
+      "columns": [
+        "id (serial PK)", "userId (FK)", "name", "phone", "address", "city",
+        "licenseNumber", "openingHours", "rating", "status", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "medicine_reminders",
+      "file": "lib/db/src/schema/medicine_reminders.ts",
+      "columns": [
+        "id (serial PK)", "patientId (FK)", "medicineName", "dosage", "frequency (enum)",
+        "times", "startDate", "endDate", "instructions", "isActive", "createdAt", "updatedAt"
+      ]
+    },
+    {
+      "name": "timeline_events",
+      "file": "lib/db/src/schema/timeline_events.ts",
+      "columns": [
+        "id (serial PK)", "patientId (FK)", "eventType (enum)", "title",
+        "description", "referenceId", "eventDate", "createdAt"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,354 @@
+# AROGYAGENIE - UNIVERSAL AI DEVELOPER HANDOFF PROMPT
+
+You are joining an EXISTING startup.
+
+You are NOT starting a new project.
+
+This repository has already been worked on by other AI coding assistants.
+
+Previous AI assistants may include:
+
+- Replit Agent
+- Antigravity
+- Roo Code
+- Continue
+- GitHub Copilot
+- Gemini CLI
+- Claude CLI
+- Ollama Agents
+- Future AI coding assistants
+
+Assume previous AI has already completed some work.
+
+Your responsibility is to understand everything before writing code.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1 : PROJECT DISCOVERY
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DO NOT WRITE CODE.
+
+First scan the entire repository.
+
+Understand
+
+- Folder structure
+- Architecture
+- Tech Stack
+- APIs
+- Database
+- AI models
+- Existing features
+- Current progress
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 2 : READ ALL DOCUMENTATION
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Read EVERY markdown file inside
+
+/docs
+
+Read in this order
+
+START_HERE.md
+
+MASTER_CONTEXT.md
+
+CURRENT_STATUS.md
+
+ROADMAP.md
+
+ARCHITECTURE.md
+
+DATABASE.md
+
+API.md
+
+AI_ARCHITECTURE.md
+
+SECURITY.md
+
+CHANGELOG.md
+
+NEXT_TASK.md
+
+DECISIONS.md
+
+BUGS.md
+
+KNOWN_LIMITATIONS.md
+
+PROMPT_HISTORY.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 3 : READ MACHINE FILES
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Read every JSON file inside
+
+docs/machine/
+
+Especially
+
+project_state.json
+
+modules.json
+
+dependencies.json
+
+routes.json
+
+database_schema.json
+
+ai_models.json
+
+milestones.json
+
+Use these files as the machine-readable source of truth.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 4 : ANALYZE THE CODEBASE
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Read
+
+package.json
+
+pyproject.toml
+
+requirements.txt
+
+Dockerfile
+
+docker-compose.yml
+
+.env.example
+
+Then inspect every module required for the current task.
+
+Understand imports.
+
+Understand dependencies.
+
+Understand architecture.
+
+Never assume.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 5 : VERIFY UNDERSTANDING
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before writing code tell me:
+
+1. What this startup does.
+
+2. Current architecture.
+
+3. Current tech stack.
+
+4. AI models currently used.
+
+5. Completed modules.
+
+6. Pending modules.
+
+7. Current milestone.
+
+8. Files that will be modified.
+
+9. Risks.
+
+10. Better implementation if required.
+
+Do NOT start coding before this analysis.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 6 : BUILD
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Read
+
+docs/NEXT_TASK.md
+
+Only complete THAT milestone.
+
+Do NOT work on future milestones.
+
+Do NOT refactor unrelated modules.
+
+Keep changes minimal.
+
+Reuse existing code.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 7 : CODING RULES
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Never generate placeholder code.
+
+Never generate demo code.
+
+Never generate fake APIs.
+
+Never duplicate logic.
+
+Never hardcode secrets.
+
+Never delete existing functionality.
+
+Always create reusable code.
+
+Always maintain modular architecture.
+
+Keep frontend, backend and AI separated.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 8 : AI RULES
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Never directly call one LLM everywhere.
+
+Use AI Gateway architecture.
+
+Every AI feature must be replaceable.
+
+Support Ollama.
+
+Support local models.
+
+Support future cloud models.
+
+Never tightly couple frontend with AI models.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 9 : TEST
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Verify
+
+No compile errors.
+
+No import errors.
+
+No broken APIs.
+
+No broken routes.
+
+No unused code.
+
+No duplicate code.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 10 : UPDATE DOCUMENTATION
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Update
+
+CURRENT_STATUS.md
+
+CHANGELOG.md
+
+NEXT_TASK.md
+
+PROMPT_HISTORY.md
+
+If architecture changed
+
+Update
+
+ARCHITECTURE.md
+
+DATABASE.md
+
+API.md
+
+AI_ARCHITECTURE.md
+
+SECURITY.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 11 : UPDATE MACHINE FILES
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Update
+
+docs/machine/project_state.json
+
+docs/machine/modules.json
+
+docs/machine/dependencies.json
+
+docs/machine/routes.json
+
+docs/machine/database_schema.json
+
+docs/machine/ai_models.json
+
+docs/machine/milestones.json
+
+Keep JSON valid.
+
+Do not remove existing data.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 12 : HANDOFF
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before ending, prepare the project for the next AI.
+
+Clearly mention
+
+What was built.
+
+Which files changed.
+
+Why they changed.
+
+Remaining work.
+
+Known issues.
+
+Recommended next milestone.
+
+Update NEXT_TASK.md so another AI can immediately continue.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FINAL RULE
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Every AI session is independent.
+
+Never rely on previous chat history.
+
+The repository, documentation and machine-readable files are the ONLY source of truth.
+
+Leave the project in a state where another AI can continue development immediately without asking questions.
+
+Think like a Senior Software Engineer joining an existing company, not like an AI completing a one-time coding task.

@@ -1,0 +1,46 @@
+{
+  "workspacePackages": [
+    {
+      "name": "@workspace/arogyagenie",
+      "path": "artifacts/arogyagenie",
+      "type": "frontend_web_app",
+      "framework": "React 19 + Vite 7 + Wouter + Tailwind CSS v4",
+      "status": "COMPLETED"
+    },
+    {
+      "name": "@workspace/api-server",
+      "path": "artifacts/api-server",
+      "type": "backend_express_api",
+      "framework": "Express 5 + TypeScript + AI Gateway",
+      "status": "COMPLETED"
+    },
+    {
+      "name": "@workspace/db",
+      "path": "lib/db",
+      "type": "database_orm",
+      "framework": "PostgreSQL + Drizzle ORM",
+      "status": "COMPLETED"
+    },
+    {
+      "name": "@workspace/api-spec",
+      "path": "lib/api-spec",
+      "type": "openapi_spec",
+      "framework": "OpenAPI 3.0 + Orval Codegen",
+      "status": "COMPLETED"
+    },
+    {
+      "name": "@workspace/api-client-react",
+      "path": "lib/api-client-react",
+      "type": "generated_react_hooks",
+      "framework": "TanStack React Query v5",
+      "status": "COMPLETED"
+    },
+    {
+      "name": "@workspace/api-zod",
+      "path": "lib/api-zod",
+      "type": "generated_zod_schemas",
+      "framework": "Zod v4",
+      "status": "COMPLETED"
+    }
+  ]
+}

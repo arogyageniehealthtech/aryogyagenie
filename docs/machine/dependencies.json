@@ -1,0 +1,47 @@
+{
+  "dependencies": [
+    {
+      "module": "patient_timeline",
+      "dependsOn": [
+        "appointments",
+        "prescriptions",
+        "lab_reports",
+        "diagnostic_bookings",
+        "symptom_assessments",
+        "medicine_reminders"
+      ]
+    },
+    {
+      "module": "symptom_checker",
+      "dependsOn": [
+        "express_ai_gateway",
+        "symptom_assessments_db_table"
+      ]
+    },
+    {
+      "module": "doctor_portal",
+      "dependsOn": [
+        "clerk_authentication",
+        "doctor_api_routes",
+        "doctors_db_table",
+        "appointments_db_table",
+        "prescriptions_db_table"
+      ]
+    },
+    {
+      "module": "appointment_booking",
+      "dependsOn": [
+        "doctors_db_table",
+        "appointments_db_table",
+        "patient_authentication"
+      ]
+    },
+    {
+      "module": "medicine_reminders",
+      "dependsOn": [
+        "prescriptions_db_table",
+        "medicine_reminders_db_table"
+      ]
+    }
+  ]
+}

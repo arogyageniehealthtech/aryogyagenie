@@ -1,0 +1,95 @@
+import { Router } from "express";
+import { eq } from "drizzle-orm";
+import { db, diagnosticCentersTable, usersTable, diagnosticBookingsTable } from "@workspace/db";
+import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
+
+const router = Router();
+
+// GET /diagnostic-centers
+router.get("/diagnostic-centers", async (req, res): Promise<void> => {
+  const { search } = req.query as { search?: string };
+  const rows = await db
+    .select({ dc: diagnosticCentersTable, u: usersTable })
+    .from(diagnosticCentersTable)
+    .innerJoin(usersTable, eq(diagnosticCentersTable.userId, usersTable.id))
+    .where(eq(diagnosticCentersTable.status, "active"));
+
+  let result = rows.map((r) => ({
+    id: r.dc.id, userId: r.dc.userId,
+    name: r.dc.name, email: r.u.email,
+    phone: r.dc.phone, address: r.dc.address,
+    city: r.dc.city, accreditation: r.dc.accreditation,
+    services: r.dc.services, openingHours: r.dc.openingHours,
+    rating: r.dc.rating, status: r.dc.status,
+  }));
+
+  if (search) {
+    const s = search.toLowerCase();
+    result = result.filter((c) => c.name.toLowerCase().includes(s) || (c.city ?? "").toLowerCase().includes(s));
+  }
+
+  res.json(result);
+});
+
+// GET /diagnostic-centers/me/profile
+router.get("/diagnostic-centers/me/profile", requireAuth, requireRole(["diagnostic_center"]), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const row = await db
+    .select({ dc: diagnosticCentersTable, u: usersTable })
+    .from(diagnosticCentersTable)
+    .innerJoin(usersTable, eq(diagnosticCentersTable.userId, usersTable.id))
+    .where(eq(diagnosticCentersTable.userId, req.userId!))
+    .limit(1);
+
+  if (!row[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const { dc, u } = row[0];
+  res.json({ id: dc.id, userId: dc.userId, name: dc.name, email: u.email, phone: dc.phone, address: dc.address, city: dc.city, accreditation: dc.accreditation, services: dc.services, openingHours: dc.openingHours, rating: dc.rating, status: dc.status });
+});
+
+// PUT /diagnostic-centers/me/profile
+router.put("/diagnostic-centers/me/profile", requireAuth, requireRole(["diagnostic_center"]), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { name, phone, address, city, accreditation, services, openingHours } = req.body;
+  const [dc] = await db.update(diagnosticCentersTable).set({ name, phone, address, city, accreditation, services, openingHours }).where(eq(diagnosticCentersTable.userId, req.userId!)).returning();
+  const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
+  res.json({ id: dc.id, userId: dc.userId, name: dc.name, email: u?.email ?? "", phone: dc.phone, address: dc.address, city: dc.city, accreditation: dc.accreditation, services: dc.services, openingHours: dc.openingHours, rating: dc.rating, status: dc.status });
+});
+
+// GET /diagnostic-centers/me/dashboard
+router.get("/diagnostic-centers/me/dashboard", requireAuth, requireRole(["diagnostic_center"]), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const dc = await db.query.diagnosticCentersTable.findFirst({ where: eq(diagnosticCentersTable.userId, req.userId!) });
+  if (!dc) { res.status(404).json({ error: "Not found" }); return; }
+
+  const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
+  const firstName = user?.firstName ?? null;
+  const lastName = user?.lastName ?? null;
+  const userName = dc.name || (user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null) || user?.email || "Diagnostic Center";
+
+  const today = new Date().toISOString().split("T")[0];
+  const bookings = await db.select().from(diagnosticBookingsTable).where(eq(diagnosticBookingsTable.diagnosticCenterId, dc.id));
+
+  const todayCount = bookings.filter((b) => b.bookingDate === today).length;
+  const pending = bookings.filter((b) => b.status === "pending").length;
+  const completed = bookings.filter((b) => b.status === "completed").length;
+  const recent = bookings.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5)
+    .map((b) => ({ ...b, patientName: null, centerName: null, createdAt: b.createdAt.toISOString() }));
+
+  res.json({ userName, name: dc.name, firstName, lastName, totalBookings: bookings.length, pendingBookings: pending, completedBookings: completed, todayBookings: todayCount, recentBookings: recent });
+});
+
+// GET /diagnostic-centers/me/bookings
+router.get("/diagnostic-centers/me/bookings", requireAuth, requireRole(["diagnostic_center"]), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const dc = await db.query.diagnosticCentersTable.findFirst({ where: eq(diagnosticCentersTable.userId, req.userId!) });
+  if (!dc) { res.status(404).json({ error: "Not found" }); return; }
+
+  const { status } = req.query as { status?: string };
+  let bookings = await db.select().from(diagnosticBookingsTable).where(eq(diagnosticBookingsTable.diagnosticCenterId, dc.id));
+  if (status) bookings = bookings.filter((b) => b.status === status);
+
+  const enriched = await Promise.all(bookings.map(async (b) => {
+    const patient = await db.query.usersTable.findFirst({ where: eq(usersTable.id, b.patientId) });
+    return { ...b, patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null, centerName: dc.name, createdAt: b.createdAt.toISOString() };
+  }));
+
+  res.json(enriched);
+});
+
+export default router;

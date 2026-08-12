@@ -1,0 +1,31 @@
+{
+  "current": {
+    "provider": "ollama",
+    "endpoint": "http://localhost:11434/api/generate",
+    "model": "llama3:8b",
+    "service": "aiGateway.ts",
+    "features": ["symptom_triage"],
+    "fallback": "heuristic_triage_engine",
+    "status": "ACTIVE"
+  },
+  "planned": [
+    {
+      "feature": "ai_lab_report_summary",
+      "model": "llama3:8b",
+      "status": "PLANNED",
+      "targetMilestone": "Milestone 4"
+    },
+    {
+      "feature": "medical_rag_embeddings",
+      "model": "bge-large-en-v1.5",
+      "status": "PLANNED",
+      "targetMilestone": "Milestone 5"
+    },
+    {
+      "feature": "prescription_ocr",
+      "model": "layoutlmv3",
+      "status": "PLANNED",
+      "targetMilestone": "Milestone 5"
+    }
+  ]
+}
