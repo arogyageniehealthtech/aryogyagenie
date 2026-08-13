@@ -1,10 +1,19 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { Request } from "express";
 
-function getUserOrIpKey(req: Request): string {
+function getUserOrIpKey(req: Request, _res: any): string {
   const userId = (req as any).userId;
   if (userId) return `user_${userId}`;
-  return req.ip ?? req.socket.remoteAddress ?? "anonymous";
+  
+  // Extract IP from request and use ipKeyGenerator to properly handle IPv6
+  const ip = req.ip || req.socket.remoteAddress || "anonymous";
+  try {
+    // ipKeyGenerator normalizes the IP (handles IPv6 subnet /64 normalization)
+    return ipKeyGenerator(ip);
+  } catch {
+    // Fallback to raw IP if normalization fails
+    return ip;
+  }
 }
 
 /**
@@ -21,6 +30,7 @@ export const globalRateLimiter = rateLimit({
     error: "Too many requests, please try again after 15 minutes.",
   },
   skip: (req) => req.path === "/health" || req.path === "/healthz" || req.path === "/health/ready",
+  skipFailedRequests: true,
 });
 
 /**
@@ -37,4 +47,5 @@ export const strictAiRateLimiter = rateLimit({
   message: {
     error: "AI rate limit reached. You have made too many AI requests. Please wait a few minutes before trying again.",
   },
+  skipFailedRequests: true,
 });
