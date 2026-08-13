@@ -1,13 +1,16 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray, desc } from "drizzle-orm";
 import { db, diagnosticCentersTable, usersTable, diagnosticBookingsTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
 // GET /diagnostic-centers
 router.get("/diagnostic-centers", async (req, res): Promise<void> => {
   const { search } = req.query as { search?: string };
+  const pagination = parsePaginationParams(req);
+
   const rows = await db
     .select({ dc: diagnosticCentersTable, u: usersTable })
     .from(diagnosticCentersTable)
@@ -28,7 +31,11 @@ router.get("/diagnostic-centers", async (req, res): Promise<void> => {
     result = result.filter((c) => c.name.toLowerCase().includes(s) || (c.city ?? "").toLowerCase().includes(s));
   }
 
-  res.json(result);
+  const total = result.length;
+  setPaginationHeaders(res, total, pagination);
+  const paginatedResult = result.slice(pagination.offset, pagination.offset + pagination.limit);
+
+  res.json(paginatedResult);
 });
 
 // GET /diagnostic-centers/me/profile
@@ -81,13 +88,31 @@ router.get("/diagnostic-centers/me/bookings", requireAuth, requireRole(["diagnos
   if (!dc) { res.status(404).json({ error: "Not found" }); return; }
 
   const { status } = req.query as { status?: string };
+  const pagination = parsePaginationParams(req);
+
   let bookings = await db.select().from(diagnosticBookingsTable).where(eq(diagnosticBookingsTable.diagnosticCenterId, dc.id));
   if (status) bookings = bookings.filter((b) => b.status === status);
 
-  const enriched = await Promise.all(bookings.map(async (b) => {
-    const patient = await db.query.usersTable.findFirst({ where: eq(usersTable.id, b.patientId) });
+  const total = bookings.length;
+  setPaginationHeaders(res, total, pagination);
+
+  const paginatedBookings = bookings.slice(pagination.offset, pagination.offset + pagination.limit);
+
+  if (paginatedBookings.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const patientIds = Array.from(new Set(paginatedBookings.map((b) => b.patientId)));
+  const patients = patientIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, patientIds))
+    : [];
+  const patientMap = new Map(patients.map((p) => [p.id, p]));
+
+  const enriched = paginatedBookings.map((b) => {
+    const patient = patientMap.get(b.patientId);
     return { ...b, patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null, centerName: dc.name, createdAt: b.createdAt.toISOString() };
-  }));
+  });
 
   res.json(enriched);
 });

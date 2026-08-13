@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -21,7 +21,11 @@ export const providerApplicationsTable = pgTable("provider_applications", {
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("idx_provider_applications_status").on(table.status),
+  index("idx_provider_applications_email").on(table.email),
+  index("idx_provider_applications_user_id").on(table.userId),
+]);
 
 export const insertProviderApplicationSchema = createInsertSchema(providerApplicationsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertProviderApplication = z.infer<typeof insertProviderApplicationSchema>;

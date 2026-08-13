@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -20,7 +20,9 @@ export const symptomAssessmentsTable = pgTable("symptom_assessments", {
   structuredAssessment: jsonb("structured_assessment").$type<Record<string, any>>(),
   sources: jsonb("sources").$type<any[]>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_symptom_assessments_patient_id").on(table.patientId),
+]);
 
 export const insertSymptomAssessmentSchema = createInsertSchema(symptomAssessmentsTable).omit({ id: true, createdAt: true });
 export type InsertSymptomAssessment = z.infer<typeof insertSymptomAssessmentSchema>;

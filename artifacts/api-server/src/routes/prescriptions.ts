@@ -1,38 +1,85 @@
 import { Router } from "express";
-import { eq, or } from "drizzle-orm";
+import { eq, inArray, desc } from "drizzle-orm";
 import { db, prescriptionsTable, usersTable, doctorsTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
 // GET /prescriptions
 router.get("/prescriptions", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
-  let prescriptions;
+  const pagination = parsePaginationParams(req);
 
+  let whereClause;
   if (user?.role === "doctor") {
     const doctor = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
     if (!doctor) { res.json([]); return; }
-    prescriptions = await db.select().from(prescriptionsTable).where(eq(prescriptionsTable.doctorId, doctor.id));
+    whereClause = eq(prescriptionsTable.doctorId, doctor.id);
   } else if (user?.role === "pharmacy") {
-    prescriptions = await db.select().from(prescriptionsTable);
+    whereClause = undefined;
   } else {
-    prescriptions = await db.select().from(prescriptionsTable).where(eq(prescriptionsTable.patientId, req.userId!));
+    whereClause = eq(prescriptionsTable.patientId, req.userId!);
   }
 
-  const enriched = await Promise.all(
-    prescriptions.map(async (p) => {
-      const patient = await db.query.usersTable.findFirst({ where: eq(usersTable.id, p.patientId) });
-      const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.id, p.doctorId) });
-      const doctorUser = doctorRow ? await db.query.usersTable.findFirst({ where: eq(usersTable.id, doctorRow.userId) }) : null;
-      return {
-        ...p,
-        patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null,
-        doctorName: doctorUser ? `${doctorUser.firstName ?? ""} ${doctorUser.lastName ?? ""}`.trim() : null,
-        createdAt: p.createdAt.toISOString(),
-      };
-    }),
-  );
+  const [totalCountResult] = await db
+    .select({ count: db.$count(prescriptionsTable, whereClause) })
+    .from(prescriptionsTable);
+  const total = totalCountResult?.count ?? 0;
+
+  const prescriptions = whereClause
+    ? await db
+        .select()
+        .from(prescriptionsTable)
+        .where(whereClause)
+        .orderBy(desc(prescriptionsTable.createdAt))
+        .limit(pagination.limit)
+        .offset(pagination.offset)
+    : await db
+        .select()
+        .from(prescriptionsTable)
+        .orderBy(desc(prescriptionsTable.createdAt))
+        .limit(pagination.limit)
+        .offset(pagination.offset);
+
+  setPaginationHeaders(res, total, pagination);
+
+  if (prescriptions.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  // Batch query patients
+  const patientIds = Array.from(new Set(prescriptions.map((p) => p.patientId)));
+  const patientsList = patientIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, patientIds))
+    : [];
+  const patientMap = new Map(patientsList.map((u) => [u.id, u]));
+
+  // Batch query doctors
+  const doctorIds = Array.from(new Set(prescriptions.map((p) => p.doctorId)));
+  const doctorsList = doctorIds.length > 0
+    ? await db.select().from(doctorsTable).where(inArray(doctorsTable.id, doctorIds))
+    : [];
+  const doctorMap = new Map(doctorsList.map((d) => [d.id, d]));
+
+  const doctorUserIds = Array.from(new Set(doctorsList.map((d) => d.userId)));
+  const doctorUsersList = doctorUserIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, doctorUserIds))
+    : [];
+  const doctorUserMap = new Map(doctorUsersList.map((u) => [u.id, u]));
+
+  const enriched = prescriptions.map((p) => {
+    const patient = patientMap.get(p.patientId);
+    const doctorRow = doctorMap.get(p.doctorId);
+    const doctorUser = doctorRow ? doctorUserMap.get(doctorRow.userId) : null;
+    return {
+      ...p,
+      patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null,
+      doctorName: doctorUser ? `${doctorUser.firstName ?? ""} ${doctorUser.lastName ?? ""}`.trim() : null,
+      createdAt: p.createdAt.toISOString(),
+    };
+  });
 
   res.json(enriched);
 });
@@ -64,6 +111,21 @@ router.get("/prescriptions/:id", requireAuth, async (req: AuthenticatedRequest, 
   const p = await db.query.prescriptionsTable.findFirst({ where: eq(prescriptionsTable.id, id) });
   if (!p) { res.status(404).json({ error: "Not found" }); return; }
 
+  // Authorization check (Patient, issuing Doctor, Pharmacy, or Admin)
+  const isPatient = p.patientId === req.userId;
+  let isIssuingDoctor = false;
+  if (req.userRole === "doctor") {
+    const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
+    isIssuingDoctor = doctorRow?.id === p.doctorId;
+  }
+  const isPharmacy = req.userRole === "pharmacy";
+  const isAdmin = req.userRole === "admin";
+
+  if (!isPatient && !isIssuingDoctor && !isPharmacy && !isAdmin) {
+    res.status(403).json({ error: "Access denied. You are not authorized to view this prescription." });
+    return;
+  }
+
   res.json({ ...p, patientName: null, doctorName: null, createdAt: p.createdAt.toISOString() });
 });
 
@@ -72,14 +134,29 @@ router.patch("/prescriptions/:id", requireAuth, async (req: AuthenticatedRequest
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
+  const existingP = await db.query.prescriptionsTable.findFirst({ where: eq(prescriptionsTable.id, id) });
+  if (!existingP) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Authorization check (issuing Doctor, Pharmacy, or Admin)
+  let isIssuingDoctor = false;
+  if (req.userRole === "doctor") {
+    const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
+    isIssuingDoctor = doctorRow?.id === existingP.doctorId;
+  }
+  const isPharmacy = req.userRole === "pharmacy";
+  const isAdmin = req.userRole === "admin";
+
+  if (!isIssuingDoctor && !isPharmacy && !isAdmin) {
+    res.status(403).json({ error: "Access denied. You are not authorized to modify this prescription." });
+    return;
+  }
+
   const { status, diagnosis, medicines, instructions } = req.body;
   const [p] = await db
     .update(prescriptionsTable)
     .set({ status, diagnosis, medicines, instructions })
     .where(eq(prescriptionsTable.id, id))
     .returning();
-
-  if (!p) { res.status(404).json({ error: "Not found" }); return; }
 
   res.json({ ...p, patientName: null, doctorName: null, createdAt: p.createdAt.toISOString() });
 });

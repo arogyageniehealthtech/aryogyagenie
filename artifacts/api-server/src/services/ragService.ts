@@ -3,7 +3,7 @@
  *
  * Provides local embedding-based vector semantic retrieval over curated clinical
  * guidelines and diagnostic protocols stored in PostgreSQL.
- * Uses nomic-embed-text embeddings via Ollama.
+ * Uses nomic-embed-text embeddings via Ollama or Gemini text-embedding-004.
  */
 
 import { db, knowledgeChunksTable, type ChunkMetadata } from "@workspace/db";
@@ -61,6 +61,67 @@ export function computeCosineSimilarity(vecA: number[], vecB: number[]): number 
 const DEFAULT_RAG_TOP_K = process.env.RAG_TOP_K ? parseInt(process.env.RAG_TOP_K, 10) : 5;
 const DEFAULT_RAG_THRESHOLD = process.env.RAG_SIMILARITY_THRESHOLD ? parseFloat(process.env.RAG_SIMILARITY_THRESHOLD) : 0.58;
 
+// ─── In-Memory Chunk Cache ───────────────────────────────────────────────────
+
+interface CachedChunk {
+  chunk: typeof knowledgeChunksTable.$inferSelect;
+  embedding: number[];
+  norm: number;
+}
+
+let cachedChunks: CachedChunk[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function invalidateRAGCache(): void {
+  cachedChunks = null;
+  cacheTimestamp = 0;
+}
+
+async function getOrFetchChunks(): Promise<CachedChunk[]> {
+  const now = Date.now();
+  if (cachedChunks && now - cacheTimestamp < CACHE_TTL_MS) {
+    return cachedChunks;
+  }
+
+  const rawChunks = await db.select().from(knowledgeChunksTable);
+  cachedChunks = rawChunks.map((chunk) => {
+    const embedding = chunk.embedding as number[];
+    let normSq = 0;
+    if (Array.isArray(embedding)) {
+      for (let i = 0; i < embedding.length; i++) {
+        normSq += embedding[i] * embedding[i];
+      }
+    }
+    return {
+      chunk,
+      embedding,
+      norm: Math.sqrt(normSq),
+    };
+  });
+  cacheTimestamp = now;
+  return cachedChunks;
+}
+
+/** Compute cosine similarity using precomputed norm for vector B. */
+export function computeCosineSimilarityWithNorm(vecA: number[], vecB: number[], normB: number): number {
+  if (!vecA || !vecB || vecA.length === 0 || vecA.length !== vecB.length || normB === 0) return 0;
+
+  let dotProduct = 0;
+  let normASq = 0;
+
+  for (let i = 0; i < vecA.length; i++) {
+    const valA = vecA[i];
+    dotProduct += valA * vecB[i];
+    normASq += valA * valA;
+  }
+
+  if (normASq === 0) return 0;
+  return dotProduct / (Math.sqrt(normASq) * normB);
+}
+
+import { logger } from "../lib/logger";
+
 /**
  * Perform semantic vector similarity search using nomic-embed-text query embeddings
  * against persistent PostgreSQL knowledge chunk embeddings.
@@ -82,8 +143,8 @@ export async function searchMedicalKnowledge(
     // 1. Generate query embedding
     const queryVector = await generateEmbedding(query);
 
-    // 2. Fetch knowledge chunks from PostgreSQL
-    const chunks = await db.select().from(knowledgeChunksTable);
+    // 2. Fetch cached knowledge chunks
+    const chunks = await getOrFetchChunks();
     if (chunks.length === 0) return [];
 
     // 3. Detect query domain context for relevance reranking
@@ -95,13 +156,11 @@ export async function searchMedicalKnowledge(
     // 4. Compute vector cosine similarity & apply domain reranking
     const scoredResults: RAGRetrievalResult[] = [];
 
-    for (const chunk of chunks) {
-      const chunkEmbedding = chunk.embedding as number[];
-      let score = computeCosineSimilarity(queryVector, chunkEmbedding);
+    for (const { chunk, embedding, norm } of chunks) {
+      let score = computeCosineSimilarityWithNorm(queryVector, embedding, norm);
 
       const chunkCategory = (chunk.category || "").toLowerCase();
       const chunkTitle = (chunk.title || "").toLowerCase();
-      const chunkContent = (chunk.content || "").toLowerCase();
       const isRespiratoryChunk = chunkCategory === "pulmonology" || /\b(respiratory|bronchitis|pneumonia|cough|cold|flu|asthma)\b/i.test(chunkTitle);
       const isAbdominalChunk = chunkCategory === "gastroenterology" || /\b(stomach|abdominal|gastritis|gastroenteritis|dyspepsia|ulcer)\b/i.test(chunkTitle);
       const isHematologyChunk = chunkCategory === "hematology" || /\b(anemia|hemoglobin|iron deficiency|ferritin)\b/i.test(chunkTitle);
@@ -109,7 +168,6 @@ export async function searchMedicalKnowledge(
 
       // Domain relevance adjustments
       if (isAbdominalQuery && !isRespiratoryQuery && isRespiratoryChunk) {
-        // Significantly penalize respiratory chunks for abdominal queries when patient has no respiratory symptoms
         score -= 0.25;
       }
       if (isAbdominalQuery && isAbdominalChunk) {
@@ -153,7 +211,7 @@ export async function searchMedicalKnowledge(
     // 5. Sort descending by score and return top K
     return scoredResults.sort((a, b) => b.score - a.score).slice(0, topK);
   } catch (err: unknown) {
-    console.warn("Medical RAG Retrieval Warning:", err instanceof Error ? err.message : String(err));
+    logger.warn({ err }, "Medical RAG Retrieval Warning");
     return [];
   }
 }

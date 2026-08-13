@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { useClerk, useUser, useAuth, ClerkProvider, Show } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -6,10 +6,9 @@ import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wo
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
-import { SignInPage, SignUpPage } from "./pages/Auth";
-import { Onboarding } from "./pages/Onboarding";
 import { useGetMe, setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PageLoader } from "./components/PageLoader";
 
 if (import.meta.env.VITE_API_URL) {
   setBaseUrl(import.meta.env.VITE_API_URL);
@@ -18,52 +17,63 @@ if (import.meta.env.VITE_API_URL) {
 // Dashboard Layout
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
-// Landing
+// Helper for type-safe lazy loading of named exports
+function lazyNamed<T extends Record<string, any>, K extends keyof T>(
+  factory: () => Promise<T>,
+  name: K
+) {
+  return lazy(() => factory().then((module) => ({ default: module[name] })));
+}
+
+// Non-lazy / core pages
+import NotFound from '@/pages/not-found';
+import { SignInPage, SignUpPage } from "./pages/Auth";
+import { Onboarding } from "./pages/Onboarding";
 import { Landing } from "./pages/Landing";
 
-// Patient Pages
-import { PatientDashboard } from "./pages/patient/Dashboard";
-import { PatientAppointments } from "./pages/patient/Appointments";
-import { PatientDoctors } from "./pages/patient/Doctors";
-import { PatientPrescriptions } from "./pages/patient/Prescriptions";
-import { PatientLabReports } from "./pages/patient/LabReports";
-import { PatientDiagnosticBookings } from "./pages/patient/DiagnosticBookings";
-import { PatientMedicineReminders } from "./pages/patient/MedicineReminders";
-import { PatientTimeline } from "./pages/patient/Timeline";
-import { PatientSymptomCheck } from "./pages/patient/SymptomCheck";
-import { PatientProfile } from "./pages/patient/Profile";
+// Patient Pages (Lazy loaded)
+const PatientDashboard = lazyNamed(() => import("./pages/patient/Dashboard"), "PatientDashboard");
+const PatientAppointments = lazyNamed(() => import("./pages/patient/Appointments"), "PatientAppointments");
+const PatientDoctors = lazyNamed(() => import("./pages/patient/Doctors"), "PatientDoctors");
+const PatientPrescriptions = lazyNamed(() => import("./pages/patient/Prescriptions"), "PatientPrescriptions");
+const PatientLabReports = lazyNamed(() => import("./pages/patient/LabReports"), "PatientLabReports");
+const PatientDiagnosticBookings = lazyNamed(() => import("./pages/patient/DiagnosticBookings"), "PatientDiagnosticBookings");
+const PatientMedicineReminders = lazyNamed(() => import("./pages/patient/MedicineReminders"), "PatientMedicineReminders");
+const PatientTimeline = lazyNamed(() => import("./pages/patient/Timeline"), "PatientTimeline");
+const PatientSymptomCheck = lazyNamed(() => import("./pages/patient/SymptomCheck"), "PatientSymptomCheck");
+const PatientProfile = lazyNamed(() => import("./pages/patient/Profile"), "PatientProfile");
 
-// Doctor Pages
-import { DoctorDashboard } from "./pages/doctor/Dashboard";
-import { DoctorAppointments } from "./pages/doctor/Appointments";
-import { DoctorPatients } from "./pages/doctor/Patients";
-import { DoctorPrescriptions } from "./pages/doctor/Prescriptions";
-import { DoctorProfile } from "./pages/doctor/Profile";
+// Doctor Pages (Lazy loaded)
+const DoctorDashboard = lazyNamed(() => import("./pages/doctor/Dashboard"), "DoctorDashboard");
+const DoctorAppointments = lazyNamed(() => import("./pages/doctor/Appointments"), "DoctorAppointments");
+const DoctorPatients = lazyNamed(() => import("./pages/doctor/Patients"), "DoctorPatients");
+const DoctorPrescriptions = lazyNamed(() => import("./pages/doctor/Prescriptions"), "DoctorPrescriptions");
+const DoctorProfile = lazyNamed(() => import("./pages/doctor/Profile"), "DoctorProfile");
 
-// Diagnostic Center Pages
-import { DiagnosticDashboard } from "./pages/diagnostic/Dashboard";
-import { DiagnosticBookingsPage } from "./pages/diagnostic/Bookings";
-import { DiagnosticReportsPage } from "./pages/diagnostic/Reports";
-import { DiagnosticProfile } from "./pages/diagnostic/Profile";
+// Diagnostic Center Pages (Lazy loaded)
+const DiagnosticDashboard = lazyNamed(() => import("./pages/diagnostic/Dashboard"), "DiagnosticDashboard");
+const DiagnosticBookingsPage = lazyNamed(() => import("./pages/diagnostic/Bookings"), "DiagnosticBookingsPage");
+const DiagnosticReportsPage = lazyNamed(() => import("./pages/diagnostic/Reports"), "DiagnosticReportsPage");
+const DiagnosticProfile = lazyNamed(() => import("./pages/diagnostic/Profile"), "DiagnosticProfile");
 
-// Pharmacy Pages
-import { PharmacyDashboard } from "./pages/pharmacy/Dashboard";
-import { PharmacyPrescriptionsPage } from "./pages/pharmacy/Prescriptions";
-import { PharmacyProfile } from "./pages/pharmacy/Profile";
+// Pharmacy Pages (Lazy loaded)
+const PharmacyDashboard = lazyNamed(() => import("./pages/pharmacy/Dashboard"), "PharmacyDashboard");
+const PharmacyPrescriptionsPage = lazyNamed(() => import("./pages/pharmacy/Prescriptions"), "PharmacyPrescriptionsPage");
+const PharmacyProfile = lazyNamed(() => import("./pages/pharmacy/Profile"), "PharmacyProfile");
 
-// Admin Pages
-import { AdminDashboard } from "./pages/admin/Dashboard";
-import { AdminUsersPage } from "./pages/admin/Users";
-import { AdminPatientsPage } from "./pages/admin/Patients";
-import { AdminDoctorsPage } from "./pages/admin/Doctors";
-import { AdminDiagnosticCentersPage } from "./pages/admin/DiagnosticCenters";
-import { AdminPharmaciesPage } from "./pages/admin/Pharmacies";
-import { AdminAppointmentsPage } from "./pages/admin/Appointments";
-import { AdminSettingsPage } from "./pages/admin/Settings";
+// Admin Pages (Lazy loaded)
+const AdminDashboard = lazyNamed(() => import("./pages/admin/Dashboard"), "AdminDashboard");
+const AdminUsersPage = lazyNamed(() => import("./pages/admin/Users"), "AdminUsersPage");
+const AdminPatientsPage = lazyNamed(() => import("./pages/admin/Patients"), "AdminPatientsPage");
+const AdminDoctorsPage = lazyNamed(() => import("./pages/admin/Doctors"), "AdminDoctorsPage");
+const AdminDiagnosticCentersPage = lazyNamed(() => import("./pages/admin/DiagnosticCenters"), "AdminDiagnosticCentersPage");
+const AdminPharmaciesPage = lazyNamed(() => import("./pages/admin/Pharmacies"), "AdminPharmaciesPage");
+const AdminAppointmentsPage = lazyNamed(() => import("./pages/admin/Appointments"), "AdminAppointmentsPage");
+const AdminSettingsPage = lazyNamed(() => import("./pages/admin/Settings"), "AdminSettingsPage");
 
-// Provider Status & Admin Applications
-import { ProviderStatusPage } from "./pages/provider/ProviderStatusPage";
-import { AdminPendingApplicationsPage } from "./pages/admin/PendingApplications";
+// Provider Status & Admin Applications (Lazy loaded)
+const ProviderStatusPage = lazyNamed(() => import("./pages/provider/ProviderStatusPage"), "ProviderStatusPage");
+const AdminPendingApplicationsPage = lazyNamed(() => import("./pages/admin/PendingApplications"), "AdminPendingApplicationsPage");
 
 const queryClient = new QueryClient();
 
@@ -258,135 +268,139 @@ function ClerkProviderWithRoutes() {
         <TooltipProvider>
           <ClerkTokenBridge />
           <ClerkQueryClientCacheInvalidator />
-          <Switch>
-            <Route path="/" component={HomeRedirect} />
-            
-            <Route path="/sign-in/*?" component={SignInPage} />
-            <Route path="/sign-up/*?" component={SignUpPage} />
-            
-            <Route path="/onboarding">
-              <Show when="signed-in">
-                <Onboarding />
-              </Show>
-              <Show when="signed-out">
-                <Redirect to="/sign-in" />
-              </Show>
-            </Route>
+          <ErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <Switch>
+                <Route path="/" component={HomeRedirect} />
+                
+                <Route path="/sign-in/*?" component={SignInPage} />
+                <Route path="/sign-up/*?" component={SignUpPage} />
+                
+                <Route path="/onboarding">
+                  <Show when="signed-in">
+                    <Onboarding />
+                  </Show>
+                  <Show when="signed-out">
+                    <Redirect to="/sign-in" />
+                  </Show>
+                </Route>
 
-            <Route path="/provider-status">
-              <Show when="signed-in">
-                <ProviderStatusPage />
-              </Show>
-              <Show when="signed-out">
-                <Redirect to="/sign-in" />
-              </Show>
-            </Route>
+                <Route path="/provider-status">
+                  <Show when="signed-in">
+                    <ProviderStatusPage />
+                  </Show>
+                  <Show when="signed-out">
+                    <Redirect to="/sign-in" />
+                  </Show>
+                </Route>
 
-            {/* Patient Routes */}
-            <Route path="/patient/dashboard">
-              <ProtectedRoute component={PatientDashboard} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/appointments">
-              <ProtectedRoute component={PatientAppointments} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/doctors">
-              <ProtectedRoute component={PatientDoctors} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/prescriptions">
-              <ProtectedRoute component={PatientPrescriptions} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/lab-reports">
-              <ProtectedRoute component={PatientLabReports} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/diagnostic-bookings">
-              <ProtectedRoute component={PatientDiagnosticBookings} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/medicine-reminders">
-              <ProtectedRoute component={PatientMedicineReminders} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/timeline">
-              <ProtectedRoute component={PatientTimeline} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/symptom-check">
-              <ProtectedRoute component={PatientSymptomCheck} allowedRoles={["patient"]} />
-            </Route>
-            <Route path="/patient/profile">
-              <ProtectedRoute component={PatientProfile} allowedRoles={["patient"]} />
-            </Route>
+                {/* Patient Routes */}
+                <Route path="/patient/dashboard">
+                  <ProtectedRoute component={PatientDashboard} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/appointments">
+                  <ProtectedRoute component={PatientAppointments} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/doctors">
+                  <ProtectedRoute component={PatientDoctors} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/prescriptions">
+                  <ProtectedRoute component={PatientPrescriptions} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/lab-reports">
+                  <ProtectedRoute component={PatientLabReports} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/diagnostic-bookings">
+                  <ProtectedRoute component={PatientDiagnosticBookings} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/medicine-reminders">
+                  <ProtectedRoute component={PatientMedicineReminders} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/timeline">
+                  <ProtectedRoute component={PatientTimeline} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/symptom-check">
+                  <ProtectedRoute component={PatientSymptomCheck} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/profile">
+                  <ProtectedRoute component={PatientProfile} allowedRoles={["patient"]} />
+                </Route>
 
-            {/* Doctor Routes */}
-            <Route path="/doctor/dashboard">
-              <ProtectedRoute component={DoctorDashboard} allowedRoles={["doctor"]} />
-            </Route>
-            <Route path="/doctor/appointments">
-              <ProtectedRoute component={DoctorAppointments} allowedRoles={["doctor"]} />
-            </Route>
-            <Route path="/doctor/patients">
-              <ProtectedRoute component={DoctorPatients} allowedRoles={["doctor"]} />
-            </Route>
-            <Route path="/doctor/prescriptions">
-              <ProtectedRoute component={DoctorPrescriptions} allowedRoles={["doctor"]} />
-            </Route>
-            <Route path="/doctor/profile">
-              <ProtectedRoute component={DoctorProfile} allowedRoles={["doctor"]} />
-            </Route>
+                {/* Doctor Routes */}
+                <Route path="/doctor/dashboard">
+                  <ProtectedRoute component={DoctorDashboard} allowedRoles={["doctor"]} />
+                </Route>
+                <Route path="/doctor/appointments">
+                  <ProtectedRoute component={DoctorAppointments} allowedRoles={["doctor"]} />
+                </Route>
+                <Route path="/doctor/patients">
+                  <ProtectedRoute component={DoctorPatients} allowedRoles={["doctor"]} />
+                </Route>
+                <Route path="/doctor/prescriptions">
+                  <ProtectedRoute component={DoctorPrescriptions} allowedRoles={["doctor"]} />
+                </Route>
+                <Route path="/doctor/profile">
+                  <ProtectedRoute component={DoctorProfile} allowedRoles={["doctor"]} />
+                </Route>
 
-            {/* Diagnostic Center Routes */}
-            <Route path="/diagnostic/dashboard">
-              <ProtectedRoute component={DiagnosticDashboard} allowedRoles={["diagnostic_center"]} />
-            </Route>
-            <Route path="/diagnostic/bookings">
-              <ProtectedRoute component={DiagnosticBookingsPage} allowedRoles={["diagnostic_center"]} />
-            </Route>
-            <Route path="/diagnostic/reports">
-              <ProtectedRoute component={DiagnosticReportsPage} allowedRoles={["diagnostic_center"]} />
-            </Route>
-            <Route path="/diagnostic/profile">
-              <ProtectedRoute component={DiagnosticProfile} allowedRoles={["diagnostic_center"]} />
-            </Route>
+                {/* Diagnostic Center Routes */}
+                <Route path="/diagnostic/dashboard">
+                  <ProtectedRoute component={DiagnosticDashboard} allowedRoles={["diagnostic_center"]} />
+                </Route>
+                <Route path="/diagnostic/bookings">
+                  <ProtectedRoute component={DiagnosticBookingsPage} allowedRoles={["diagnostic_center"]} />
+                </Route>
+                <Route path="/diagnostic/reports">
+                  <ProtectedRoute component={DiagnosticReportsPage} allowedRoles={["diagnostic_center"]} />
+                </Route>
+                <Route path="/diagnostic/profile">
+                  <ProtectedRoute component={DiagnosticProfile} allowedRoles={["diagnostic_center"]} />
+                </Route>
 
-            {/* Pharmacy Routes */}
-            <Route path="/pharmacy/dashboard">
-              <ProtectedRoute component={PharmacyDashboard} allowedRoles={["pharmacy"]} />
-            </Route>
-            <Route path="/pharmacy/prescriptions">
-              <ProtectedRoute component={PharmacyPrescriptionsPage} allowedRoles={["pharmacy"]} />
-            </Route>
-            <Route path="/pharmacy/profile">
-              <ProtectedRoute component={PharmacyProfile} allowedRoles={["pharmacy"]} />
-            </Route>
-            
-            {/* Admin Routes */}
-            <Route path="/admin/dashboard">
-              <ProtectedRoute component={AdminDashboard} allowedRoles={["admin"]} />
-            </Route>
-            <Route path="/admin/pending-applications">
-              <ProtectedRoute component={AdminPendingApplicationsPage} allowedRoles={["admin"]} />
-            </Route>
-            <Route path="/admin/users">
-              <ProtectedRoute component={AdminUsersPage} allowedRoles={["admin"]} />
-            </Route>
-            <Route path="/admin/patients">
-              <ProtectedRoute component={AdminPatientsPage} allowedRoles={["admin"]} />
-            </Route>
-            <Route path="/admin/doctors">
-              <ProtectedRoute component={AdminDoctorsPage} allowedRoles={["admin"]} />
-            </Route>
-            <Route path="/admin/diagnostic-centers">
-              <ProtectedRoute component={AdminDiagnosticCentersPage} allowedRoles={["admin"]} />
-            </Route>
-            <Route path="/admin/pharmacies">
-              <ProtectedRoute component={AdminPharmaciesPage} allowedRoles={["admin"]} />
-            </Route>
-            <Route path="/admin/appointments">
-              <ProtectedRoute component={AdminAppointmentsPage} allowedRoles={["admin"]} />
-            </Route>
-            <Route path="/admin/settings">
-              <ProtectedRoute component={AdminSettingsPage} allowedRoles={["admin"]} />
-            </Route>
+                {/* Pharmacy Routes */}
+                <Route path="/pharmacy/dashboard">
+                  <ProtectedRoute component={PharmacyDashboard} allowedRoles={["pharmacy"]} />
+                </Route>
+                <Route path="/pharmacy/prescriptions">
+                  <ProtectedRoute component={PharmacyPrescriptionsPage} allowedRoles={["pharmacy"]} />
+                </Route>
+                <Route path="/pharmacy/profile">
+                  <ProtectedRoute component={PharmacyProfile} allowedRoles={["pharmacy"]} />
+                </Route>
+                
+                {/* Admin Routes */}
+                <Route path="/admin/dashboard">
+                  <ProtectedRoute component={AdminDashboard} allowedRoles={["admin"]} />
+                </Route>
+                <Route path="/admin/pending-applications">
+                  <ProtectedRoute component={AdminPendingApplicationsPage} allowedRoles={["admin"]} />
+                </Route>
+                <Route path="/admin/users">
+                  <ProtectedRoute component={AdminUsersPage} allowedRoles={["admin"]} />
+                </Route>
+                <Route path="/admin/patients">
+                  <ProtectedRoute component={AdminPatientsPage} allowedRoles={["admin"]} />
+                </Route>
+                <Route path="/admin/doctors">
+                  <ProtectedRoute component={AdminDoctorsPage} allowedRoles={["admin"]} />
+                </Route>
+                <Route path="/admin/diagnostic-centers">
+                  <ProtectedRoute component={AdminDiagnosticCentersPage} allowedRoles={["admin"]} />
+                </Route>
+                <Route path="/admin/pharmacies">
+                  <ProtectedRoute component={AdminPharmaciesPage} allowedRoles={["admin"]} />
+                </Route>
+                <Route path="/admin/appointments">
+                  <ProtectedRoute component={AdminAppointmentsPage} allowedRoles={["admin"]} />
+                </Route>
+                <Route path="/admin/settings">
+                  <ProtectedRoute component={AdminSettingsPage} allowedRoles={["admin"]} />
+                </Route>
 
-            <Route component={NotFound} />
-          </Switch>
+                <Route component={NotFound} />
+              </Switch>
+            </Suspense>
+          </ErrorBoundary>
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>

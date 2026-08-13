@@ -21,9 +21,13 @@ function matchDoctorSpecialty(docSpec: string | null | undefined, filterSpec: st
   return false;
 }
 
+import { inArray } from "drizzle-orm";
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
+
 // GET /doctors - list approved doctors
 router.get("/doctors", async (req, res): Promise<void> => {
   const { specialty, search } = req.query as { specialty?: string; search?: string };
+  const pagination = parsePaginationParams(req);
 
   const rows = await db
     .select({
@@ -83,7 +87,11 @@ router.get("/doctors", async (req, res): Promise<void> => {
     );
   }
 
-  res.json(result);
+  const total = result.length;
+  setPaginationHeaders(res, total, pagination);
+  const paginatedResult = result.slice(pagination.offset, pagination.offset + pagination.limit);
+
+  res.json(paginatedResult);
 });
 
 // GET /doctors/:id
@@ -169,11 +177,11 @@ router.get("/doctors/me/dashboard", requireAuth, requireRole(["doctor"]), async 
 
   const today = new Date().toISOString().split("T")[0];
 
-  const [allAppts, todayAppts, patients, prescriptions] = await Promise.all([
-    db.select().from(appointmentsTable).where(eq(appointmentsTable.doctorId, doctorRow.id)),
+  const [allAppts, patients, prescriptions, user] = await Promise.all([
     db.select().from(appointmentsTable).where(eq(appointmentsTable.doctorId, doctorRow.id)),
     db.selectDistinct({ patientId: appointmentsTable.patientId }).from(appointmentsTable).where(eq(appointmentsTable.doctorId, doctorRow.id)),
     db.select().from(prescriptionsTable).where(eq(prescriptionsTable.doctorId, doctorRow.id)),
+    db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) }),
   ]);
 
   const todayCount = allAppts.filter((a) => a.appointmentDate === today).length;
@@ -185,28 +193,30 @@ router.get("/doctors/me/dashboard", requireAuth, requireRole(["doctor"]), async 
     .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate))
     .slice(0, 5);
 
-  // Get recent patient details
+  // Batch fetch recent patient details
   const recentPatientIds = [...new Set(allAppts.map((a) => a.patientId))].slice(0, 5);
-  const recentPatientData = await Promise.all(
-    recentPatientIds.map(async (pid) => {
-      const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, pid) });
-      const visits = allAppts.filter((a) => a.patientId === pid).length;
-      const lastVisit = allAppts
-        .filter((a) => a.patientId === pid)
-        .sort((a, b) => b.appointmentDate.localeCompare(a.appointmentDate))[0]?.appointmentDate;
-      return {
-        id: pid,
-        firstName: u?.firstName ?? "",
-        lastName: u?.lastName ?? "",
-        email: u?.email ?? "",
-        avatarUrl: u?.avatarUrl ?? null,
-        lastVisit: lastVisit ?? null,
-        totalVisits: visits,
-      };
-    }),
-  );
+  const patientUsers = recentPatientIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, recentPatientIds))
+    : [];
+  const patientUserMap = new Map(patientUsers.map((u) => [u.id, u]));
 
-  const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
+  const recentPatientData = recentPatientIds.map((pid) => {
+    const u = patientUserMap.get(pid);
+    const visits = allAppts.filter((a) => a.patientId === pid).length;
+    const lastVisit = allAppts
+      .filter((a) => a.patientId === pid)
+      .sort((a, b) => b.appointmentDate.localeCompare(a.appointmentDate))[0]?.appointmentDate;
+    return {
+      id: pid,
+      firstName: u?.firstName ?? "",
+      lastName: u?.lastName ?? "",
+      email: u?.email ?? "",
+      avatarUrl: u?.avatarUrl ?? null,
+      lastVisit: lastVisit ?? null,
+      totalVisits: visits,
+    };
+  });
+
   const firstName = user?.firstName ?? null;
   const lastName = user?.lastName ?? null;
   const userName = user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email : null;
@@ -236,25 +246,44 @@ router.get("/doctors/me/appointments", requireAuth, requireRole(["doctor"]), asy
   if (!doctorRow) { res.status(404).json({ error: "Doctor not found" }); return; }
 
   const { status, date } = req.query as { status?: string; date?: string };
+  const pagination = parsePaginationParams(req);
+
   let appts = await db.select().from(appointmentsTable).where(eq(appointmentsTable.doctorId, doctorRow.id));
 
   if (status) appts = appts.filter((a) => a.status === status);
   if (date) appts = appts.filter((a) => a.appointmentDate === date);
 
-  const enriched = await Promise.all(
-    appts.map(async (a) => {
-      const patient = await db.query.usersTable.findFirst({ where: eq(usersTable.id, a.patientId) });
-      const doctor = await db.query.usersTable.findFirst({ where: eq(usersTable.id, doctorRow.userId) });
-      return {
-        ...a,
-        patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null,
-        doctorName: doctor ? `${doctor.firstName ?? ""} ${doctor.lastName ?? ""}`.trim() : null,
-        doctorSpecialty: doctorRow.specialty,
-        consultationFee: a.consultationFee ?? null,
-        createdAt: a.createdAt.toISOString(),
-      };
-    }),
-  );
+  const total = appts.length;
+  setPaginationHeaders(res, total, pagination);
+
+  const paginatedAppts = appts.slice(pagination.offset, pagination.offset + pagination.limit);
+
+  if (paginatedAppts.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  // Batch query patient & doctor users
+  const patientIds = Array.from(new Set(paginatedAppts.map((a) => a.patientId)));
+  const patientUsers = patientIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, patientIds))
+    : [];
+  const patientUserMap = new Map(patientUsers.map((u) => [u.id, u]));
+
+  const doctorUser = await db.query.usersTable.findFirst({ where: eq(usersTable.id, doctorRow.userId) });
+  const doctorName = doctorUser ? `${doctorUser.firstName ?? ""} ${doctorUser.lastName ?? ""}`.trim() : null;
+
+  const enriched = paginatedAppts.map((a) => {
+    const patient = patientUserMap.get(a.patientId);
+    return {
+      ...a,
+      patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null,
+      doctorName,
+      doctorSpecialty: doctorRow.specialty,
+      consultationFee: a.consultationFee ?? null,
+      createdAt: a.createdAt.toISOString(),
+    };
+  });
 
   res.json(enriched);
 });
@@ -264,27 +293,39 @@ router.get("/doctors/me/patients", requireAuth, requireRole(["doctor"]), async (
   const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
   if (!doctorRow) { res.status(404).json({ error: "Doctor not found" }); return; }
 
+  const pagination = parsePaginationParams(req);
   const appts = await db.select().from(appointmentsTable).where(eq(appointmentsTable.doctorId, doctorRow.id));
   const patientIds = [...new Set(appts.map((a) => a.patientId))];
 
-  const patients = await Promise.all(
-    patientIds.map(async (pid) => {
-      const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, pid) });
-      const visits = appts.filter((a) => a.patientId === pid).length;
-      const lastVisit = appts
-        .filter((a) => a.patientId === pid)
-        .sort((a, b) => b.appointmentDate.localeCompare(a.appointmentDate))[0]?.appointmentDate;
-      return {
-        id: pid,
-        firstName: u?.firstName ?? "",
-        lastName: u?.lastName ?? "",
-        email: u?.email ?? "",
-        avatarUrl: u?.avatarUrl ?? null,
-        lastVisit: lastVisit ?? null,
-        totalVisits: visits,
-      };
-    }),
-  );
+  const total = patientIds.length;
+  setPaginationHeaders(res, total, pagination);
+
+  const paginatedPatientIds = patientIds.slice(pagination.offset, pagination.offset + pagination.limit);
+
+  if (paginatedPatientIds.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const patientUsers = await db.select().from(usersTable).where(inArray(usersTable.id, paginatedPatientIds));
+  const patientUserMap = new Map(patientUsers.map((u) => [u.id, u]));
+
+  const patients = paginatedPatientIds.map((pid) => {
+    const u = patientUserMap.get(pid);
+    const visits = appts.filter((a) => a.patientId === pid).length;
+    const lastVisit = appts
+      .filter((a) => a.patientId === pid)
+      .sort((a, b) => b.appointmentDate.localeCompare(a.appointmentDate))[0]?.appointmentDate;
+    return {
+      id: pid,
+      firstName: u?.firstName ?? "",
+      lastName: u?.lastName ?? "",
+      email: u?.email ?? "",
+      avatarUrl: u?.avatarUrl ?? null,
+      lastVisit: lastVisit ?? null,
+      totalVisits: visits,
+    };
+  });
 
   res.json(patients);
 });

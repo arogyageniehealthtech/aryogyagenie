@@ -1,20 +1,21 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, usersTable, doctorsTable, diagnosticCentersTable, pharmaciesTable, appointmentsTable, labReportsTable, providerApplicationsTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
 // GET /admin/stats
 router.get("/admin/stats", requireAuth, requireRole(["admin"]), async (_req, res): Promise<void> => {
   const [users, doctors, diagnosticCenters, pharmacies, appointments, labReports, applications] = await Promise.all([
-    db.select().from(usersTable),
-    db.select().from(doctorsTable),
-    db.select().from(diagnosticCentersTable),
-    db.select().from(pharmaciesTable),
-    db.select().from(appointmentsTable),
-    db.select().from(labReportsTable),
-    db.select().from(providerApplicationsTable),
+    db.select({ id: usersTable.id, role: usersTable.role, status: usersTable.status }).from(usersTable),
+    db.select({ id: doctorsTable.id, userId: doctorsTable.userId }).from(doctorsTable),
+    db.select({ id: diagnosticCentersTable.id, userId: diagnosticCentersTable.userId }).from(diagnosticCentersTable),
+    db.select({ id: pharmaciesTable.id, userId: pharmaciesTable.userId }).from(pharmaciesTable),
+    db.select({ id: appointmentsTable.id, patientId: appointmentsTable.patientId, appointmentDate: appointmentsTable.appointmentDate, status: appointmentsTable.status }).from(appointmentsTable),
+    db.select({ id: labReportsTable.id, patientId: labReportsTable.patientId }).from(labReportsTable),
+    db.select({ id: providerApplicationsTable.id, status: providerApplicationsTable.status }).from(providerApplicationsTable),
   ]);
 
   const thisMonth = new Date();
@@ -64,10 +65,10 @@ router.get("/admin/stats", requireAuth, requireRole(["admin"]), async (_req, res
 // GET /admin/users
 router.get("/admin/users", requireAuth, requireRole(["admin"]), async (req, res): Promise<void> => {
   const { role, search } = req.query as { role?: string; search?: string };
+  const pagination = parsePaginationParams(req);
+
   let users = await db.select().from(usersTable);
 
-  // Provider applicants (Doctor, Diagnostic Center, Pharmacy) and unapproved accounts remain EXCLUSIVELY under Pending Applications.
-  // Only active or suspended users appear in the Users directory and role directories.
   users = users.filter((u) => u.status === "active" || u.status === "suspended");
 
   if (role) users = users.filter((u) => u.role === role);
@@ -80,7 +81,12 @@ router.get("/admin/users", requireAuth, requireRole(["admin"]), async (req, res)
     );
   }
 
-  res.json(users.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() })));
+  const total = users.length;
+  setPaginationHeaders(res, total, pagination);
+
+  const paginatedUsers = users.slice(pagination.offset, pagination.offset + pagination.limit);
+
+  res.json(paginatedUsers.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() })));
 });
 
 // PATCH /admin/users/:id/status
@@ -102,10 +108,17 @@ router.patch("/admin/users/:id/status", requireAuth, requireRole(["admin"]), asy
 // GET /admin/appointments
 router.get("/admin/appointments", requireAuth, requireRole(["admin"]), async (req, res): Promise<void> => {
   const { status } = req.query as { status?: string };
-  let appointments = await db.select().from(appointmentsTable);
+  const pagination = parsePaginationParams(req);
+
+  let appointments = await db.select().from(appointmentsTable).orderBy(desc(appointmentsTable.createdAt));
   if (status) appointments = appointments.filter((a) => a.status === status);
 
-  res.json(appointments.map((a) => ({
+  const total = appointments.length;
+  setPaginationHeaders(res, total, pagination);
+
+  const paginatedAppts = appointments.slice(pagination.offset, pagination.offset + pagination.limit);
+
+  res.json(paginatedAppts.map((a) => ({
     ...a,
     patientName: null, doctorName: null, doctorSpecialty: null,
     consultationFee: a.consultationFee ?? null,

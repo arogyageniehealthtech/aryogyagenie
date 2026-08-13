@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -10,9 +11,19 @@ import {
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
 import { logger } from "./lib/logger";
+import { globalRateLimiter } from "./middlewares/rateLimiter";
 import router from "./routes";
 
 const app = express();
+
+// Security Headers (Helmet)
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Disabled to prevent breaking Clerk widgets/CDN scripts
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 
 app.use(
   pinoHttp({
@@ -36,7 +47,31 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-app.use(cors({ credentials: true, origin: true }));
+// CORS configuration (Environment-aware)
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : null;
+
+app.use(
+  cors({
+    credentials: true,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins) {
+        if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+          return callback(null, true);
+        }
+        return callback(new Error(`CORS origin '${origin}' not allowed by policy`));
+      }
+
+      // Default in dev/staging: reflect request origin
+      return callback(null, true);
+    },
+  }),
+);
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -52,13 +87,24 @@ app.use(
   })),
 );
 
+// Apply Global API Rate Limiter
+app.use("/api", globalRateLimiter);
+
 app.use("/api", router);
 
-// Global Error Handler
+// Global Error Handler — Prevents leaking stack traces or internal errors to clients
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error({ err }, "Unhandled server error in API route");
-  res.status(err.status || 500).json({
-    error: err.message || "Internal Server Error",
+
+  const statusCode = typeof err.status === "number" && err.status >= 400 && err.status < 600 ? err.status : 500;
+  const isProduction = process.env.NODE_ENV === "production";
+
+  const responseMessage = isProduction && statusCode === 500
+    ? "Internal Server Error"
+    : err.message || "An unexpected error occurred";
+
+  res.status(statusCode).json({
+    error: responseMessage,
   });
 });
 

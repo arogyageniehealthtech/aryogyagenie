@@ -11,6 +11,7 @@ import path from "node:path";
 import { db, knowledgeDocumentsTable, knowledgeChunksTable, type ChunkMetadata } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generateEmbedding } from "./ollamaEmbeddingService";
+import { invalidateRAGCache } from "./ragService";
 
 export interface IngestDocumentInput {
   documentId: string;
@@ -242,6 +243,8 @@ export async function ingestMedicalDocument(input: IngestDocumentInput): Promise
       vectorLength: embedding.length,
     });
   }
+
+  invalidateRAGCache();
 
   return {
     documentId: input.documentId,

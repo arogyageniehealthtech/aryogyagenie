@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,7 +11,10 @@ export const timelineEventsTable = pgTable("timeline_events", {
   referenceId: integer("reference_id"),
   eventDate: date("event_date", { mode: "string" }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_timeline_events_patient_id").on(table.patientId),
+  index("idx_timeline_events_date").on(table.eventDate),
+]);
 
 export const insertTimelineEventSchema = createInsertSchema(timelineEventsTable).omit({ id: true, createdAt: true });
 export type InsertTimelineEvent = z.infer<typeof insertTimelineEventSchema>;

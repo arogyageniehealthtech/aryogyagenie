@@ -1,34 +1,74 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import {
   db, usersTable, appointmentsTable, doctorsTable,
   labReportsTable, medicineRemindersTable, prescriptionsTable,
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
 // GET /appointments - patient's appointments
 router.get("/appointments", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { status } = req.query as { status?: string };
-  let appts = await db.select().from(appointmentsTable).where(eq(appointmentsTable.patientId, req.userId!));
-  if (status) appts = appts.filter((a) => a.status === status);
+  const pagination = parsePaginationParams(req);
 
-  const enriched = await Promise.all(
-    appts.map(async (a) => {
-      const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.id, a.doctorId) });
-      const doctorUser = doctorRow ? await db.query.usersTable.findFirst({ where: eq(usersTable.id, doctorRow.userId) }) : null;
-      const patient = await db.query.usersTable.findFirst({ where: eq(usersTable.id, a.patientId) });
-      return {
-        ...a,
-        patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null,
-        doctorName: doctorUser ? `${doctorUser.firstName ?? ""} ${doctorUser.lastName ?? ""}`.trim() : null,
-        doctorSpecialty: doctorRow?.specialty ?? null,
-        consultationFee: a.consultationFee ?? null,
-        createdAt: a.createdAt.toISOString(),
-      };
-    }),
-  );
+  const whereClause = status
+    ? and(eq(appointmentsTable.patientId, req.userId!), eq(appointmentsTable.status, status as any))
+    : eq(appointmentsTable.patientId, req.userId!);
+
+  const [totalCountResult] = await db
+    .select({ count: db.$count(appointmentsTable, whereClause) })
+    .from(appointmentsTable);
+  const total = totalCountResult?.count ?? 0;
+
+  const appts = await db
+    .select()
+    .from(appointmentsTable)
+    .where(whereClause)
+    .orderBy(desc(appointmentsTable.createdAt))
+    .limit(pagination.limit)
+    .offset(pagination.offset);
+
+  setPaginationHeaders(res, total, pagination);
+
+  if (appts.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  // Batch query patient
+  const patient = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
+  const patientName = patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null;
+
+  // Batch query doctors
+  const doctorIds = Array.from(new Set(appts.map((a) => a.doctorId)));
+  const doctorsList = doctorIds.length > 0
+    ? await db.select().from(doctorsTable).where(inArray(doctorsTable.id, doctorIds))
+    : [];
+
+  const doctorMap = new Map(doctorsList.map((d) => [d.id, d]));
+  const doctorUserIds = Array.from(new Set(doctorsList.map((d) => d.userId)));
+
+  const doctorUsersList = doctorUserIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, doctorUserIds))
+    : [];
+
+  const doctorUserMap = new Map(doctorUsersList.map((u) => [u.id, u]));
+
+  const enriched = appts.map((a) => {
+    const doctorRow = doctorMap.get(a.doctorId);
+    const doctorUser = doctorRow ? doctorUserMap.get(doctorRow.userId) : null;
+    return {
+      ...a,
+      patientName,
+      doctorName: doctorUser ? `${doctorUser.firstName ?? ""} ${doctorUser.lastName ?? ""}`.trim() : null,
+      doctorSpecialty: doctorRow?.specialty ?? null,
+      consultationFee: a.consultationFee ?? null,
+      createdAt: a.createdAt.toISOString(),
+    };
+  });
 
   res.json(enriched);
 });
@@ -70,6 +110,20 @@ router.get("/appointments/:id", requireAuth, async (req: AuthenticatedRequest, r
   const appt = await db.query.appointmentsTable.findFirst({ where: eq(appointmentsTable.id, id) });
   if (!appt) { res.status(404).json({ error: "Appointment not found" }); return; }
 
+  // Ownership / Authorization check (Patient, assigned Doctor, or Admin)
+  const isPatient = appt.patientId === req.userId;
+  let isAssignedDoctor = false;
+  if (req.userRole === "doctor") {
+    const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
+    isAssignedDoctor = doctorRow?.id === appt.doctorId;
+  }
+  const isAdmin = req.userRole === "admin";
+
+  if (!isPatient && !isAssignedDoctor && !isAdmin) {
+    res.status(403).json({ error: "Access denied. You are not authorized to view this appointment." });
+    return;
+  }
+
   res.json({
     ...appt,
     patientName: null, doctorName: null, doctorSpecialty: null,
@@ -83,14 +137,29 @@ router.patch("/appointments/:id", requireAuth, async (req: AuthenticatedRequest,
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
+  const existingAppt = await db.query.appointmentsTable.findFirst({ where: eq(appointmentsTable.id, id) });
+  if (!existingAppt) { res.status(404).json({ error: "Appointment not found" }); return; }
+
+  // Ownership / Authorization check
+  const isPatient = existingAppt.patientId === req.userId;
+  let isAssignedDoctor = false;
+  if (req.userRole === "doctor") {
+    const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
+    isAssignedDoctor = doctorRow?.id === existingAppt.doctorId;
+  }
+  const isAdmin = req.userRole === "admin";
+
+  if (!isPatient && !isAssignedDoctor && !isAdmin) {
+    res.status(403).json({ error: "Access denied. You are not authorized to modify this appointment." });
+    return;
+  }
+
   const { status, notes, appointmentDate, appointmentTime } = req.body;
   const [appt] = await db
     .update(appointmentsTable)
     .set({ status, notes, appointmentDate, appointmentTime })
     .where(eq(appointmentsTable.id, id))
     .returning();
-
-  if (!appt) { res.status(404).json({ error: "Appointment not found" }); return; }
 
   res.json({
     ...appt,

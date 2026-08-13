@@ -70,7 +70,7 @@ export interface AIAssessmentResponse {
     disclaimer: string;
     sources: RAGSourceMetadata[];
   };
-  providerUsed: "ollama-llama3" | "fallback-heuristic";
+  providerUsed: "gemini-1.5-flash" | "ollama-llama3" | "fallback-heuristic";
   sources?: RAGSourceMetadata[];
   ragUsed?: boolean;
   invalidInputMessage?: string;
@@ -93,41 +93,57 @@ export function detectLLMProvider(): "gemini" | "ollama" {
 /**
  * Provider-agnostic LLM call.
  * Uses Gemini Flash (production) or Ollama llama3:8b (local) based on env vars.
+ * Includes exponential backoff retry for Gemini transient failures (429/500/503/network).
  * Returns the raw text response string, or null on failure.
  */
 export async function callLLM(prompt: string, maxTokens: number = 450): Promise<string | null> {
   const provider = detectLLMProvider();
 
   if (provider === "gemini") {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
-    try {
-      const response = await fetch(
-        `${GEMINI_BASE_URL}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: maxTokens,
-            },
-          }),
-          signal: controller.signal,
+    const maxRetries = 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20_000); // 20-second Gemini timeout
+      try {
+        const response = await fetch(
+          `${GEMINI_BASE_URL}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: maxTokens,
+              },
+            }),
+            signal: controller.signal,
+          }
+        );
+
+        if (response.ok) {
+          const data = (await response.json()) as {
+            candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+          };
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return text;
         }
-      );
-      if (response.ok) {
-        const data = (await response.json()) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-        };
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
+
+        // Retry on 429, 500, 502, 503, 504 status codes
+        if ([429, 500, 502, 503, 504].includes(response.status) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 500; // 500ms, 1000ms
+          await new Promise((res) => setTimeout(res, delay));
+          continue;
+        }
+      } catch (_err) {
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 500;
+          await new Promise((res) => setTimeout(res, delay));
+          continue;
+        }
+      } finally {
+        clearTimeout(timer);
       }
-    } catch (_err) {
-      // Fallback to Ollama if Gemini call fails (e.g. invalid key in local dev)
-    } finally {
-      clearTimeout(timer);
     }
   }
 
@@ -146,14 +162,17 @@ export async function callLLM(prompt: string, maxTokens: number = 450): Promise<
       }),
       signal: controller.signal,
     });
-    if (!response.ok) return null;
-    const data = (await response.json()) as { response: string };
-    return data.response ?? null;
-  } catch {
-    return null;
+    if (response.ok) {
+      const data = (await response.json()) as { response?: string };
+      if (data.response) return data.response;
+    }
+  } catch (_err) {
+    // Fallthrough to null on Ollama error
   } finally {
     clearTimeout(timer);
   }
+
+  return null;
 }
 
 type UrgencyLevel = AIAssessmentResponse["urgencyLevel"];
@@ -565,7 +584,7 @@ CRITICAL RULES:
             disclaimer: DISCLAIMER.trim(),
             sources: ragPayload.sources,
           },
-          providerUsed: activeProvider === "gemini" ? "ollama-llama3" : "ollama-llama3",
+          providerUsed: activeProvider === "gemini" ? "gemini-1.5-flash" : "ollama-llama3",
           sources: ragPayload.sources,
           ragUsed: ragPayload.sources.length > 0,
         };
@@ -746,7 +765,7 @@ export interface AILabReportResponse {
   possibleSignificance: string[];
   questionsForDoctor: string[];
   urgency: "NORMAL" | "ATTENTION_REQUIRED" | "URGENT";
-  providerUsed: "ollama-llama3" | "fallback-heuristic";
+  providerUsed: "gemini-1.5-flash" | "ollama-llama3" | "fallback-heuristic";
   disclaimer: string;
   sources?: RAGSourceMetadata[];
   ragUsed?: boolean;
@@ -802,7 +821,7 @@ export async function analyzeLabReport(req: AILabReportRequest): Promise<AILabRe
         possibleSignificance: Array.isArray(parsed.possibleSignificance) ? parsed.possibleSignificance : ["Please review with your physician."],
         questionsForDoctor: Array.isArray(parsed.questionsForDoctor) ? parsed.questionsForDoctor : ["What do these test results mean for my health?"],
         urgency: ["NORMAL", "ATTENTION_REQUIRED", "URGENT"].includes(parsed.urgency) ? parsed.urgency : "NORMAL",
-        providerUsed: detectLLMProvider() === "gemini" ? "ollama-llama3" : "ollama-llama3",
+        providerUsed: detectLLMProvider() === "gemini" ? "gemini-1.5-flash" : "ollama-llama3",
         disclaimer: disclaimerText,
         sources: ragPayload.sources,
         ragUsed: ragPayload.sources.length > 0,

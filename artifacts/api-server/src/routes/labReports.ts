@@ -1,13 +1,31 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, labReportsTable } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
 // GET /lab-reports
 router.get("/lab-reports", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const reports = await db.select().from(labReportsTable).where(eq(labReportsTable.patientId, req.userId!));
+  const pagination = parsePaginationParams(req);
+  const whereClause = eq(labReportsTable.patientId, req.userId!);
+
+  const [totalCountResult] = await db
+    .select({ count: db.$count(labReportsTable, whereClause) })
+    .from(labReportsTable);
+  const total = totalCountResult?.count ?? 0;
+
+  const reports = await db
+    .select()
+    .from(labReportsTable)
+    .where(whereClause)
+    .orderBy(desc(labReportsTable.createdAt))
+    .limit(pagination.limit)
+    .offset(pagination.offset);
+
+  setPaginationHeaders(res, total, pagination);
+
   res.json(reports.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })));
 });
 
@@ -41,13 +59,30 @@ router.post("/lab-reports", requireAuth, async (req: AuthenticatedRequest, res):
   res.status(201).json({ ...report, createdAt: report.createdAt.toISOString() });
 });
 
+import { strictAiRateLimiter } from "../middlewares/rateLimiter";
+import { diagnosticCentersTable } from "@workspace/db";
+
 // POST /lab-reports/:id/analyze
-router.post("/lab-reports/:id/analyze", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
+router.post("/lab-reports/:id/analyze", requireAuth, strictAiRateLimiter, async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const report = await db.query.labReportsTable.findFirst({ where: eq(labReportsTable.id, id) });
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Ownership check
+  const isPatient = report.patientId === req.userId;
+  let isDiagnosticCenter = false;
+  if (req.userRole === "diagnostic_center" && report.diagnosticCenterId) {
+    const dc = await db.query.diagnosticCentersTable.findFirst({ where: eq(diagnosticCentersTable.userId, req.userId!) });
+    isDiagnosticCenter = dc?.id === report.diagnosticCenterId;
+  }
+  const isDoctorOrAdmin = req.userRole === "doctor" || req.userRole === "admin";
+
+  if (!isPatient && !isDiagnosticCenter && !isDoctorOrAdmin) {
+    res.status(403).json({ error: "Access denied. You are not authorized to analyze this lab report." });
+    return;
+  }
 
   const analysis = await analyzeLabReport({
     testName: report.testName,
@@ -69,6 +104,20 @@ router.get("/lab-reports/:id", requireAuth, async (req: AuthenticatedRequest, re
   const report = await db.query.labReportsTable.findFirst({ where: eq(labReportsTable.id, id) });
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
 
+  // Ownership check
+  const isPatient = report.patientId === req.userId;
+  let isDiagnosticCenter = false;
+  if (req.userRole === "diagnostic_center" && report.diagnosticCenterId) {
+    const dc = await db.query.diagnosticCentersTable.findFirst({ where: eq(diagnosticCentersTable.userId, req.userId!) });
+    isDiagnosticCenter = dc?.id === report.diagnosticCenterId;
+  }
+  const isDoctorOrAdmin = req.userRole === "doctor" || req.userRole === "admin";
+
+  if (!isPatient && !isDiagnosticCenter && !isDoctorOrAdmin) {
+    res.status(403).json({ error: "Access denied. You are not authorized to view this lab report." });
+    return;
+  }
+
   res.json({ ...report, createdAt: report.createdAt.toISOString() });
 });
 
@@ -77,9 +126,25 @@ router.patch("/lab-reports/:id", requireAuth, async (req: AuthenticatedRequest, 
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
+  const existingReport = await db.query.labReportsTable.findFirst({ where: eq(labReportsTable.id, id) });
+  if (!existingReport) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Ownership check
+  const isPatient = existingReport.patientId === req.userId;
+  let isDiagnosticCenter = false;
+  if (req.userRole === "diagnostic_center" && existingReport.diagnosticCenterId) {
+    const dc = await db.query.diagnosticCentersTable.findFirst({ where: eq(diagnosticCentersTable.userId, req.userId!) });
+    isDiagnosticCenter = dc?.id === existingReport.diagnosticCenterId;
+  }
+  const isDoctorOrAdmin = req.userRole === "doctor" || req.userRole === "admin";
+
+  if (!isPatient && !isDiagnosticCenter && !isDoctorOrAdmin) {
+    res.status(403).json({ error: "Access denied. You are not authorized to modify this lab report." });
+    return;
+  }
+
   const { aiSummary, results, status, fileUrl } = req.body;
   const [report] = await db.update(labReportsTable).set({ aiSummary, results, status, fileUrl }).where(eq(labReportsTable.id, id)).returning();
-  if (!report) { res.status(404).json({ error: "Not found" }); return; }
 
   res.json({ ...report, createdAt: report.createdAt.toISOString() });
 });

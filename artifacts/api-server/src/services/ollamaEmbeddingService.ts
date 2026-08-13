@@ -225,8 +225,10 @@ async function generateOllamaEmbeddingBatch(texts: string[]): Promise<number[][]
 
 // ─── Public API (provider-transparent) ──────────────────────────────────────────
 
+import { logger } from "../lib/logger";
+
 /**
- * Generate a single embedding vector.
+ * Generate a single vector embedding (768 dimensions) for input text.
  * Automatically uses Gemini (if valid GEMINI_API_KEY is set) or Ollama.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
@@ -238,7 +240,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     try {
       return await generateGeminiEmbedding(text);
     } catch (err) {
-      console.warn("Gemini embedding failed:", err instanceof Error ? err.message : err);
+      logger.warn({ err }, "Gemini embedding failed");
       // NEVER attempt local Ollama fallback on Render / production
       if (process.env.NODE_ENV !== "production" && !process.env.RENDER) {
         return generateOllamaEmbedding(text);
@@ -260,7 +262,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
     try {
       return await generateGeminiEmbeddingBatch(texts);
     } catch (err) {
-      console.warn("Gemini batch embedding failed:", err instanceof Error ? err.message : err);
+      logger.warn({ err }, "Gemini batch embedding failed");
       // NEVER attempt local Ollama fallback on Render / production
       if (process.env.NODE_ENV !== "production" && !process.env.RENDER) {
         return generateOllamaEmbeddingBatch(texts);

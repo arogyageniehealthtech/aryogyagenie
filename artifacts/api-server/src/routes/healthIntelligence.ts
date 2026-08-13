@@ -69,8 +69,10 @@ router.get(
   }
 );
 
+import { strictAiRateLimiter } from "../middlewares/rateLimiter";
+
 // POST /ai/health-assistant
-router.post("/ai/health-assistant", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
+router.post("/ai/health-assistant", requireAuth, strictAiRateLimiter, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { query } = req.body;
   if (!query) {
     res.status(400).json({ error: "Query string is required" });

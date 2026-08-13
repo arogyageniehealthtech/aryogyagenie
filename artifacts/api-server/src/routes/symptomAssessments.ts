@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, symptomAssessmentsTable, timelineEventsTable } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { analyzeSymptoms, generateFollowUpQuestions } from "../services/aiGateway";
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
+import { strictAiRateLimiter } from "../middlewares/rateLimiter";
 
 const router = Router();
 
@@ -15,20 +17,31 @@ function isValidDuration(duration: string): boolean {
 
 // GET /symptom-assessments
 router.get("/symptom-assessments", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const pagination = parsePaginationParams(req);
+  const whereClause = eq(symptomAssessmentsTable.patientId, req.userId!);
+
+  const [totalCountResult] = await db
+    .select({ count: db.$count(symptomAssessmentsTable, whereClause) })
+    .from(symptomAssessmentsTable);
+  const total = totalCountResult?.count ?? 0;
+
   const assessments = await db
     .select()
     .from(symptomAssessmentsTable)
-    .where(eq(symptomAssessmentsTable.patientId, req.userId!));
+    .where(whereClause)
+    .orderBy(desc(symptomAssessmentsTable.createdAt))
+    .limit(pagination.limit)
+    .offset(pagination.offset);
+
+  setPaginationHeaders(res, total, pagination);
 
   res.json(
-    assessments
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))
+    assessments.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))
   );
 });
 
 // POST /symptom-assessments/follow-up (Stage 1 -> Generate Follow-up Questions / Emergency Check)
-router.post("/symptom-assessments/follow-up", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
+router.post("/symptom-assessments/follow-up", requireAuth, strictAiRateLimiter, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { symptoms, severity, duration, additionalNotes } = req.body;
   if (!symptoms) {
     res.status(400).json({ error: "symptoms is required" });
@@ -56,7 +69,7 @@ router.post("/symptom-assessments/follow-up", requireAuth, async (req: Authentic
 });
 
 // POST /symptom-assessments (Stage 2 -> Final Structured Assessment Generation & Save)
-router.post("/symptom-assessments", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
+router.post("/symptom-assessments", requireAuth, strictAiRateLimiter, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { symptoms, severity, duration, additionalNotes, followUpQuestions, followUpAnswers } = req.body;
   if (!symptoms) {
     res.status(400).json({ error: "symptoms is required" });

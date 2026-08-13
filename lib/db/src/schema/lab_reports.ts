@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,7 +14,10 @@ export const labReportsTable = pgTable("lab_reports", {
   status: text("status", { enum: ["pending", "completed", "reviewed"] }).notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("idx_lab_reports_patient_id").on(table.patientId),
+  index("idx_lab_reports_status").on(table.status),
+]);
 
 export const insertLabReportSchema = createInsertSchema(labReportsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertLabReport = z.infer<typeof insertLabReportSchema>;

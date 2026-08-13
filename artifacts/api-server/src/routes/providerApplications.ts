@@ -252,6 +252,8 @@ router.get("/provider-applications/me", requireAuth, async (req: AuthenticatedRe
   }
 });
 
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
+
 // GET /admin/provider-applications (Admin Only)
 router.get(
   "/admin/provider-applications",
@@ -260,14 +262,21 @@ router.get(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { status } = req.query as { status?: string };
+      const pagination = parsePaginationParams(req);
+
       let apps = await db.select().from(providerApplicationsTable).orderBy(desc(providerApplicationsTable.createdAt));
 
       if (status) {
         apps = apps.filter((a) => a.status === status.toUpperCase());
       }
 
+      const total = apps.length;
+      setPaginationHeaders(res, total, pagination);
+
+      const paginatedApps = apps.slice(pagination.offset, pagination.offset + pagination.limit);
+
       res.json(
-        apps.map((a) => ({
+        paginatedApps.map((a) => ({
           ...a,
           createdAt: a.createdAt.toISOString(),
           updatedAt: a.updatedAt.toISOString(),

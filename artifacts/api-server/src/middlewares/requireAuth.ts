@@ -2,6 +2,7 @@ import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
 import { db, usersTable, doctorsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 export interface AuthenticatedRequest extends Request {
   userId?: number;
@@ -87,7 +88,7 @@ export const requireAuth = async (
           .returning();
         if (promoted) user = promoted;
       } catch (err) {
-        console.warn("Could not auto-promote admin email:", err);
+        logger.warn({ err }, "Could not auto-promote admin email");
       }
     }
   }

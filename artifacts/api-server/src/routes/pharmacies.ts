@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray, desc } from "drizzle-orm";
 import { db, pharmaciesTable, usersTable, prescriptionsTable, doctorsTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
@@ -49,15 +50,50 @@ router.get("/pharmacies/me/dashboard", requireAuth, requireRole(["pharmacy"]), a
 // GET /pharmacies/me/prescriptions
 router.get("/pharmacies/me/prescriptions", requireAuth, requireRole(["pharmacy"]), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { status } = req.query as { status?: string };
+  const pagination = parsePaginationParams(req);
+
   let prescriptions = await db.select().from(prescriptionsTable);
   if (status) prescriptions = prescriptions.filter((p) => p.status === status);
 
-  const enriched = await Promise.all(prescriptions.map(async (p) => {
-    const patient = await db.query.usersTable.findFirst({ where: eq(usersTable.id, p.patientId) });
-    const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.id, p.doctorId) });
-    const doctorUser = doctorRow ? await db.query.usersTable.findFirst({ where: eq(usersTable.id, doctorRow.userId) }) : null;
-    return { ...p, patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null, doctorName: doctorUser ? `${doctorUser.firstName ?? ""} ${doctorUser.lastName ?? ""}`.trim() : null, createdAt: p.createdAt.toISOString() };
-  }));
+  const total = prescriptions.length;
+  setPaginationHeaders(res, total, pagination);
+
+  const paginatedPrescriptions = prescriptions.slice(pagination.offset, pagination.offset + pagination.limit);
+
+  if (paginatedPrescriptions.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const patientIds = Array.from(new Set(paginatedPrescriptions.map((p) => p.patientId)));
+  const patientsList = patientIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, patientIds))
+    : [];
+  const patientMap = new Map(patientsList.map((u) => [u.id, u]));
+
+  const doctorIds = Array.from(new Set(paginatedPrescriptions.map((p) => p.doctorId)));
+  const doctorsList = doctorIds.length > 0
+    ? await db.select().from(doctorsTable).where(inArray(doctorsTable.id, doctorIds))
+    : [];
+  const doctorMap = new Map(doctorsList.map((d) => [d.id, d]));
+
+  const doctorUserIds = Array.from(new Set(doctorsList.map((d) => d.userId)));
+  const doctorUsersList = doctorUserIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, doctorUserIds))
+    : [];
+  const doctorUserMap = new Map(doctorUsersList.map((u) => [u.id, u]));
+
+  const enriched = paginatedPrescriptions.map((p) => {
+    const patient = patientMap.get(p.patientId);
+    const doctorRow = doctorMap.get(p.doctorId);
+    const doctorUser = doctorRow ? doctorUserMap.get(doctorRow.userId) : null;
+    return {
+      ...p,
+      patientName: patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null,
+      doctorName: doctorUser ? `${doctorUser.firstName ?? ""} ${doctorUser.lastName ?? ""}`.trim() : null,
+      createdAt: p.createdAt.toISOString(),
+    };
+  });
 
   res.json(enriched);
 });
