@@ -205,6 +205,8 @@ CREATE TABLE "patient_ai_summaries" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+-- Ensure pgvector extension exists before creating or referencing vector columns
+CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE "knowledge_chunks" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"document_id" text NOT NULL,

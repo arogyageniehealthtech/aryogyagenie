@@ -152,6 +152,7 @@ export async function searchMedicalKnowledge(
       chunk: typeof knowledgeChunksTable.$inferSelect;
       score: number;
     }> = [];
+    let vectorQueryFailed = false;
 
     try {
       const pgVectorResult = await db.execute<{
@@ -202,11 +203,24 @@ export async function searchMedicalKnowledge(
         }));
       }
     } catch (vectorErr) {
-      logger.warn({ vectorErr }, "pgvector query error, using fallback chunk search");
+      vectorQueryFailed = true;
+      logger.warn({ vectorErr }, "pgvector query error");
     }
 
-    // Fallback if vector column is empty / unpopulated
+    // If pgvector query failed in production, do NOT perform a full-table scan.
+    if (vectorQueryFailed && process.env.NODE_ENV === "production") {
+      logger.error({ err: vectorQueryFailed }, "pgvector query failed in production; aborting RAG retrieval");
+      return [];
+    }
+
+    // Fallback (development only): if no candidates found, compute similarity in-memory
     if (candidateChunks.length === 0) {
+      if (process.env.NODE_ENV === "production") {
+        // In production we must not load the entire knowledge base into memory.
+        logger.warn("No candidate chunks returned from pgvector query in production; returning empty result set");
+        return [];
+      }
+
       const chunks = await getOrFetchChunks();
       if (chunks.length === 0) return [];
       candidateChunks = chunks.map(({ chunk, embedding, norm }) => ({
