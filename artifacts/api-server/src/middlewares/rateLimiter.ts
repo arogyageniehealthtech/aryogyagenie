@@ -1,30 +1,39 @@
 import rateLimit from "express-rate-limit";
+import type { Request } from "express";
+
+function getUserOrIpKey(req: Request): string {
+  const userId = (req as any).userId;
+  if (userId) return `user_${userId}`;
+  return req.ip ?? req.socket.remoteAddress ?? "anonymous";
+}
 
 /**
  * General API Rate Limiter
- * 300 requests per 15 minutes per IP.
+ * Defaults: 300 requests per 15 minutes per user/IP.
  */
 export const globalRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   limit: parseInt(process.env.RATE_LIMIT_GLOBAL_MAX ?? "300", 10),
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: getUserOrIpKey,
   message: {
-    error: "Too many requests from this IP, please try again after 15 minutes.",
+    error: "Too many requests, please try again after 15 minutes.",
   },
-  skip: (req) => req.path === "/api/health" || req.path === "/api/healthz" || req.path === "/api/health/ready",
+  skip: (req) => req.path === "/health" || req.path === "/healthz" || req.path === "/health/ready",
 });
 
 /**
  * Strict AI Rate Limiter
- * Protects LLM quota & CPU from automated spam or excessive queries.
- * 30 requests per 15 minutes per IP.
+ * Protects Gemini LLM quota & server CPU from automated spam.
+ * Defaults: 30 requests per 15 minutes per user/IP.
  */
 export const strictAiRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   limit: parseInt(process.env.RATE_LIMIT_AI_MAX ?? "30", 10),
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: getUserOrIpKey,
   message: {
     error: "AI rate limit reached. You have made too many AI requests. Please wait a few minutes before trying again.",
   },

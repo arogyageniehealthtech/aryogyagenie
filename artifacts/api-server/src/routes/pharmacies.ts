@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, inArray, desc } from "drizzle-orm";
+import { eq, inArray, desc, or, isNull, and } from "drizzle-orm";
 import { db, pharmaciesTable, usersTable, prescriptionsTable, doctorsTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
@@ -37,14 +37,20 @@ router.get("/pharmacies/me/dashboard", requireAuth, requireRole(["pharmacy"]), a
   const lastName = user?.lastName ?? null;
   const userName = pharmacy?.name || (user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null) || user?.email || "Pharmacy";
 
-  const prescriptions = await db.select().from(prescriptionsTable);
+  if (!pharmacy) {
+    res.json({ userName, name: userName, firstName, lastName, totalPrescriptions: 0, pendingPrescriptions: 0, dispensedToday: 0, recentPrescriptions: [] });
+    return;
+  }
+
+  const pharmacyFilter = or(eq(prescriptionsTable.pharmacyId, pharmacy.id), isNull(prescriptionsTable.pharmacyId));
+  const prescriptions = await db.select().from(prescriptionsTable).where(pharmacyFilter);
   const today = new Date().toISOString().split("T")[0];
   const dispensedToday = prescriptions.filter((p) => p.status === "dispensed" && p.prescribedDate === today).length;
   const pending = prescriptions.filter((p) => p.status === "active").length;
   const recent = prescriptions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5)
     .map((p) => ({ ...p, patientName: null, doctorName: null, createdAt: p.createdAt.toISOString() }));
 
-  res.json({ userName, name: pharmacy?.name ?? userName, firstName, lastName, totalPrescriptions: prescriptions.length, pendingPrescriptions: pending, dispensedToday, recentPrescriptions: recent });
+  res.json({ userName, name: pharmacy.name ?? userName, firstName, lastName, totalPrescriptions: prescriptions.length, pendingPrescriptions: pending, dispensedToday, recentPrescriptions: recent });
 });
 
 // GET /pharmacies/me/prescriptions
@@ -52,13 +58,30 @@ router.get("/pharmacies/me/prescriptions", requireAuth, requireRole(["pharmacy"]
   const { status } = req.query as { status?: string };
   const pagination = parsePaginationParams(req);
 
-  let prescriptions = await db.select().from(prescriptionsTable);
-  if (status) prescriptions = prescriptions.filter((p) => p.status === status);
+  const pharmacy = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
+  if (!pharmacy) {
+    res.json([]);
+    return;
+  }
 
-  const total = prescriptions.length;
+  const pharmacyFilter = or(eq(prescriptionsTable.pharmacyId, pharmacy.id), isNull(prescriptionsTable.pharmacyId));
+  const whereClause = status
+    ? and(pharmacyFilter, eq(prescriptionsTable.status, status as "active" | "dispensed" | "expired"))
+    : pharmacyFilter;
+
+  const [totalCountResult] = await db
+    .select({ count: db.$count(prescriptionsTable, whereClause) })
+    .from(prescriptionsTable);
+  const total = totalCountResult?.count ?? 0;
   setPaginationHeaders(res, total, pagination);
 
-  const paginatedPrescriptions = prescriptions.slice(pagination.offset, pagination.offset + pagination.limit);
+  const paginatedPrescriptions = await db
+    .select()
+    .from(prescriptionsTable)
+    .where(whereClause)
+    .orderBy(desc(prescriptionsTable.createdAt))
+    .limit(pagination.limit)
+    .offset(pagination.offset);
 
   if (paginatedPrescriptions.length === 0) {
     res.json([]);

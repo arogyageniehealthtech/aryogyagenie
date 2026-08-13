@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, jsonb, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, timestamp, index, vector } from "drizzle-orm/pg-core";
 
 export const knowledgeDocumentsTable = pgTable("knowledge_documents", {
   id: serial("id").primaryKey(),
@@ -38,10 +38,12 @@ export const knowledgeChunksTable = pgTable("knowledge_chunks", {
   source: text("source"),
   metadata: jsonb("metadata").$type<ChunkMetadata>().notNull(),
   embedding: jsonb("embedding").$type<number[]>().notNull(),
+  embeddingVector: vector("embedding_vector", { dimensions: 768 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_knowledge_chunks_document_id").on(table.documentId),
   index("idx_knowledge_chunks_category").on(table.category),
+  index("idx_knowledge_chunks_embedding_hnsw").using("hnsw", table.embeddingVector.op("vector_cosine_ops")),
 ]);
 
 export type KnowledgeDocument = typeof knowledgeDocumentsTable.$inferSelect;

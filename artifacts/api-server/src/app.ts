@@ -47,27 +47,46 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-// CORS configuration (Environment-aware)
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+// CORS configuration (Strict Production Fail-Closed Policy)
+const isProductionMode = process.env.NODE_ENV === "production";
+const rawAllowedOrigins = process.env.ALLOWED_ORIGINS?.trim();
+
+if (isProductionMode && !rawAllowedOrigins) {
+  throw new Error(
+    "FATAL CONFIGURATION ERROR: ALLOWED_ORIGINS environment variable must be explicitly defined in production mode."
+  );
+}
+
+const allowedOrigins = rawAllowedOrigins
+  ? rawAllowedOrigins.split(",").map((o) => o.trim()).filter(Boolean)
   : null;
+
+if (isProductionMode && allowedOrigins && allowedOrigins.includes("*")) {
+  throw new Error(
+    "FATAL CONFIGURATION ERROR: Wildcard '*' CORS origin is forbidden in production when credentials are enabled."
+  );
+}
 
 app.use(
   cors({
     credentials: true,
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+      // Allow non-browser requests with no origin (e.g. mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
       if (allowedOrigins) {
-        if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+        if (allowedOrigins.includes(origin)) {
           return callback(null, true);
         }
         return callback(new Error(`CORS origin '${origin}' not allowed by policy`));
       }
 
-      // Default in dev/staging: reflect request origin
-      return callback(null, true);
+      if (!isProductionMode) {
+        // Default in dev: reflect request origin
+        return callback(null, true);
+      }
+
+      return callback(new Error("CORS origin not allowed by policy"));
     },
   }),
 );

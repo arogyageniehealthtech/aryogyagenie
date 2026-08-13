@@ -7,6 +7,7 @@ export const prescriptionsTable = pgTable("prescriptions", {
   patientId: integer("patient_id").notNull(),
   doctorId: integer("doctor_id").notNull(),
   appointmentId: integer("appointment_id"),
+  pharmacyId: integer("pharmacy_id"),
   medicines: text("medicines").notNull(),
   diagnosis: text("diagnosis"),
   instructions: text("instructions"),
@@ -18,6 +19,7 @@ export const prescriptionsTable = pgTable("prescriptions", {
 }, (table) => [
   index("idx_prescriptions_patient_id").on(table.patientId),
   index("idx_prescriptions_doctor_id").on(table.doctorId),
+  index("idx_prescriptions_pharmacy_id").on(table.pharmacyId),
   index("idx_prescriptions_status").on(table.status),
 ]);
 

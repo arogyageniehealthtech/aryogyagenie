@@ -120,11 +120,12 @@ export function computeCosineSimilarityWithNorm(vecA: number[], vecB: number[], 
   return dotProduct / (Math.sqrt(normASq) * normB);
 }
 
+import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 /**
- * Perform semantic vector similarity search using nomic-embed-text query embeddings
- * against persistent PostgreSQL knowledge chunk embeddings.
+ * Perform semantic vector similarity search using nomic-embed-text/Gemini query embeddings
+ * against persistent PostgreSQL knowledge chunk pgvector embeddings.
  */
 export async function searchMedicalKnowledge(
   query: string,
@@ -142,10 +143,77 @@ export async function searchMedicalKnowledge(
   try {
     // 1. Generate query embedding
     const queryVector = await generateEmbedding(query);
+    if (!queryVector || queryVector.length === 0) return [];
 
-    // 2. Fetch cached knowledge chunks
-    const chunks = await getOrFetchChunks();
-    if (chunks.length === 0) return [];
+    const queryVectorStr = `[${queryVector.join(",")}]`;
+
+    // 2. Query PostgreSQL pgvector index directly for top candidates
+    let candidateChunks: Array<{
+      chunk: typeof knowledgeChunksTable.$inferSelect;
+      score: number;
+    }> = [];
+
+    try {
+      const pgVectorResult = await db.execute<{
+        id: number;
+        document_id: string;
+        chunk_index: number;
+        title: string;
+        content: string;
+        category: string;
+        tags: any;
+        section: string | null;
+        page: string | null;
+        source: string | null;
+        metadata: any;
+        embedding: any;
+        embedding_vector: any;
+        created_at: Date;
+        score: number;
+      }>(sql`
+        SELECT 
+          id, document_id, chunk_index, title, content, category, tags, section, page, source, metadata, embedding, created_at,
+          (1 - (embedding_vector <=> ${queryVectorStr}::vector)) AS score
+        FROM knowledge_chunks
+        WHERE embedding_vector IS NOT NULL
+        ORDER BY (embedding_vector <=> ${queryVectorStr}::vector) ASC
+        LIMIT ${topK * 4}
+      `);
+
+      if (pgVectorResult && pgVectorResult.rows && pgVectorResult.rows.length > 0) {
+        candidateChunks = pgVectorResult.rows.map((row) => ({
+          chunk: {
+            id: row.id,
+            documentId: row.document_id,
+            chunkIndex: row.chunk_index,
+            title: row.title,
+            content: row.content,
+            category: row.category,
+            tags: typeof row.tags === "string" ? JSON.parse(row.tags) : row.tags,
+            section: row.section,
+            page: row.page,
+            source: row.source,
+            metadata: typeof row.metadata === "string" ? JSON.parse(row.metadata) : row.metadata,
+            embedding: row.embedding,
+            embeddingVector: row.embedding_vector ?? null,
+            createdAt: new Date(row.created_at),
+          },
+          score: Number(row.score),
+        }));
+      }
+    } catch (vectorErr) {
+      logger.warn({ vectorErr }, "pgvector query error, using fallback chunk search");
+    }
+
+    // Fallback if vector column is empty / unpopulated
+    if (candidateChunks.length === 0) {
+      const chunks = await getOrFetchChunks();
+      if (chunks.length === 0) return [];
+      candidateChunks = chunks.map(({ chunk, embedding, norm }) => ({
+        chunk,
+        score: computeCosineSimilarityWithNorm(queryVector, embedding, norm),
+      }));
+    }
 
     // 3. Detect query domain context for relevance reranking
     const isAbdominalQuery = /\b(stomach|abdominal|abdomen|belly|navel|belly button|epigastric|digestive|gastro|gut|bowel)\b/i.test(queryLower);
@@ -153,11 +221,11 @@ export async function searchMedicalKnowledge(
     const isHematologyQuery = /\b(hemoglobin|anemia|iron|ferritin|blood count|cbc|rbc|hematology)\b/i.test(queryLower);
     const isCardiologyQuery = /\b(heart|cardiac|hypertension|blood pressure|angina|chest pain|palpitations)\b/i.test(queryLower);
 
-    // 4. Compute vector cosine similarity & apply domain reranking
+    // 4. Compute final scored results with domain adjustments
     const scoredResults: RAGRetrievalResult[] = [];
 
-    for (const { chunk, embedding, norm } of chunks) {
-      let score = computeCosineSimilarityWithNorm(queryVector, embedding, norm);
+    for (const { chunk, score: rawScore } of candidateChunks) {
+      let score = rawScore;
 
       const chunkCategory = (chunk.category || "").toLowerCase();
       const chunkTitle = (chunk.title || "").toLowerCase();

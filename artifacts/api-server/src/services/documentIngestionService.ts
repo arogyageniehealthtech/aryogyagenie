@@ -233,6 +233,7 @@ export async function ingestMedicalDocument(input: IngestDocumentInput): Promise
       source,
       metadata,
       embedding,
+      embeddingVector: embedding,
     });
 
     ingestedResults.push({

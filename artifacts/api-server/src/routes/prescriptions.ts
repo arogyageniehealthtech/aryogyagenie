@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, inArray, desc } from "drizzle-orm";
-import { db, prescriptionsTable, usersTable, doctorsTable } from "@workspace/db";
+import { eq, inArray, desc, or, isNull } from "drizzle-orm";
+import { db, prescriptionsTable, usersTable, doctorsTable, pharmaciesTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
@@ -17,6 +17,10 @@ router.get("/prescriptions", requireAuth, async (req: AuthenticatedRequest, res)
     if (!doctor) { res.json([]); return; }
     whereClause = eq(prescriptionsTable.doctorId, doctor.id);
   } else if (user?.role === "pharmacy") {
+    const pharmacy = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
+    if (!pharmacy) { res.json([]); return; }
+    whereClause = or(eq(prescriptionsTable.pharmacyId, pharmacy.id), isNull(prescriptionsTable.pharmacyId));
+  } else if (user?.role === "admin") {
     whereClause = undefined;
   } else {
     whereClause = eq(prescriptionsTable.patientId, req.userId!);
@@ -86,7 +90,7 @@ router.get("/prescriptions", requireAuth, async (req: AuthenticatedRequest, res)
 
 // POST /prescriptions
 router.post("/prescriptions", requireAuth, requireRole(["doctor"]), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { patientId, appointmentId, medicines, diagnosis, instructions, fileUrl, prescribedDate } = req.body;
+  const { patientId, appointmentId, pharmacyId, medicines, diagnosis, instructions, fileUrl, prescribedDate } = req.body;
   if (!patientId || !medicines || !prescribedDate) {
     res.status(400).json({ error: "patientId, medicines, prescribedDate required" });
     return;
@@ -97,6 +101,7 @@ router.post("/prescriptions", requireAuth, requireRole(["doctor"]), async (req: 
 
   const [p] = await db.insert(prescriptionsTable).values({
     patientId, doctorId: doctorRow.id, appointmentId: appointmentId ?? null,
+    pharmacyId: pharmacyId ?? null,
     medicines, diagnosis, instructions, fileUrl, prescribedDate,
   }).returning();
 
@@ -111,17 +116,25 @@ router.get("/prescriptions/:id", requireAuth, async (req: AuthenticatedRequest, 
   const p = await db.query.prescriptionsTable.findFirst({ where: eq(prescriptionsTable.id, id) });
   if (!p) { res.status(404).json({ error: "Not found" }); return; }
 
-  // Authorization check (Patient, issuing Doctor, Pharmacy, or Admin)
+  // Authorization check (Patient, issuing Doctor, authorized Pharmacy, or Admin)
   const isPatient = p.patientId === req.userId;
   let isIssuingDoctor = false;
   if (req.userRole === "doctor") {
     const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
     isIssuingDoctor = doctorRow?.id === p.doctorId;
   }
-  const isPharmacy = req.userRole === "pharmacy";
+
+  let isAuthorizedPharmacy = false;
+  if (req.userRole === "pharmacy") {
+    const pharmacy = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
+    if (pharmacy && (p.pharmacyId === null || p.pharmacyId === pharmacy.id)) {
+      isAuthorizedPharmacy = true;
+    }
+  }
+
   const isAdmin = req.userRole === "admin";
 
-  if (!isPatient && !isIssuingDoctor && !isPharmacy && !isAdmin) {
+  if (!isPatient && !isIssuingDoctor && !isAuthorizedPharmacy && !isAdmin) {
     res.status(403).json({ error: "Access denied. You are not authorized to view this prescription." });
     return;
   }
@@ -137,24 +150,39 @@ router.patch("/prescriptions/:id", requireAuth, async (req: AuthenticatedRequest
   const existingP = await db.query.prescriptionsTable.findFirst({ where: eq(prescriptionsTable.id, id) });
   if (!existingP) { res.status(404).json({ error: "Not found" }); return; }
 
-  // Authorization check (issuing Doctor, Pharmacy, or Admin)
+  // Authorization check (issuing Doctor, authorized Pharmacy, or Admin)
   let isIssuingDoctor = false;
   if (req.userRole === "doctor") {
     const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
     isIssuingDoctor = doctorRow?.id === existingP.doctorId;
   }
-  const isPharmacy = req.userRole === "pharmacy";
+
+  let pharmacyRow = null;
+  let isAuthorizedPharmacy = false;
+  if (req.userRole === "pharmacy") {
+    pharmacyRow = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
+    if (pharmacyRow && (existingP.pharmacyId === null || existingP.pharmacyId === pharmacyRow.id)) {
+      isAuthorizedPharmacy = true;
+    }
+  }
+
   const isAdmin = req.userRole === "admin";
 
-  if (!isIssuingDoctor && !isPharmacy && !isAdmin) {
+  if (!isIssuingDoctor && !isAuthorizedPharmacy && !isAdmin) {
     res.status(403).json({ error: "Access denied. You are not authorized to modify this prescription." });
     return;
   }
 
   const { status, diagnosis, medicines, instructions } = req.body;
+  const updatePayload: Record<string, any> = { status, diagnosis, medicines, instructions };
+  
+  if (isAuthorizedPharmacy && pharmacyRow && existingP.pharmacyId === null) {
+    updatePayload.pharmacyId = pharmacyRow.id;
+  }
+
   const [p] = await db
     .update(prescriptionsTable)
-    .set({ status, diagnosis, medicines, instructions })
+    .set(updatePayload)
     .where(eq(prescriptionsTable.id, id))
     .returning();
 

@@ -44,6 +44,11 @@ export const pool = new Pool({
   idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT ?? "30000", 10),
   connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONN_TIMEOUT ?? "5000", 10),
 });
+
+pool.on("error", (err) => {
+  console.error("Unexpected PostgreSQL pool client error:", err);
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

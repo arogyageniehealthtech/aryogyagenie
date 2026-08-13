@@ -8,6 +8,8 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "db:generate": "pnpm --filter @workspace/db run generate",
+    "db:migrate": "pnpm --filter @workspace/db run migrate",
     "db:push": "pnpm --filter @workspace/db run push",
     "db:seed": "pnpm --filter @workspace/scripts exec tsx ./src/seed.ts",
     "db:reset": "pnpm --filter @workspace/scripts exec tsx ./src/resetDb.ts",

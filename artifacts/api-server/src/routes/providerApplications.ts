@@ -264,16 +264,22 @@ router.get(
       const { status } = req.query as { status?: string };
       const pagination = parsePaginationParams(req);
 
-      let apps = await db.select().from(providerApplicationsTable).orderBy(desc(providerApplicationsTable.createdAt));
+      const whereClause = status ? eq(providerApplicationsTable.status, status.toUpperCase() as any) : undefined;
 
-      if (status) {
-        apps = apps.filter((a) => a.status === status.toUpperCase());
-      }
+      const [totalCountResult] = await db
+        .select({ count: db.$count(providerApplicationsTable, whereClause) })
+        .from(providerApplicationsTable);
+      const total = totalCountResult?.count ?? 0;
 
-      const total = apps.length;
       setPaginationHeaders(res, total, pagination);
 
-      const paginatedApps = apps.slice(pagination.offset, pagination.offset + pagination.limit);
+      const paginatedApps = await db
+        .select()
+        .from(providerApplicationsTable)
+        .where(whereClause)
+        .orderBy(desc(providerApplicationsTable.createdAt))
+        .limit(pagination.limit)
+        .offset(pagination.offset);
 
       res.json(
         paginatedApps.map((a) => ({
