@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import {
   Search, Star, MapPin, Stethoscope, ArrowRight, Award,
-  LayoutGrid, Map as MapIcon, Locate, Calendar, Navigation, Edit3, Loader2, MousePointerClick, X,
+  LayoutGrid, Map as MapIcon, Locate, Calendar, Navigation, Edit3, Loader2, MousePointerClick, X, Radio,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker, useMap, useMapEvents } from "react-leaflet";
@@ -165,6 +165,7 @@ export function PatientDoctors() {
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [showAddressBox, setShowAddressBox] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [isLiveGps, setIsLiveGps] = useState(false);
   const [radiusIdx, setRadiusIdx] = useState(3); // default 8 km
   const [nearbyDocs, setNearbyDocs] = useState<any[]>([]);
   const [loadingNearby, setLoadingNearby] = useState(false);
@@ -172,6 +173,7 @@ export function PatientDoctors() {
 
   const mapRef = useRef<LeafletMap | null>(null);
   const userMarkerRef = useRef<any>(null);
+  const watchIdRef = useRef<number | null>(null);
   const radiusKm = RADIUS_STEPS[radiusIdx];
 
   const updateAndSaveLocation = useCallback((lat: number, lng: number, name: string) => {
@@ -189,34 +191,64 @@ export function PatientDoctors() {
     specialty: specialty !== "all" ? specialty : undefined
   });
 
-  const locateUserGPS = useCallback(() => {
+  const startLiveGPS = useCallback(() => {
     setLocating(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setLocating(false);
-          const addr = await fetchReverseGeocode(newLoc.lat, newLoc.lng);
-          updateAndSaveLocation(newLoc.lat, newLoc.lng, addr);
-          if (mapRef.current) {
-            mapRef.current.flyTo([newLoc.lat, newLoc.lng], 14, { duration: 1 });
-          }
-        },
-        () => setLocating(false),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    } else {
+    if (!navigator.geolocation) {
       setLocating(false);
+      return;
     }
+
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+
+    const id = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const freshLat = pos.coords.latitude;
+        const freshLng = pos.coords.longitude;
+        setLocating(false);
+        setIsLiveGps(true);
+        const addr = await fetchReverseGeocode(freshLat, freshLng);
+        updateAndSaveLocation(freshLat, freshLng, addr);
+        if (mapRef.current) {
+          mapRef.current.flyTo([freshLat, freshLng], 14, { duration: 1 });
+        }
+      },
+      () => {
+        setLocating(false);
+        setIsLiveGps(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+
+    watchIdRef.current = id;
   }, [updateAndSaveLocation]);
 
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
   const handleMapClick = useCallback(async (clickedLat: number, clickedLng: number) => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      setIsLiveGps(false);
+    }
     const addr = await fetchReverseGeocode(clickedLat, clickedLng);
     updateAndSaveLocation(clickedLat, clickedLng, addr);
   }, [updateAndSaveLocation]);
 
   const searchAddress = useCallback(async (queryAddress: string) => {
     if (!queryAddress.trim()) return;
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      setIsLiveGps(false);
+    }
     setIsSearchingAddress(true);
     try {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryAddress)}&format=json&limit=1`;
@@ -242,6 +274,11 @@ export function PatientDoctors() {
   }, [updateAndSaveLocation]);
 
   const selectQuickCity = useCallback((city: typeof QUICK_CITIES[0]) => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      setIsLiveGps(false);
+    }
     updateAndSaveLocation(city.lat, city.lng, city.name);
     setShowAddressBox(false);
     if (mapRef.current) {
@@ -252,6 +289,11 @@ export function PatientDoctors() {
   const userMarkerDragHandlers = useMemo(
     () => ({
       async dragend() {
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+          setIsLiveGps(false);
+        }
         const marker = userMarkerRef.current;
         if (marker != null) {
           const latLng = marker.getLatLng();
@@ -401,7 +443,7 @@ export function PatientDoctors() {
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                   <div className="flex items-center gap-1.5 text-xs bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                    <span className="h-2.5 w-2.5 rounded-full bg-blue-600 animate-pulse" />
+                    <span className={`h-2.5 w-2.5 rounded-full animate-pulse ${isLiveGps ? "bg-emerald-500" : "bg-blue-600"}`} />
                     <span className="font-bold text-slate-700 max-w-[140px] truncate">{locationName}</span>
                     <button
                       onClick={() => setShowAddressBox((s) => !s)}
@@ -413,13 +455,13 @@ export function PatientDoctors() {
 
                   <Button
                     size="sm"
-                    variant="outline"
-                    onClick={locateUserGPS}
+                    variant={isLiveGps ? "default" : "outline"}
+                    onClick={startLiveGPS}
                     disabled={locating}
-                    className="h-8 text-xs rounded-xl gap-1"
+                    className={`h-8 text-xs rounded-xl gap-1 font-bold ${isLiveGps ? "bg-emerald-600 text-white" : ""}`}
                   >
-                    <Locate className="h-3.5 w-3.5 text-blue-500" />
-                    {locating ? "Locating..." : "GPS"}
+                    {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isLiveGps ? <Radio className="h-3.5 w-3.5 animate-pulse text-white" /> : <Locate className="h-3.5 w-3.5 text-blue-500" />}
+                    {isLiveGps ? "Live GPS" : "GPS"}
                   </Button>
                 </div>
               </div>
@@ -555,8 +597,8 @@ export function PatientDoctors() {
                     center={[userLoc.lat, userLoc.lng]}
                     radius={22}
                     pathOptions={{
-                      color: "#3B82F6",
-                      fillColor: "#3B82F6",
+                      color: isLiveGps ? "#10B981" : "#3B82F6",
+                      fillColor: isLiveGps ? "#10B981" : "#3B82F6",
                       fillOpacity: 0.22,
                       weight: 0,
                     }}
@@ -567,7 +609,7 @@ export function PatientDoctors() {
                     radius={10}
                     pathOptions={{
                       color: "#FFFFFF",
-                      fillColor: "#2563EB",
+                      fillColor: isLiveGps ? "#059669" : "#2563EB",
                       fillOpacity: 1,
                       weight: 3,
                     }}
@@ -583,6 +625,7 @@ export function PatientDoctors() {
                     <Popup>
                       <div className="text-xs font-bold text-center">
                         📍 You are here ({locationName})
+                        {isLiveGps && <p className="text-[10px] text-emerald-600 font-bold mt-1">🟢 Live Real-Time GPS Active</p>}
                         <p className="font-normal text-slate-500 mt-1">Drag pin or click map to move!</p>
                       </div>
                     </Popup>

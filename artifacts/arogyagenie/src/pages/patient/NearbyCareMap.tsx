@@ -6,7 +6,7 @@ import {
   MapPin, Stethoscope, Pill, TestTube, Locate, AlertCircle,
   Navigation, ExternalLink, Phone, Star, Search, X,
   ChevronUp, ChevronDown, Loader2, Calendar, Edit3, Check, MousePointerClick,
-  Building2,
+  Building2, Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -326,7 +326,6 @@ function ProviderDetail({
   );
 }
 
-// Helper to read initial saved location
 function getSavedLocation(): { lat: number; lng: number; name: string } {
   try {
     const raw = localStorage.getItem("arogyagenie_user_location");
@@ -355,8 +354,11 @@ export function NearbyCareMap() {
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [showAddressBox, setShowAddressBox] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [isLiveGps, setIsLiveGps] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
-  const [clickNotice, setClickNotice] = useState<string | null>("💡 Click anywhere on the map or type address above to set your location pin!");
+  const [clickNotice, setClickNotice] = useState<string | null>("💡 Click anywhere on the map or type address to position your pin!");
+
+  const watchIdRef = useRef<number | null>(null);
 
   // Providers state
   const [providers, setProviders] = useState<NearbyProvider[]>([]);
@@ -374,7 +376,6 @@ export function NearbyCareMap() {
   const userMarkerRef = useRef<any>(null);
   const radiusKm = RADIUS_STEPS[radiusIdx];
 
-  // Persist location helper
   const updateAndSaveLocation = useCallback((lat: number, lng: number, name: string) => {
     setUserLoc({ lat, lng });
     setLocationName(name);
@@ -385,7 +386,6 @@ export function NearbyCareMap() {
     }
   }, []);
 
-  // ── Fetch nearby providers for userLoc ─────────────────────────────────────
   const fetchNearby = useCallback(async (lat: number, lng: number) => {
     setLoading(true);
     try {
@@ -407,8 +407,13 @@ export function NearbyCareMap() {
     }
   }, [radiusKm, filter, search]);
 
-  // ── Update location from Map Click ──────────────────────────────────────────
   const handleMapClick = useCallback(async (clickedLat: number, clickedLng: number) => {
+    // If user clicks map, stop live GPS watch so map stays where user clicked
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      setIsLiveGps(false);
+    }
     setClickNotice(null);
     setSelected(null);
     fetchNearby(clickedLat, clickedLng);
@@ -416,9 +421,13 @@ export function NearbyCareMap() {
     updateAndSaveLocation(clickedLat, clickedLng, addr);
   }, [fetchNearby, updateAndSaveLocation]);
 
-  // ── Geocode custom address typed by patient ────────────────────────────────
   const searchAddress = useCallback(async (queryAddress: string) => {
     if (!queryAddress.trim()) return;
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      setIsLiveGps(false);
+    }
     setIsSearchingAddress(true);
     setLocError(null);
     try {
@@ -447,8 +456,12 @@ export function NearbyCareMap() {
     }
   }, [fetchNearby, updateAndSaveLocation]);
 
-  // Quick City Select
   const selectQuickCity = useCallback((city: typeof QUICK_CITIES[0]) => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      setIsLiveGps(false);
+    }
     updateAndSaveLocation(city.lat, city.lng, city.name);
     setShowAddressBox(false);
     fetchNearby(city.lat, city.lng);
@@ -457,35 +470,59 @@ export function NearbyCareMap() {
     }
   }, [fetchNearby, updateAndSaveLocation]);
 
-  // ── GPS locate ─────────────────────────────────────────────────────────────
-  const locateGPS = useCallback(() => {
+  // ── Live Continuous Real-Time GPS Tracking ─────────────────────────────────
+  const startLiveGPS = useCallback(() => {
     setLocating(true);
     setLocError(null);
+
     if (!navigator.geolocation) {
       setLocError("Geolocation not supported on this browser.");
       setLocating(false);
       return;
     }
-    navigator.geolocation.getCurrentPosition(
+
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+
+    // Force maximumAge: 0 to flush 1-week-old cached locations!
+    const id = navigator.geolocation.watchPosition(
       async (pos) => {
-        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        fetchNearby(loc.lat, loc.lng);
+        const freshLat = pos.coords.latitude;
+        const freshLng = pos.coords.longitude;
+
         setLocating(false);
-        const addr = await fetchReverseGeocode(loc.lat, loc.lng);
-        updateAndSaveLocation(loc.lat, loc.lng, addr);
+        setIsLiveGps(true);
+        fetchNearby(freshLat, freshLng);
+
+        const addr = await fetchReverseGeocode(freshLat, freshLng);
+        updateAndSaveLocation(freshLat, freshLng, addr);
+
         if (mapRef.current) {
-          mapRef.current.flyTo([loc.lat, loc.lng], 14, { duration: 1 });
+          mapRef.current.flyTo([freshLat, freshLng], 14, { duration: 1 });
         }
       },
       () => {
-        setLocError("GPS access unavailable. Select your city or type address above!");
+        setLocError("GPS access unavailable or cached location returned. Select your city or type address above!");
         setLocating(false);
+        setIsLiveGps(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }, // maximumAge: 0 flushes stale cache!
     );
+
+    watchIdRef.current = id;
   }, [fetchNearby, updateAndSaveLocation]);
 
-  // Initial fetch using saved/default location (WITHOUT forcing GPS auto-overwrite on mount)
+  // Cleanup watchPosition on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  // Initial fetch using saved location
   useEffect(() => {
     fetchNearby(userLoc.lat, userLoc.lng);
   }, []);
@@ -494,10 +531,14 @@ export function NearbyCareMap() {
     if (userLoc) fetchNearby(userLoc.lat, userLoc.lng);
   }, [radiusKm, filter, fetchNearby]);
 
-  // ── Draggable user pin end event ───────────────────────────────────────────
   const userMarkerDragHandlers = useMemo(
     () => ({
       async dragend() {
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+          setIsLiveGps(false);
+        }
         const marker = userMarkerRef.current;
         if (marker != null) {
           const latLng = marker.getLatLng();
@@ -567,11 +608,7 @@ export function NearbyCareMap() {
           />
 
           <MapInit onReady={(m) => { mapRef.current = m; }} />
-
-          {/* Click anywhere on map to set location */}
           <MapClickListener onMapClick={handleMapClick} />
-
-          {/* Smooth map fly component */}
           <MapFly lat={userLoc.lat} lng={userLoc.lng} zoom={14} />
 
           {/* Glowing Outer Blue Halo */}
@@ -579,20 +616,20 @@ export function NearbyCareMap() {
             center={[userLoc.lat, userLoc.lng]}
             radius={22}
             pathOptions={{
-              color: "#3B82F6",
-              fillColor: "#3B82F6",
+              color: isLiveGps ? "#10B981" : "#3B82F6",
+              fillColor: isLiveGps ? "#10B981" : "#3B82F6",
               fillOpacity: 0.22,
               weight: 0,
             }}
           />
 
-          {/* Solid Vivid Blue Dot */}
+          {/* Solid Vivid Blue/Green Dot */}
           <CircleMarker
             center={[userLoc.lat, userLoc.lng]}
             radius={10}
             pathOptions={{
               color: "#FFFFFF",
-              fillColor: "#2563EB",
+              fillColor: isLiveGps ? "#059669" : "#2563EB",
               fillOpacity: 1,
               weight: 3,
             }}
@@ -610,6 +647,7 @@ export function NearbyCareMap() {
               <div className="text-xs font-bold text-center min-w-[150px]">
                 📍 Your Location
                 <p className="font-semibold text-blue-600 mt-1">{locationName}</p>
+                {isLiveGps && <p className="text-[10px] text-emerald-600 font-bold mt-1">🟢 Live Real-Time GPS Active</p>}
                 <p className="font-normal text-slate-400 mt-1 text-[10px]">Drag pin or click map to move!</p>
               </div>
             </Popup>
@@ -678,10 +716,9 @@ export function NearbyCareMap() {
 
         {/* ── Floating top HUD ──────────────────────────────────────────────── */}
         <div className="absolute top-3 left-0 right-0 z-[1000] px-4 flex flex-col gap-2 pointer-events-none">
-          {/* Top location bar & action buttons */}
           <div className="flex items-center gap-2 pointer-events-auto">
             <div className="flex-1 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-slate-200 px-3.5 py-2 flex items-center gap-2 min-w-0">
-              <span className="h-3 w-3 rounded-full bg-blue-600 border-2 border-white shadow-xs shrink-0 animate-pulse" />
+              <span className={`h-3 w-3 rounded-full border-2 border-white shadow-xs shrink-0 animate-pulse ${isLiveGps ? "bg-emerald-500" : "bg-blue-600"}`} />
               <span className="text-xs font-bold text-slate-800 truncate" title={locationName}>
                 {locationName}
               </span>
@@ -694,22 +731,27 @@ export function NearbyCareMap() {
               </button>
             </div>
 
-            {/* Locate GPS button */}
+            {/* Live Real-time GPS button */}
             <button
-              onClick={locateGPS}
+              onClick={startLiveGPS}
               disabled={locating}
-              className="h-10 w-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-slate-200 transition-all hover:scale-105 shrink-0"
-              title="Fly to Browser Location"
+              className={`h-10 w-10 rounded-full shadow-lg flex items-center justify-center border transition-all hover:scale-105 shrink-0 ${
+                isLiveGps
+                  ? "bg-emerald-500 text-white border-emerald-600 shadow-emerald-200"
+                  : "bg-white text-blue-600 border-slate-200"
+              }`}
+              title="Activate Real-Time Live GPS"
             >
               {locating ? (
-                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+              ) : isLiveGps ? (
+                <Radio className="h-4 w-4 animate-pulse text-white" />
               ) : (
                 <Locate className="h-4 w-4 text-blue-500" />
               )}
             </button>
           </div>
 
-          {/* Click instruction prompt */}
           {clickNotice && (
             <div className="pointer-events-auto flex items-center justify-between gap-2 text-xs text-blue-800 bg-blue-50/95 backdrop-blur-md border border-blue-200 rounded-2xl px-3.5 py-1.5 shadow-md">
               <span className="flex items-center gap-1.5 font-medium">
@@ -722,7 +764,6 @@ export function NearbyCareMap() {
             </div>
           )}
 
-          {/* Manual Address & Quick City Selector Dropdown */}
           {showAddressBox && (
             <div className="bg-white rounded-2xl p-3.5 shadow-2xl border border-slate-200 pointer-events-auto space-y-3">
               <div className="flex items-center justify-between">
@@ -732,7 +773,6 @@ export function NearbyCareMap() {
                 </button>
               </div>
 
-              {/* Address input */}
               <div className="flex gap-2">
                 <input
                   autoFocus
@@ -754,7 +794,6 @@ export function NearbyCareMap() {
                 </Button>
               </div>
 
-              {/* Quick City Buttons */}
               <div className="space-y-1 pt-1">
                 <p className="text-[11px] font-semibold text-slate-400">Quick Select Metro Area:</p>
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -772,7 +811,6 @@ export function NearbyCareMap() {
             </div>
           )}
 
-          {/* Filter pills row */}
           <div className="flex items-center gap-2 pointer-events-auto overflow-x-auto pb-0.5 scrollbar-none">
             <button
               onClick={() => setShowSearch((s) => !s)}
@@ -807,7 +845,6 @@ export function NearbyCareMap() {
             })}
           </div>
 
-          {/* Search input */}
           {showSearch && (
             <div className="relative pointer-events-auto">
               <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
@@ -826,7 +863,6 @@ export function NearbyCareMap() {
             </div>
           )}
 
-          {/* Error notice */}
           {locError && (
             <div className="pointer-events-auto flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2 shadow-lg">
               <AlertCircle className="h-4 w-4 shrink-0" />
