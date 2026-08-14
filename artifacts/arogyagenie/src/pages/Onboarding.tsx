@@ -4,14 +4,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { User, Stethoscope, TestTube, Pill, CheckCircle2, Clock } from "lucide-react";
+import {
+  User, Stethoscope, TestTube, Pill, CheckCircle2, Clock,
+  MapPin, Loader2, Navigation,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DOCTOR_SPECIALTIES } from "@/lib/specialties";
 
@@ -21,7 +24,7 @@ const onboardingSchema = z.object({
   role: z.enum(["patient", "doctor", "diagnostic_center", "pharmacy"]),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  name: z.string().optional(), // for Diagnostic Center or Pharmacy
+  name: z.string().optional(),
   phone: z.string().min(5, "Phone number is required"),
   email: z.string().email("Valid email is required").optional().or(z.literal("")),
   specialty: z.string().optional(),
@@ -32,14 +35,143 @@ const onboardingSchema = z.object({
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+// ─── Nominatim Geocoding Helper ───────────────────────────────────────────────
+interface GeocodeResult {
+  lat: number;
+  lng: number;
+  displayName: string;
+}
+
+async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&addressdetails=1`;
+  const res = await fetch(url, {
+    headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
+  });
+  const data = await res.json();
+  if (!data || data.length === 0) return null;
+  return {
+    lat: parseFloat(data[0].lat),
+    lng: parseFloat(data[0].lon),
+    displayName: data[0].display_name,
+  };
+}
+
+// ─── AddressWithGeocode Component ────────────────────────────────────────────
+interface AddressWithGeocodeProps {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  onCoordsDetected: (lat: number, lng: number) => void;
+  label?: string;
+}
+
+function AddressWithGeocode({
+  value,
+  onChange,
+  placeholder,
+  onCoordsDetected,
+  label = "Address *",
+}: AddressWithGeocodeProps) {
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeStatus, setGeocodeStatus] = useState<
+    { type: "success"; text: string } | { type: "error"; text: string } | null
+  >(null);
+
+  const handleGeocode = useCallback(async () => {
+    if (!value.trim()) {
+      setGeocodeStatus({ type: "error", text: "Please enter an address first." });
+      return;
+    }
+    setGeocoding(true);
+    setGeocodeStatus(null);
+    try {
+      const result = await geocodeAddress(value.trim());
+      if (!result) {
+        setGeocodeStatus({
+          type: "error",
+          text: "Address not found. Try adding more detail (e.g. city, state).",
+        });
+      } else {
+        onCoordsDetected(result.lat, result.lng);
+        setGeocodeStatus({
+          type: "success",
+          text: `Located: ${result.displayName.split(",").slice(0, 3).join(",")}`,
+        });
+      }
+    } catch {
+      setGeocodeStatus({ type: "error", text: "Geocoding failed. Please try again." });
+    } finally {
+      setGeocoding(false);
+    }
+  }, [value, onCoordsDetected]);
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+        {label}
+      </label>
+      <div className="flex gap-2">
+        <Input
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setGeocodeStatus(null);
+          }}
+          placeholder={placeholder}
+          className="flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleGeocode}
+          disabled={geocoding || !value.trim()}
+          className="shrink-0 gap-1.5 h-10 px-3 border-violet-200 text-violet-700 hover:bg-violet-50"
+          title="Auto-detect coordinates from address using OpenStreetMap (free)"
+        >
+          {geocoding ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Navigation className="h-3.5 w-3.5" />
+          )}
+          {geocoding ? "Locating…" : "Detect"}
+        </Button>
+      </div>
+      {geocodeStatus && (
+        <p
+          className={`text-xs flex items-start gap-1 mt-1 ${
+            geocodeStatus.type === "success" ? "text-emerald-600" : "text-amber-600"
+          }`}
+        >
+          {geocodeStatus.type === "success" ? (
+            <CheckCircle2 className="h-3.5 w-3.5 mt-px shrink-0" />
+          ) : (
+            <MapPin className="h-3.5 w-3.5 mt-px shrink-0" />
+          )}
+          {geocodeStatus.text}
+        </p>
+      )}
+      {!geocodeStatus && value.trim() && (
+        <p className="text-xs text-slate-400">
+          Click <strong>Detect</strong> to auto-locate this address on the map (free, no key needed).
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Onboarding Page ──────────────────────────────────────────────────────────
 export function Onboarding() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { data: user, isLoading } = useGetMe();
   const queryClient = useQueryClient();
-  
+
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Geocoded coordinates — stored separately, not in form schema
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const form = useForm<z.infer<typeof onboardingSchema>>({
     resolver: zodResolver(onboardingSchema),
@@ -53,11 +185,17 @@ export function Onboarding() {
       specialty: "General Physician",
       address: "",
       dateOfBirth: "",
-      gender: ""
-    }
+      gender: "",
+    },
   });
 
   const selectedRole = form.watch("role");
+  const addressValue = form.watch("address") ?? "";
+
+  // Reset coords when role changes
+  useEffect(() => {
+    setCoords(null);
+  }, [selectedRole]);
 
   const getDashboardPath = (role?: string | null, status?: string | null): string => {
     if (!role) return "/onboarding";
@@ -84,7 +222,6 @@ export function Onboarding() {
     setIsSubmitting(true);
     try {
       if (data.role === "patient") {
-        // Patient registration
         const updatedUser = await customFetch<any>("/api/users/me/onboard", {
           method: "POST",
           body: JSON.stringify({
@@ -100,7 +237,6 @@ export function Onboarding() {
         await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
         setLocation("/patient/dashboard");
       } else {
-        // Provider application flow (Doctor, Diagnostic Center, Pharmacy)
         const appType =
           data.role === "doctor"
             ? "DOCTOR"
@@ -108,15 +244,21 @@ export function Onboarding() {
             ? "DIAGNOSTIC_CENTER"
             : "PHARMACY";
 
-        const payload = {
+        const payload: Record<string, any> = {
           type: appType,
           firstName: data.firstName,
           lastName: data.lastName,
-          name: data.name || (data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : undefined),
+          name:
+            data.name ||
+            (data.firstName && data.lastName
+              ? `${data.firstName} ${data.lastName}`
+              : undefined),
           phone: data.phone,
           email: data.email || user?.email,
           specialty: data.specialty,
           address: data.address,
+          // Attach geocoded coordinates if the provider clicked "Detect"
+          ...(coords ? { latitude: coords.lat, longitude: coords.lng } : {}),
         };
 
         const responseData = await customFetch<any>("/api/provider-applications", {
@@ -125,8 +267,6 @@ export function Onboarding() {
         });
 
         await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-        
-        // DO NOT give portal access. Show polished message.
         setSubmittedMessage(
           responseData?.message ||
             "Application submitted successfully. Our team will review your details and contact you shortly. Portal access will be provided after approval."
@@ -147,7 +287,11 @@ export function Onboarding() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 py-12">
       <div className="w-full max-w-2xl bg-card rounded-2xl shadow-xl border border-blue-100 overflow-hidden">
         <div className="bg-primary p-8 text-white text-center">
-          <img src={`${basePath}/logo.png`} alt="ArogyaGenie Logo" className="h-16 w-16 mx-auto mb-4 bg-white rounded-full p-2" />
+          <img
+            src={`${basePath}/logo.png`}
+            alt="ArogyaGenie Logo"
+            className="h-16 w-16 mx-auto mb-4 bg-white rounded-full p-2"
+          />
           <h1 className="text-2xl font-bold mb-2">Welcome to ArogyaGenie</h1>
           <p className="text-primary-foreground/80">Select your role to register your account.</p>
         </div>
@@ -161,6 +305,12 @@ export function Onboarding() {
               <div className="space-y-2">
                 <h3 className="text-xl font-bold text-slate-900">Application Submitted</h3>
                 <p className="text-slate-600 max-w-md mx-auto leading-relaxed">{submittedMessage}</p>
+                {coords && (
+                  <p className="text-xs text-emerald-600 flex items-center justify-center gap-1 mt-2">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Location registered — you will appear on the patient map after approval.
+                  </p>
+                )}
               </div>
               <div className="pt-4">
                 <Button
@@ -174,6 +324,7 @@ export function Onboarding() {
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                {/* Role selector */}
                 <FormField
                   control={form.control}
                   name="role"
@@ -316,6 +467,26 @@ export function Onboarding() {
                         </FormItem>
                       )}
                     />
+
+                    {/* Clinic address with Nominatim geocoding */}
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <AddressWithGeocode
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              placeholder="123 Clinic Road, Salt Lake, Kolkata"
+                              label="Clinic Address (for patient map)"
+                              onCoordsDetected={(lat, lng) => setCoords({ lat, lng })}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 )}
 
@@ -336,19 +507,27 @@ export function Onboarding() {
                         </FormItem>
                       )}
                     />
+
+                    {/* Address with geocoding */}
                     <FormField
                       control={form.control}
                       name="address"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Address *</FormLabel>
                           <FormControl>
-                            <Input placeholder="123 Health Ave, MG Road, Bengaluru" {...field} />
+                            <AddressWithGeocode
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              placeholder="123 Health Ave, MG Road, Bengaluru"
+                              label="Center Address (for patient map)"
+                              onCoordsDetected={(lat, lng) => setCoords({ lat, lng })}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -397,19 +576,27 @@ export function Onboarding() {
                         </FormItem>
                       )}
                     />
+
+                    {/* Address with geocoding */}
                     <FormField
                       control={form.control}
                       name="address"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Address *</FormLabel>
                           <FormControl>
-                            <Input placeholder="45 Station Road, Mumbai" {...field} />
+                            <AddressWithGeocode
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              placeholder="45 Station Road, Mumbai"
+                              label="Pharmacy Address (for patient map)"
+                              onCoordsDetected={(lat, lng) => setCoords({ lat, lng })}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -505,12 +692,31 @@ export function Onboarding() {
                   </div>
                 )}
 
+                {/* Provider geocode status banner */}
+                {selectedRole !== "patient" && !coords && addressValue.trim() && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    Click <strong className="mx-0.5">Detect</strong> next to your address to register on the patient map.
+                  </p>
+                )}
+                {selectedRole !== "patient" && coords && (
+                  <p className="text-xs text-emerald-600 flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    Location detected ({coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}) — you will appear on the patient map after approval.
+                  </p>
+                )}
+
                 <Button type="submit" className="w-full h-12 text-lg font-semibold" disabled={isSubmitting}>
-                  {isSubmitting
-                    ? "Submitting..."
-                    : selectedRole === "patient"
-                    ? "Complete Patient Setup"
-                    : "Submit Application for Approval"}
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Submitting...
+                    </span>
+                  ) : selectedRole === "patient" ? (
+                    "Complete Patient Setup"
+                  ) : (
+                    "Submit Application for Approval"
+                  )}
                 </Button>
               </form>
             </Form>
