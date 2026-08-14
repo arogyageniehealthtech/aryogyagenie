@@ -8,15 +8,30 @@ import path from "node:path";
  */
 import fs from "node:fs";
 
+function findMigrationsFolder(): string {
+  let current = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    const candidate1 = path.join(current, "lib/db/drizzle");
+    if (fs.existsSync(path.join(candidate1, "meta/_journal.json"))) {
+      return candidate1;
+    }
+    const candidate2 = path.join(current, "drizzle");
+    if (fs.existsSync(path.join(candidate2, "meta/_journal.json"))) {
+      return candidate2;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return path.resolve(import.meta.dirname, "../drizzle");
+}
+
 export async function runMigrations(closePool = true) {
   console.log("=================================================");
   console.log("STARTING CONTROLLED DATABASE MIGRATION");
   console.log("=================================================");
 
-  let migrationsFolder = path.resolve(import.meta.dirname, "../drizzle");
-  if (!fs.existsSync(migrationsFolder)) {
-    migrationsFolder = path.resolve(process.cwd(), "lib/db/drizzle");
-  }
+  const migrationsFolder = findMigrationsFolder();
   console.log(`Applying SQL migrations from: ${migrationsFolder}`);
 
   try {
