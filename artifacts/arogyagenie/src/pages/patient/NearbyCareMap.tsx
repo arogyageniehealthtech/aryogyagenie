@@ -1,13 +1,22 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useState, useEffect, useCallback, useRef,
+} from "react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
-import { MapPin, Navigation, Search, Stethoscope, Pill, TestTube, X, Phone, Clock, Star, ChevronRight, Locate, AlertCircle, ExternalLink } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import {
+  MapPin, Stethoscope, Pill, TestTube, Locate, AlertCircle,
+  Navigation, ExternalLink, Phone, Star, Search, X,
+  ChevronUp, ChevronDown, Loader2, Calendar,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
-import { divIcon, LatLngExpression } from "leaflet";
+import {
+  MapContainer, TileLayer, Marker, Popup, Circle, useMap,
+  Polyline,
+} from "react-leaflet";
+import { divIcon, type LatLngExpression, type Map as LeafletMap } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useLocation } from "wouter";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface NearbyProvider {
   id: number;
   type: "doctor" | "pharmacy" | "diagnostic_center";
@@ -23,334 +32,367 @@ interface NearbyProvider {
   distanceKm: number;
 }
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+type FilterType = "all" | "doctor" | "pharmacy" | "diagnostic_center";
+type SheetState = "collapsed" | "half" | "full";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const RADIUS_STEPS = [2, 4, 6, 8, 10, 12, 14, 16]; // km
+
 const TYPE_CONFIG = {
   doctor: {
     label: "Doctor",
+    emoji: "🩺",
     color: "#7C3AED",
-    bgColor: "rgba(124,58,237,0.1)",
-    borderColor: "rgba(124,58,237,0.25)",
+    bg: "rgba(124,58,237,0.12)",
+    border: "rgba(124,58,237,0.3)",
     icon: Stethoscope,
-    markerColor: "#7C3AED",
   },
   pharmacy: {
     label: "Pharmacy",
+    emoji: "💊",
     color: "#059669",
-    bgColor: "rgba(5,150,105,0.1)",
-    borderColor: "rgba(5,150,105,0.25)",
+    bg: "rgba(5,150,105,0.12)",
+    border: "rgba(5,150,105,0.3)",
     icon: Pill,
-    markerColor: "#059669",
   },
   diagnostic_center: {
     label: "Diagnostic Lab",
+    emoji: "🔬",
     color: "#D97706",
-    bgColor: "rgba(217,119,6,0.1)",
-    borderColor: "rgba(217,119,6,0.25)",
+    bg: "rgba(217,119,6,0.12)",
+    border: "rgba(217,119,6,0.3)",
     icon: TestTube,
-    markerColor: "#D97706",
   },
-};
+} as const;
 
-const RADIUS_OPTIONS = [2, 5, 10, 25, 50];
-
-// ─── Custom Marker Icon ───────────────────────────────────────────────────────
-function createProviderIcon(type: "doctor" | "pharmacy" | "diagnostic_center", isSelected = false) {
+// ─── Custom Map Markers ───────────────────────────────────────────────────────
+function makeProviderPin(
+  type: "doctor" | "pharmacy" | "diagnostic_center",
+  selected = false,
+) {
   const cfg = TYPE_CONFIG[type];
-  const size = isSelected ? 44 : 36;
-  const icons = { doctor: "🩺", pharmacy: "💊", diagnostic_center: "🔬" };
+  const sz = selected ? 48 : 38;
   return divIcon({
     html: `
       <div style="
-        width: ${size}px; height: ${size}px;
-        background: white;
-        border: 3px solid ${cfg.markerColor};
+        position:relative;
+        width:${sz}px; height:${sz}px;
+        background:white;
+        border:3px solid ${cfg.color};
         border-radius: 50% 50% 50% 0;
         transform: rotate(-45deg);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        box-shadow: 0 ${selected ? 8 : 4}px ${selected ? 24 : 12}px rgba(0,0,0,${selected ? 0.35 : 0.2});
         display:flex; align-items:center; justify-content:center;
-        transition: all 0.2s;
+        transition: all 0.25s cubic-bezier(.34,1.56,.64,1);
+        ${selected ? `animation: pinBounce 0.4s cubic-bezier(.34,1.56,.64,1);` : ""}
       ">
-        <span style="transform: rotate(45deg); font-size: ${isSelected ? 20 : 16}px; line-height:1;">${icons[type]}</span>
-      </div>`,
+        <span style="transform:rotate(45deg); font-size:${selected ? 22 : 17}px; line-height:1;">
+          ${cfg.emoji}
+        </span>
+      </div>
+      <style>
+        @keyframes pinBounce {
+          0% { transform: rotate(-45deg) scale(0.6); }
+          70% { transform: rotate(-45deg) scale(1.15); }
+          100% { transform: rotate(-45deg) scale(1); }
+        }
+      </style>`,
     className: "",
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size],
-    popupAnchor: [0, -size],
+    iconSize: [sz, sz],
+    iconAnchor: [sz / 2, sz],
+    popupAnchor: [0, -sz],
   });
 }
 
-function createUserIcon() {
+function makeUserPin() {
   return divIcon({
     html: `
-      <div style="position:relative; width:20px; height:20px;">
+      <div style="position:relative; width:24px; height:24px;">
         <div style="
+          position:absolute; top:50%; left:50%;
+          transform: translate(-50%, -50%);
+          width:40px; height:40px;
+          background: rgba(59,130,246,0.18);
+          border-radius: 50%;
+          animation: pulseRing 2s ease-out infinite;
+        "></div>
+        <div style="
+          position:absolute; top:50%; left:50%;
+          transform: translate(-50%, -50%);
           width:20px; height:20px;
-          background:#3B82F6; border:3px solid white;
-          border-radius:50%; box-shadow: 0 2px 8px rgba(59,130,246,0.6);
+          background: #3B82F6;
+          border: 3.5px solid white;
+          border-radius: 50%;
+          box-shadow: 0 2px 10px rgba(59,130,246,0.55);
         "></div>
-        <div style="
-          position:absolute; top:-8px; left:-8px;
-          width:36px; height:36px;
-          background: rgba(59,130,246,0.2);
-          border-radius:50%;
-          animation: pulse 2s infinite;
-        "></div>
-      </div>`,
+      </div>
+      <style>
+        @keyframes pulseRing {
+          0% { transform: translate(-50%,-50%) scale(0.6); opacity:0.8; }
+          100% { transform: translate(-50%,-50%) scale(2.2); opacity:0; }
+        }
+      </style>`,
     className: "",
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
   });
 }
 
-// ─── Map Recenter Helper ──────────────────────────────────────────────────────
-function MapRecenter({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
+// ─── Map helpers ──────────────────────────────────────────────────────────────
+function MapFly({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView([lat, lng], zoom ?? map.getZoom(), { animate: true });
+    map.flyTo([lat, lng], zoom ?? map.getZoom(), { duration: 0.9 });
   }, [lat, lng, zoom, map]);
   return null;
 }
 
-// ─── Distance Badge ───────────────────────────────────────────────────────────
-function DistanceBadge({ km }: { km: number }) {
-  const label = km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)} km`;
-  return (
-    <span
-      className="text-xs font-bold px-2.5 py-1 rounded-full shrink-0"
-      style={{ background: "rgba(59,130,246,0.1)", color: "#2563EB" }}
-    >
-      {label}
-    </span>
-  );
+function MapInit({ onReady }: { onReady: (m: LeafletMap) => void }) {
+  const map = useMap();
+  useEffect(() => { onReady(map); }, [map, onReady]);
+  return null;
 }
 
-// ─── Provider Card ────────────────────────────────────────────────────────────
+// ─── Distance formatter ───────────────────────────────────────────────────────
+function fmtDist(km: number) {
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
+
+// ─── Provider mini-card (in bottom sheet list) ────────────────────────────────
 function ProviderCard({
-  provider,
-  isSelected,
+  p,
+  selected,
   onClick,
 }: {
-  provider: NearbyProvider;
-  isSelected: boolean;
+  p: NearbyProvider;
+  selected: boolean;
   onClick: () => void;
 }) {
-  const cfg = TYPE_CONFIG[provider.type];
+  const cfg = TYPE_CONFIG[p.type];
   const Icon = cfg.icon;
-
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${provider.latitude},${provider.longitude}`;
-
   return (
     <div
       onClick={onClick}
-      className="rounded-2xl p-4 cursor-pointer transition-all border"
+      className="flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all shrink-0 border"
       style={{
-        background: isSelected ? cfg.bgColor : "white",
-        borderColor: isSelected ? cfg.markerColor : "rgba(226,232,240,0.8)",
-        boxShadow: isSelected
-          ? `0 4px 20px ${cfg.bgColor}`
-          : "0 1px 4px rgba(0,0,0,0.06)",
+        minWidth: 260,
+        background: selected ? cfg.bg : "white",
+        borderColor: selected ? cfg.color : "rgba(226,232,240,0.8)",
+        boxShadow: selected ? `0 4px 20px ${cfg.bg}` : "0 1px 4px rgba(0,0,0,0.05)",
       }}
     >
-      <div className="flex items-start gap-3">
-        {/* Icon */}
-        <div
-          className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: cfg.bgColor, border: `1.5px solid ${cfg.borderColor}` }}
-        >
-          <Icon className="h-5 w-5" style={{ color: cfg.color }} />
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-bold text-slate-900 text-sm leading-snug truncate">{provider.name}</h3>
-            <DistanceBadge km={provider.distanceKm} />
-          </div>
-
-          {provider.specialty && (
-            <p className="text-xs text-slate-500 mt-0.5">{provider.specialty}</p>
+      <div
+        className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0 text-2xl"
+        style={{ background: cfg.bg }}
+      >
+        {cfg.emoji}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-slate-900 text-sm truncate">{p.name}</p>
+        {p.specialty && <p className="text-xs text-slate-500 truncate">{p.specialty}</p>}
+        <div className="flex items-center gap-2 mt-1">
+          <span
+            className="text-xs font-bold px-2 py-0.5 rounded-full"
+            style={{ background: cfg.bg, color: cfg.color }}
+          >
+            {fmtDist(p.distanceKm)}
+          </span>
+          {p.rating != null && p.rating > 0 && (
+            <span className="flex items-center gap-0.5 text-xs text-amber-600">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              {p.rating.toFixed(1)}
+            </span>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+// ─── Provider Detail Panel (inside bottom sheet when a provider is selected) ──
+function ProviderDetail({
+  p,
+  onClose,
+  onBook,
+}: {
+  p: NearbyProvider;
+  onClose: () => void;
+  onBook: () => void;
+}) {
+  const cfg = TYPE_CONFIG[p.type];
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`;
+  return (
+    <div className="px-4 pb-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <div
+          className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 text-3xl"
+          style={{ background: cfg.bg }}
+        >
+          {cfg.emoji}
+        </div>
+        <div className="flex-1">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="font-bold text-slate-900 text-lg leading-tight">{p.name}</h2>
+              {p.specialty && <p className="text-sm text-slate-500">{p.specialty}</p>}
+            </div>
+            <button onClick={onClose} className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center ml-2 shrink-0">
+              <X className="h-4 w-4 text-slate-500" />
+            </button>
+          </div>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: cfg.bgColor, color: cfg.color }}
+              className="text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{ background: cfg.bg, color: cfg.color }}
             >
               {cfg.label}
             </span>
-            {provider.rating != null && provider.rating > 0 && (
+            {p.rating != null && p.rating > 0 && (
               <span className="flex items-center gap-0.5 text-xs text-amber-600 font-medium">
                 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                {provider.rating.toFixed(1)}
+                {p.rating.toFixed(1)}
               </span>
             )}
-            {provider.city && (
-              <span className="text-xs text-slate-400">{provider.city}</span>
-            )}
-          </div>
-
-          {provider.address && (
-            <p className="text-xs text-slate-400 mt-1.5 leading-relaxed line-clamp-2">
-              <MapPin className="h-3 w-3 inline mr-1 -mt-px" />
-              {provider.address}
-            </p>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 mt-3">
-            <a
-              href={directionsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            <span
+              className="text-xs font-bold px-2.5 py-1 rounded-full"
               style={{ background: "rgba(59,130,246,0.1)", color: "#2563EB" }}
             >
-              <Navigation className="h-3.5 w-3.5" />
-              Directions
-              <ExternalLink className="h-3 w-3 opacity-70" />
-            </a>
-            {provider.phone && (
-              <a
-                href={`tel:${provider.phone}`}
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                style={{ background: "rgba(5,150,105,0.1)", color: "#059669" }}
-              >
-                <Phone className="h-3.5 w-3.5" />
-                Call
-              </a>
-            )}
+              📍 {fmtDist(p.distanceKm)} away
+            </span>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-// ─── Empty State ──────────────────────────────────────────────────────────────
-function EmptyState({ radiusKm, onExpandRadius }: { radiusKm: number; onExpandRadius: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-      <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-        <MapPin className="h-8 w-8 text-slate-300" />
+      {/* Details */}
+      <div className="rounded-2xl bg-slate-50 p-3 space-y-2">
+        {p.address && (
+          <div className="flex items-start gap-2 text-sm text-slate-600">
+            <MapPin className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
+            <span>{p.address}{p.city ? `, ${p.city}` : ""}</span>
+          </div>
+        )}
+        {p.phone && (
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+            <a href={`tel:${p.phone}`} className="text-blue-600 font-medium">{p.phone}</a>
+          </div>
+        )}
+        {p.openingHours && (
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Star className="h-4 w-4 text-slate-400 shrink-0" />
+            <span>{p.openingHours}</span>
+          </div>
+        )}
       </div>
-      <h3 className="font-bold text-slate-900 text-base">No providers found nearby</h3>
-      <p className="text-sm text-slate-500 mt-1 max-w-xs">
-        No active providers found within {radiusKm} km of your location. Try expanding the search radius.
-      </p>
-      {radiusKm < 50 && (
-        <Button
-          size="sm"
-          className="mt-4"
-          style={{ background: "#7C3AED", color: "white" }}
-          onClick={onExpandRadius}
+
+      {/* Actions */}
+      <div className="grid grid-cols-2 gap-3">
+        <a
+          href={directionsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 h-12 rounded-2xl text-sm font-bold border-2 transition-all"
+          style={{ borderColor: cfg.color, color: cfg.color }}
         >
-          Expand to {radiusKm === 2 ? 5 : radiusKm === 5 ? 10 : radiusKm === 10 ? 25 : 50} km
-        </Button>
-      )}
-      <p className="text-xs text-slate-400 mt-3">
-        Providers appear automatically as doctors, pharmacies & labs register and get approved.
-      </p>
+          <Navigation className="h-4 w-4" />
+          Directions
+          <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+        </a>
+        <button
+          onClick={onBook}
+          className="flex items-center justify-center gap-2 h-12 rounded-2xl text-sm font-bold text-white transition-all shadow-lg active:scale-95"
+          style={{ background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)` }}
+        >
+          <Calendar className="h-4 w-4" />
+          Book Now
+        </button>
+      </div>
     </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export function NearbyCareMap() {
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
+  const [, setLocation] = useLocation();
 
+  // Location
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState<string | null>(null);
+
+  // Providers
   const [providers, setProviders] = useState<NearbyProvider[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const [selectedProvider, setSelectedProvider] = useState<NearbyProvider | null>(null);
-  const [activeType, setActiveType] = useState<"all" | "doctor" | "pharmacy" | "diagnostic_center">("all");
-  const [radiusKm, setRadiusKm] = useState(25);
+  // UI state
+  const [radiusIdx, setRadiusIdx] = useState(3); // default 8 km
+  const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<NearbyProvider | null>(null);
+  const [sheet, setSheet] = useState<SheetState>("half");
+  const [showSearch, setShowSearch] = useState(false);
 
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const radiusKm = RADIUS_STEPS[radiusIdx];
 
-  // ── Default center (India) ─────────────────────────────────────────────────
-  const defaultCenter: LatLngExpression = [20.5937, 78.9629];
-  const mapCenter: LatLngExpression = userLocation
-    ? [userLocation.lat, userLocation.lng]
-    : defaultCenter;
+  // ── Fetch ──────────────────────────────────────────────────────────────────
+  const fetchNearby = useCallback(async (lat: number, lng: number) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        lat: lat.toString(),
+        lng: lng.toString(),
+        radius: radiusKm.toString(),
+        type: filter,
+        ...(search ? { search } : {}),
+      });
+      const res = await fetch(`/api/nearby?${params}`);
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setProviders(data.results ?? []);
+    } catch {
+      setProviders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [radiusKm, filter, search]);
 
-  // ── Fetch nearby providers ──────────────────────────────────────────────────
-  const fetchNearby = useCallback(
-    async (lat: number, lng: number) => {
-      setLoading(true);
-      setFetchError(null);
-      try {
-        const params = new URLSearchParams({
-          lat: lat.toString(),
-          lng: lng.toString(),
-          radius: radiusKm.toString(),
-          type: activeType,
-          ...(search ? { search } : {}),
-        });
-        const res = await fetch(`/api/nearby?${params}`);
-        if (!res.ok) throw new Error("Failed to load providers");
-        const data = await res.json();
-        setProviders(data.results ?? []);
-      } catch (e: any) {
-        setFetchError(e.message || "Failed to load nearby providers");
-        setProviders([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [radiusKm, activeType, search],
-  );
-
-  // ── Get user geolocation ────────────────────────────────────────────────────
+  // ── GPS locate ─────────────────────────────────────────────────────────────
   const locate = useCallback(() => {
     setLocating(true);
-    setLocationError(null);
+    setLocError(null);
     if (!navigator.geolocation) {
-      setLocationError("Geolocation is not supported by your browser.");
+      setLocError("Geolocation not supported.");
       setLocating(false);
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserLocation(loc);
+        setUserLoc(loc);
         fetchNearby(loc.lat, loc.lng);
         setLocating(false);
       },
       () => {
-        setLocationError("Unable to get your location. Please allow location access and try again.");
+        setLocError("Location access denied. Enable location in browser settings.");
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }, [fetchNearby]);
 
-  // ── Auto-locate on mount ────────────────────────────────────────────────────
+  // Auto-locate on mount
+  useEffect(() => { locate(); }, []);
+
+  // Re-fetch when filters or radius change
   useEffect(() => {
-    locate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (userLoc) fetchNearby(userLoc.lat, userLoc.lng);
+  }, [radiusKm, filter, fetchNearby]);
 
-  // ── Re-fetch when filters change ────────────────────────────────────────────
-  useEffect(() => {
-    if (userLocation) {
-      fetchNearby(userLocation.lat, userLocation.lng);
-    }
-  }, [activeType, radiusKm, fetchNearby, userLocation]);
-
-  // ── Expand radius helper ────────────────────────────────────────────────────
-  const expandRadius = () => {
-    const idx = RADIUS_OPTIONS.indexOf(radiusKm);
-    if (idx < RADIUS_OPTIONS.length - 1) setRadiusKm(RADIUS_OPTIONS[idx + 1]);
-  };
-
-  const filteredProviders = providers.filter((p) => {
-    if (activeType !== "all" && p.type !== activeType) return false;
+  // ── Filter providers client-side for search ───────────────────────────────
+  const visible = providers.filter((p) => {
+    if (filter !== "all" && p.type !== filter) return false;
     if (search.trim()) {
       const s = search.toLowerCase();
       return (
@@ -362,294 +404,388 @@ export function NearbyCareMap() {
     return true;
   });
 
+  // ── Select provider → fly to it ───────────────────────────────────────────
+  const selectProvider = useCallback((p: NearbyProvider) => {
+    setSelected(p);
+    setSheet("full");
+    if (mapRef.current) {
+      const midLat = userLoc ? (userLoc.lat + p.latitude) / 2 : p.latitude;
+      const midLng = userLoc ? (userLoc.lng + p.longitude) / 2 : p.longitude;
+      mapRef.current.flyTo([midLat, midLng], 14, { duration: 0.8 });
+    }
+  }, [userLoc]);
+
+  // ── Book handler ──────────────────────────────────────────────────────────
+  const handleBook = useCallback(() => {
+    if (!selected) return;
+    if (selected.type === "doctor") {
+      setLocation(`/patient/appointments?doctorId=${selected.id}`);
+    } else if (selected.type === "diagnostic_center") {
+      setLocation(`/patient/diagnostic-bookings`);
+    } else {
+      setLocation(`/patient/appointments`);
+    }
+  }, [selected, setLocation]);
+
+  const mapCenter: LatLngExpression = userLoc
+    ? [userLoc.lat, userLoc.lng]
+    : [20.5937, 78.9629]; // India default
+
+  // ── Sheet heights ─────────────────────────────────────────────────────────
+  const sheetHeights: Record<SheetState, string> = {
+    collapsed: "80px",
+    half: "240px",
+    full: selected ? "420px" : "240px",
+  };
+
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-full" style={{ minHeight: "calc(100vh - 64px)" }}>
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="shrink-0 px-6 py-4 border-b border-slate-100 bg-white">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Nearest Healthcare</h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                Discover doctors, pharmacies & diagnostic labs close to you.
-              </p>
-            </div>
+      {/* ── Full-screen map container ──────────────────────────────────────── */}
+      <div
+        className="relative overflow-hidden"
+        style={{ height: "calc(100vh - 64px)" }}
+      >
+        {/* ── Leaflet Map ─────────────────────────────────────────────────── */}
+        <MapContainer
+          center={mapCenter}
+          zoom={userLoc ? 13 : 5}
+          style={{ height: "100%", width: "100%", zIndex: 0 }}
+          zoomControl={false}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
 
-            <div className="flex items-center gap-2">
-              {/* Radius selector */}
-              <div className="flex items-center gap-1 bg-slate-50 rounded-xl border border-slate-200 px-1 py-1">
-                {RADIUS_OPTIONS.map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setRadiusKm(r)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                    style={
-                      radiusKm === r
-                        ? { background: "#7C3AED", color: "white" }
-                        : { color: "#64748B" }
-                    }
-                  >
-                    {r}km
-                  </button>
-                ))}
-              </div>
+          <MapInit onReady={(m) => { mapRef.current = m; }} />
 
-              {/* Locate Me */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={locate}
-                disabled={locating}
-                className="h-9 gap-1.5 rounded-xl border-slate-200"
+          {/* Fly-to on user location */}
+          {userLoc && <MapFly lat={userLoc.lat} lng={userLoc.lng} zoom={13} />}
+
+          {/* User location */}
+          {userLoc && (
+            <>
+              <Marker
+                position={[userLoc.lat, userLoc.lng]}
+                icon={makeUserPin()}
               >
-                <Locate className="h-4 w-4" />
-                {locating ? "Locating…" : "Locate Me"}
-              </Button>
-            </div>
-          </div>
+                <Popup>📍 Your location</Popup>
+              </Marker>
+              {/* Animated radius ring */}
+              <Circle
+                center={[userLoc.lat, userLoc.lng]}
+                radius={radiusKm * 1000}
+                pathOptions={{
+                  color: "#7C3AED",
+                  fillColor: "#7C3AED",
+                  fillOpacity: 0.04,
+                  weight: 2,
+                  dashArray: "8 5",
+                }}
+              />
+            </>
+          )}
 
-          {/* Type filter pills */}
-          <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-0.5 scrollbar-none">
+          {/* Provider markers */}
+          {visible.map((p) => {
+            const isSelected =
+              selected?.id === p.id && selected?.type === p.type;
+            const cfg = TYPE_CONFIG[p.type];
+            return (
+              <Marker
+                key={`${p.type}-${p.id}`}
+                position={[p.latitude, p.longitude]}
+                icon={makeProviderPin(p.type, isSelected)}
+                eventHandlers={{ click: () => selectProvider(p) }}
+              >
+                <Popup>
+                  <div style={{ minWidth: 170 }}>
+                    <p className="font-bold text-sm">{p.name}</p>
+                    {p.specialty && <p className="text-xs text-gray-500">{p.specialty}</p>}
+                    <p className="text-xs font-bold mt-1" style={{ color: cfg.color }}>
+                      {cfg.label} · {fmtDist(p.distanceKm)} away
+                    </p>
+                    <button
+                      onClick={() => selectProvider(p)}
+                      className="mt-2 text-xs font-bold px-3 py-1 rounded-lg text-white"
+                      style={{ background: cfg.color }}
+                    >
+                      View Details
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
+          {/* Straight-line route to selected provider */}
+          {userLoc && selected && (
+            <Polyline
+              positions={[
+                [userLoc.lat, userLoc.lng],
+                [selected.latitude, selected.longitude],
+              ]}
+              pathOptions={{
+                color: TYPE_CONFIG[selected.type].color,
+                weight: 3,
+                opacity: 0.7,
+                dashArray: "10 8",
+              }}
+            />
+          )}
+        </MapContainer>
+
+        {/* ── Floating top HUD ──────────────────────────────────────────────── */}
+        <div
+          className="absolute top-4 left-0 right-0 z-[1000] px-4 flex flex-col gap-2 pointer-events-none"
+        >
+          {/* Filter pills row */}
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {/* Search toggle */}
+            <button
+              onClick={() => setShowSearch((s) => !s)}
+              className="h-10 w-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-slate-200 transition-all hover:scale-105"
+            >
+              {showSearch ? <X className="h-4 w-4 text-slate-600" /> : <Search className="h-4 w-4 text-slate-600" />}
+            </button>
+
+            {/* Type filter pills */}
             {(["all", "doctor", "pharmacy", "diagnostic_center"] as const).map((t) => {
               const isAll = t === "all";
               const cfg = isAll ? null : TYPE_CONFIG[t];
-              const TypeIcon = cfg?.icon;
-              const isActive = activeType === t;
+              const active = filter === t;
               return (
                 <button
                   key={t}
-                  onClick={() => setActiveType(t)}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold shrink-0 transition-all border"
+                  onClick={() => { setFilter(t); setSelected(null); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold shadow-lg transition-all border hover:scale-105"
                   style={
-                    isActive
+                    active
                       ? {
-                          background: cfg?.markerColor ?? "#7C3AED",
+                          background: cfg?.color ?? "#7C3AED",
                           color: "white",
                           borderColor: "transparent",
                         }
-                      : { background: "white", color: "#64748B", borderColor: "#E2E8F0" }
+                      : { background: "white", color: "#475569", borderColor: "rgba(226,232,240,0.8)" }
                   }
                 >
-                  {isAll ? (
-                    <MapPin className="h-3.5 w-3.5" />
-                  ) : TypeIcon ? (
-                    <TypeIcon className="h-3.5 w-3.5" />
-                  ) : null}
+                  {isAll ? "🗺️" : cfg!.emoji}
                   {isAll ? "All" : cfg!.label}
                 </button>
               );
             })}
 
-            {/* Search */}
-            <div className="relative flex-1 min-w-[180px] max-w-xs ml-auto">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <Input
-                placeholder="Search by name, specialty…"
+            {/* Locate Me button */}
+            <button
+              onClick={locate}
+              disabled={locating}
+              className="ml-auto h-10 w-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-slate-200 transition-all hover:scale-105 disabled:opacity-60"
+            >
+              {locating ? (
+                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+              ) : (
+                <Locate className="h-4 w-4 text-blue-500" />
+              )}
+            </button>
+          </div>
+
+          {/* Search input */}
+          {showSearch && (
+            <div className="relative pointer-events-auto">
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+              <input
+                autoFocus
+                placeholder="Search doctors, pharmacies, labs…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 h-8 text-xs rounded-xl border-slate-200"
+                className="w-full pl-10 pr-10 py-2.5 rounded-2xl text-sm shadow-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-violet-300"
               />
               {search && (
-                <button onClick={() => setSearch("")} className="absolute right-2.5 top-2">
-                  <X className="h-3.5 w-3.5 text-slate-400" />
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-3 text-slate-400"
+                >
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
-          </div>
+          )}
 
-          {/* Error notices */}
-          {locationError && (
-            <div className="flex items-center gap-2 mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+          {/* Error notice */}
+          {locError && (
+            <div className="pointer-events-auto flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 shadow-lg">
               <AlertCircle className="h-4 w-4 shrink-0" />
-              {locationError}
+              {locError}
             </div>
           )}
         </div>
 
-        {/* ── Main split view ─────────────────────────────────────────────── */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left: Provider list */}
-          <div className="w-[380px] shrink-0 flex flex-col border-r border-slate-100 bg-slate-50 overflow-hidden">
-            <div className="shrink-0 px-4 py-2.5 border-b border-slate-100 bg-white">
-              <p className="text-xs font-semibold text-slate-500">
-                {loading
-                  ? "Searching…"
-                  : `${filteredProviders.length} provider${filteredProviders.length !== 1 ? "s" : ""} found`}
-                {!loading && userLocation && (
-                  <span className="text-slate-400 font-normal"> within {radiusKm} km</span>
-                )}
-              </p>
-            </div>
+        {/* ── Bottom Sheet ──────────────────────────────────────────────────── */}
+        <div
+          className="absolute bottom-0 left-0 right-0 z-[1000] bg-white rounded-t-3xl shadow-2xl transition-all duration-400 ease-out"
+          style={{ height: sheetHeights[sheet] }}
+        >
+          {/* Drag handle + toggle */}
+          <div
+            className="flex flex-col items-center pt-3 pb-2 cursor-pointer"
+            onClick={() => {
+              if (sheet === "collapsed") setSheet(selected ? "full" : "half");
+              else if (sheet === "half") setSheet(selected ? "full" : "collapsed");
+              else setSheet("half");
+            }}
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-200 mb-2" />
+            {/* Radius slider row */}
+            <div className="w-full px-5 flex items-center gap-3">
+              <span className="text-xs text-slate-400 font-bold shrink-0">2km</span>
+              <div className="relative flex-1">
+                <input
+                  type="range"
+                  min={0}
+                  max={RADIUS_STEPS.length - 1}
+                  step={1}
+                  value={radiusIdx}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    setRadiusIdx(Number(e.target.value));
+                    setSelected(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, #7C3AED ${(radiusIdx / (RADIUS_STEPS.length - 1)) * 100}%, #E2E8F0 0%)`,
+                    accentColor: "#7C3AED",
+                  }}
+                />
+              </div>
+              <span className="text-xs text-slate-400 font-bold shrink-0">16km</span>
 
-            <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="bg-white rounded-2xl p-4 animate-pulse border border-slate-100"
-                  >
-                    <div className="flex gap-3">
-                      <div className="h-11 w-11 rounded-xl bg-slate-100" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-slate-100 rounded w-3/4" />
-                        <div className="h-3 bg-slate-100 rounded w-1/2" />
-                        <div className="h-3 bg-slate-100 rounded w-2/3" />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : filteredProviders.length === 0 ? (
-                <EmptyState radiusKm={radiusKm} onExpandRadius={expandRadius} />
-              ) : (
-                filteredProviders.map((p) => (
-                  <ProviderCard
-                    key={`${p.type}-${p.id}`}
-                    provider={p}
-                    isSelected={selectedProvider?.id === p.id && selectedProvider?.type === p.type}
-                    onClick={() => {
-                      setSelectedProvider(p);
-                      if (mapRef.current) {
-                        mapRef.current.setView([p.latitude, p.longitude], 16, { animate: true });
-                      }
-                    }}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Right: Map */}
-          <div className="flex-1 relative">
-            {!userLocation && !locating && (
+              {/* Current radius bubble */}
               <div
-                className="absolute inset-0 z-10 flex flex-col items-center justify-center"
-                style={{ background: "rgba(248,250,252,0.9)", backdropFilter: "blur(4px)" }}
+                className="px-3 py-1 rounded-full text-xs font-black text-white shrink-0"
+                style={{ background: "#7C3AED", minWidth: 52, textAlign: "center" }}
               >
-                <MapPin className="h-12 w-12 text-slate-300 mb-3" />
-                <p className="font-bold text-slate-700">Enable location to see providers near you</p>
-                <Button
-                  className="mt-4 gap-2"
-                  style={{ background: "#7C3AED", color: "white" }}
-                  onClick={locate}
-                >
-                  <Locate className="h-4 w-4" />
-                  Use My Location
-                </Button>
-              </div>
-            )}
-
-            <MapContainer
-              center={mapCenter}
-              zoom={userLocation ? 12 : 5}
-              style={{ height: "100%", width: "100%" }}
-              ref={mapRef}
-              zoomControl={true}
-            >
-              {/* OpenStreetMap tiles — 100% free, no API key */}
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-
-              {/* Recenter when location changes */}
-              {userLocation && (
-                <MapRecenter lat={userLocation.lat} lng={userLocation.lng} zoom={12} />
-              )}
-
-              {/* User location marker */}
-              {userLocation && (
-                <>
-                  <Marker
-                    position={[userLocation.lat, userLocation.lng]}
-                    icon={createUserIcon()}
-                  >
-                    <Popup>📍 You are here</Popup>
-                  </Marker>
-                  <Circle
-                    center={[userLocation.lat, userLocation.lng]}
-                    radius={radiusKm * 1000}
-                    pathOptions={{
-                      color: "#7C3AED",
-                      fillColor: "#7C3AED",
-                      fillOpacity: 0.04,
-                      weight: 1.5,
-                      dashArray: "6 4",
-                    }}
-                  />
-                </>
-              )}
-
-              {/* Provider markers */}
-              {filteredProviders.map((p) => {
-                const isSelected = selectedProvider?.id === p.id && selectedProvider?.type === p.type;
-                const cfg = TYPE_CONFIG[p.type];
-                return (
-                  <Marker
-                    key={`${p.type}-${p.id}`}
-                    position={[p.latitude, p.longitude]}
-                    icon={createProviderIcon(p.type, isSelected)}
-                    eventHandlers={{ click: () => setSelectedProvider(p) }}
-                  >
-                    <Popup>
-                      <div className="min-w-[180px]">
-                        <p className="font-bold text-sm">{p.name}</p>
-                        {p.specialty && <p className="text-xs text-gray-500">{p.specialty}</p>}
-                        <p
-                          className="text-xs font-semibold mt-1"
-                          style={{ color: cfg.color }}
-                        >
-                          {cfg.label}
-                        </p>
-                        <p className="text-xs text-blue-600 font-bold mt-1">
-                          {p.distanceKm < 1
-                            ? `${Math.round(p.distanceKm * 1000)} m away`
-                            : `${p.distanceKm.toFixed(1)} km away`}
-                        </p>
-                        {p.address && <p className="text-xs text-gray-400 mt-1">{p.address}</p>}
-                        <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block mt-2 text-xs font-semibold text-blue-600 hover:underline"
-                        >
-                          Get Directions →
-                        </a>
-                      </div>
-                    </Popup>
-                  </Marker>
-                );
-              })}
-            </MapContainer>
-
-            {/* Legend */}
-            <div
-              className="absolute bottom-4 right-4 z-[1000] rounded-xl bg-white/90 border border-slate-200 shadow-lg p-3 backdrop-blur-sm"
-            >
-              <p className="text-xs font-bold text-slate-600 mb-2">Map Legend</p>
-              {Object.entries(TYPE_CONFIG).map(([key, cfg]) => {
-                const Icon = cfg.icon;
-                return (
-                  <div key={key} className="flex items-center gap-2 mb-1.5">
-                    <div
-                      className="h-5 w-5 rounded-full flex items-center justify-center"
-                      style={{ background: cfg.bgColor }}
-                    >
-                      <Icon className="h-3 w-3" style={{ color: cfg.color }} />
-                    </div>
-                    <span className="text-xs text-slate-600">{cfg.label}</span>
-                  </div>
-                );
-              })}
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center">
-                  <span className="text-blue-600 text-[10px]">●</span>
-                </div>
-                <span className="text-xs text-slate-600">Your Location</span>
+                {radiusKm} km
               </div>
             </div>
           </div>
+
+          {/* Sheet content */}
+          {sheet !== "collapsed" && (
+            <div className="px-4 overflow-hidden" style={{ height: "calc(100% - 70px)" }}>
+              {selected && sheet === "full" ? (
+                /* ── Provider detail view ── */
+                <ProviderDetail
+                  p={selected}
+                  onClose={() => { setSelected(null); setSheet("half"); }}
+                  onBook={handleBook}
+                />
+              ) : (
+                /* ── Provider list view ── */
+                <div className="flex flex-col h-full">
+                  {/* Count header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-bold text-slate-800">
+                      {loading ? (
+                        <span className="flex items-center gap-2 text-slate-400">
+                          <Loader2 className="h-4 w-4 animate-spin" /> Searching…
+                        </span>
+                      ) : visible.length === 0 ? (
+                        userLoc ? "No providers in this area yet" : "Enable location to search"
+                      ) : (
+                        `${visible.length} provider${visible.length !== 1 ? "s" : ""} within ${radiusKm} km`
+                      )}
+                    </p>
+                    {sheet === "half" && visible.length > 0 && (
+                      <button
+                        onClick={() => setSheet("full")}
+                        className="text-xs font-bold text-violet-600 flex items-center gap-1"
+                      >
+                        See all <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Horizontal scrolling cards */}
+                  {visible.length > 0 ? (
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none flex-1">
+                      {visible.map((p) => (
+                        <ProviderCard
+                          key={`${p.type}-${p.id}`}
+                          p={p}
+                          selected={selected?.id === p.id && selected?.type === p.type}
+                          onClick={() => selectProvider(p)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center py-4 text-center">
+                      <div className="text-4xl mb-2">🗺️</div>
+                      <p className="text-slate-600 font-semibold text-sm">
+                        {userLoc
+                          ? "No providers found here yet"
+                          : "Enable location to find care near you"}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                        {userLoc
+                          ? "Providers appear automatically as doctors, pharmacies & labs register and get approved. Try expanding the radius."
+                          : "Click the 📍 locate button to share your position."}
+                      </p>
+                      {userLoc && radiusKm < 16 && (
+                        <button
+                          className="mt-3 text-xs font-bold px-4 py-2 rounded-full text-white"
+                          style={{ background: "#7C3AED" }}
+                          onClick={() => setRadiusIdx((i) => Math.min(i + 1, RADIUS_STEPS.length - 1))}
+                        >
+                          Expand to {RADIUS_STEPS[Math.min(radiusIdx + 1, RADIUS_STEPS.length - 1)]} km
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Collapsed pull tab */}
+          {sheet === "collapsed" && (
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+              <ChevronUp className="h-3.5 w-3.5" />
+              {visible.length} provider{visible.length !== 1 ? "s" : ""} · {radiusKm} km radius
+            </div>
+          )}
         </div>
+
+        {/* Provider count badge on map */}
+        {userLoc && !loading && visible.length > 0 && (
+          <div
+            className="absolute top-28 right-4 z-[999] px-3 py-1.5 rounded-full text-xs font-black text-white shadow-lg"
+            style={{ background: "linear-gradient(135deg, #7C3AED, #5B21B6)" }}
+          >
+            {visible.length} nearby
+          </div>
+        )}
       </div>
+
+      {/* Global slider thumb style */}
+      <style>{`
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: #7C3AED;
+          border: 3px solid white;
+          box-shadow: 0 2px 8px rgba(124,58,237,0.45);
+          cursor: pointer;
+          transition: transform 0.15s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+          transform: scale(1.2);
+        }
+        .scrollbar-none::-webkit-scrollbar { display: none; }
+        .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </DashboardLayout>
   );
 }
