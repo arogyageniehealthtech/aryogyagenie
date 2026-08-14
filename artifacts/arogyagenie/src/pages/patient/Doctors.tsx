@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useListDoctors } from "@workspace/api-client-react";
 import { DOCTOR_SPECIALTIES } from "@/lib/specialties";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import {
   Search, Star, MapPin, Stethoscope, ArrowRight, Award,
-  LayoutGrid, Map as MapIcon, Locate, Calendar, Navigation,
+  LayoutGrid, Map as MapIcon, Locate, Calendar, Navigation, Edit3, Loader2,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
@@ -46,11 +46,11 @@ function makeDoctorPin(selected = false) {
 function makePatientPin() {
   return divIcon({
     html: `
-      <div style="position:relative; width:24px; height:24px;">
+      <div style="position:relative; width:28px; height:28px;">
         <div style="
           position:absolute; top:50%; left:50%;
           transform: translate(-50%, -50%);
-          width:40px; height:40px;
+          width:44px; height:44px;
           background: rgba(59,130,246,0.2);
           border-radius: 50%;
           animation: pulseRing 2s ease-out infinite;
@@ -58,12 +58,14 @@ function makePatientPin() {
         <div style="
           position:absolute; top:50%; left:50%;
           transform: translate(-50%, -50%);
-          width:20px; height:20px;
-          background: #3B82F6;
+          width:24px; height:24px;
+          background: #2563EB;
           border: 3.5px solid white;
           border-radius: 50%;
-          box-shadow: 0 2px 10px rgba(59,130,246,0.5);
-        "></div>
+          box-shadow: 0 3px 12px rgba(37,99,235,0.6);
+          display:flex; align-items:center; justify-content:center;
+          color:white; font-size:12px; font-weight:bold;
+        ">🏠</div>
       </div>
       <style>
         @keyframes pulseRing {
@@ -72,8 +74,8 @@ function makePatientPin() {
         }
       </style>`,
     className: "",
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   });
 }
 
@@ -85,7 +87,6 @@ function MapFly({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number })
   return null;
 }
 
-// ─── Doctor Card Skeleton ───────────────────────────────────────────────────
 function DoctorCardSkeleton() {
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-slate-100/80 shadow-xs animate-pulse">
@@ -106,7 +107,6 @@ function DoctorCardSkeleton() {
   );
 }
 
-// ─── Main Component ─────────────────────────────────────────────────────────
 export function PatientDoctors() {
   const urlParams = new URLSearchParams(window.location.search);
   const rawSpecialty = urlParams.get("specialty") || "all";
@@ -122,15 +122,20 @@ export function PatientDoctors() {
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
   const [, setLocation] = useLocation();
 
-  // Map state
-  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  // Location state
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number }>({ lat: 22.5726, lng: 88.3639 }); // Default Kolkata
+  const [locationName, setLocationName] = useState<string>("Default Location");
+  const [customAddressInput, setCustomAddressInput] = useState("");
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [showAddressBox, setShowAddressBox] = useState(false);
   const [locating, setLocating] = useState(false);
   const [radiusIdx, setRadiusIdx] = useState(3); // default 8 km
   const [nearbyDocs, setNearbyDocs] = useState<any[]>([]);
   const [loadingNearby, setLoadingNearby] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
 
+  const mapRef = useRef<LeafletMap | null>(null);
+  const userMarkerRef = useRef<any>(null);
   const radiusKm = RADIUS_STEPS[radiusIdx];
 
   const { data: doctors, isLoading } = useListDoctors({
@@ -138,14 +143,18 @@ export function PatientDoctors() {
     specialty: specialty !== "all" ? specialty : undefined
   });
 
-  // GPS Locate
-  const locateUser = useCallback(() => {
+  const locateUserGPS = useCallback(() => {
     setLocating(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setUserLoc(newLoc);
+          setLocationName("GPS Location");
           setLocating(false);
+          if (mapRef.current) {
+            mapRef.current.flyTo([newLoc.lat, newLoc.lng], 13);
+          }
         },
         () => setLocating(false),
         { enableHighAccuracy: true, timeout: 10000 }
@@ -156,12 +165,54 @@ export function PatientDoctors() {
   }, []);
 
   useEffect(() => {
-    locateUser();
-  }, [locateUser]);
+    locateUserGPS();
+  }, [locateUserGPS]);
+
+  // Address Geocode Search
+  const searchAddress = useCallback(async (queryAddress: string) => {
+    if (!queryAddress.trim()) return;
+    setIsSearchingAddress(true);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryAddress)}&format=json&limit=1`;
+      const res = await fetch(url, {
+        headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
+      });
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const newLat = parseFloat(data[0].lat);
+        const newLng = parseFloat(data[0].lon);
+        const displayName = data[0].display_name.split(",").slice(0, 2).join(",");
+        setUserLoc({ lat: newLat, lng: newLng });
+        setLocationName(displayName);
+        setShowAddressBox(false);
+        if (mapRef.current) {
+          mapRef.current.flyTo([newLat, newLng], 13);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  }, []);
+
+  // Draggable marker handlers
+  const userMarkerDragHandlers = useMemo(
+    () => ({
+      dragend() {
+        const marker = userMarkerRef.current;
+        if (marker != null) {
+          const latLng = marker.getLatLng();
+          setUserLoc({ lat: latLng.lat, lng: latLng.lng });
+          setLocationName("Custom Pinned Location");
+        }
+      },
+    }),
+    [],
+  );
 
   // Fetch nearby doctors for map view
   const fetchNearbyDoctors = useCallback(async () => {
-    if (!userLoc) return;
     setLoadingNearby(true);
     try {
       const params = new URLSearchParams({
@@ -185,27 +236,20 @@ export function PatientDoctors() {
   }, [userLoc, radiusKm, specialty, search]);
 
   useEffect(() => {
-    if (viewMode === "map" && userLoc) {
+    if (viewMode === "map") {
       fetchNearbyDoctors();
     }
   }, [viewMode, userLoc, radiusKm, specialty, search, fetchNearbyDoctors]);
 
-  const defaultCenter: LatLngExpression = userLoc
-    ? [userLoc.lat, userLoc.lng]
-    : [22.5726, 88.3639]; // Default Metro center
-
   return (
     <DashboardLayout>
       <div className="space-y-5">
-
-        {/* ── Page Header & View Toggle ──────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Find Doctors</h1>
             <p className="text-sm text-slate-500 mt-0.5">Search verified medical specialists near you.</p>
           </div>
 
-          {/* View Toggle Switch */}
           <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-auto border border-slate-200/80">
             <button
               onClick={() => setViewMode("grid")}
@@ -221,7 +265,6 @@ export function PatientDoctors() {
             <button
               onClick={() => {
                 setViewMode("map");
-                if (!userLoc) locateUser();
               }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 viewMode === "map"
@@ -235,7 +278,6 @@ export function PatientDoctors() {
           </div>
         </div>
 
-        {/* ── Search & Filter Bar ───────────────────────────────────────────── */}
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -262,7 +304,6 @@ export function PatientDoctors() {
             </Select>
           </div>
 
-          {/* Specialty Filter Chips */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
             {["all", "General Physician", "Cardiologist", "Dermatologist", "Neurologist", "Pediatrician", "Orthopedist"].map((chip) => {
               const isSelected = specialty.toLowerCase() === chip.toLowerCase();
@@ -284,55 +325,86 @@ export function PatientDoctors() {
           </div>
         </div>
 
-        {/* ── MAP VIEW MODE ─────────────────────────────────────────────────── */}
         {viewMode === "map" ? (
           <div className="space-y-3">
-            {/* Radius Slider Bar */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <span className="text-xs font-bold text-slate-500 shrink-0">Radius Range:</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={RADIUS_STEPS.length - 1}
-                  step={1}
-                  value={radiusIdx}
-                  onChange={(e) => setRadiusIdx(Number(e.target.value))}
-                  className="w-full sm:w-48 h-2 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, #7C3AED ${(radiusIdx / (RADIUS_STEPS.length - 1)) * 100}%, #E2E8F0 0%)`,
-                    accentColor: "#7C3AED",
-                  }}
-                />
-                <span className="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-bold shrink-0">
-                  {radiusKm} km
-                </span>
+            {/* Radius & Location Settings Bar */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <span className="text-xs font-bold text-slate-500 shrink-0">Distance Radius:</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={RADIUS_STEPS.length - 1}
+                    step={1}
+                    value={radiusIdx}
+                    onChange={(e) => setRadiusIdx(Number(e.target.value))}
+                    className="w-full sm:w-48 h-2 rounded-full appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #7C3AED ${(radiusIdx / (RADIUS_STEPS.length - 1)) * 100}%, #E2E8F0 0%)`,
+                      accentColor: "#7C3AED",
+                    }}
+                  />
+                  <span className="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-bold shrink-0">
+                    {radiusKm} km
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                  {/* Location indicator */}
+                  <div className="flex items-center gap-1.5 text-xs bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                    <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                    <span className="font-bold text-slate-700 max-w-[140px] truncate">{locationName}</span>
+                    <button
+                      onClick={() => setShowAddressBox((s) => !s)}
+                      className="text-violet-600 hover:underline font-bold ml-1"
+                    >
+                      <Edit3 className="h-3 w-3 inline" />
+                    </button>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={locateUserGPS}
+                    disabled={locating}
+                    className="h-8 text-xs rounded-xl gap-1"
+                  >
+                    <Locate className="h-3.5 w-3.5 text-blue-500" />
+                    {locating ? "Locating..." : "GPS"}
+                  </Button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                <span className="text-xs text-slate-500 font-medium">
-                  {loadingNearby ? "Locating doctors..." : `${nearbyDocs.length} doctor(s) found near you`}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={locateUser}
-                  disabled={locating}
-                  className="h-8 text-xs rounded-xl gap-1"
-                >
-                  <Locate className="h-3.5 w-3.5 text-blue-500" />
-                  {locating ? "Locating..." : "My Location"}
-                </Button>
-              </div>
+              {showAddressBox && (
+                <div className="pt-2 border-t border-slate-100 flex gap-2">
+                  <input
+                    placeholder="Enter city or area (e.g. Salt Lake, Kolkata)..."
+                    value={customAddressInput}
+                    onChange={(e) => setCustomAddressInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") searchAddress(customAddressInput);
+                    }}
+                    className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-violet-400"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => searchAddress(customAddressInput)}
+                    disabled={isSearchingAddress || !customAddressInput.trim()}
+                    className="h-8 text-xs font-bold bg-violet-600 text-white rounded-xl"
+                  >
+                    {isSearchingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set Location"}
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Map & Doctor List Split View */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[550px] rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
-              {/* Doctor Cards Sidebar */}
               <div className="lg:col-span-1 border-r border-slate-100 flex flex-col h-full bg-slate-50/50">
                 <div className="p-3 border-b border-slate-100 bg-white">
                   <p className="text-xs font-bold text-slate-500">
-                    Doctors within {radiusKm} km
+                    Doctors within {radiusKm} km ({nearbyDocs.length})
                   </p>
                 </div>
 
@@ -342,7 +414,7 @@ export function PatientDoctors() {
                   ) : nearbyDocs.length === 0 ? (
                     <div className="py-12 text-center text-slate-400 space-y-2">
                       <p className="text-sm font-semibold">No doctors within {radiusKm} km</p>
-                      <p className="text-xs max-w-xs mx-auto text-slate-400">Try expanding the range slider above or selecting "All Specialties".</p>
+                      <p className="text-xs max-w-xs mx-auto text-slate-400">Try expanding the range slider above or drag your blue location marker.</p>
                     </div>
                   ) : (
                     nearbyDocs.map((doc) => {
@@ -400,11 +472,10 @@ export function PatientDoctors() {
                 </div>
               </div>
 
-              {/* Interactive Map View */}
               <div className="lg:col-span-2 relative h-full">
                 <MapContainer
-                  center={defaultCenter}
-                  zoom={userLoc ? 12 : 6}
+                  center={[userLoc.lat, userLoc.lng]}
+                  zoom={13}
                   style={{ height: "100%", width: "100%", zIndex: 0 }}
                 >
                   <TileLayer
@@ -412,29 +483,34 @@ export function PatientDoctors() {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
 
-                  {userLoc && <MapFly lat={userLoc.lat} lng={userLoc.lng} zoom={13} />}
+                  {/* Draggable Patient Marker */}
+                  <Marker
+                    draggable={true}
+                    eventHandlers={userMarkerDragHandlers}
+                    position={[userLoc.lat, userLoc.lng]}
+                    icon={makePatientPin()}
+                    ref={userMarkerRef}
+                  >
+                    <Popup>
+                      <div className="text-xs font-bold text-center">
+                        🏠 Your Location
+                        <p className="font-normal text-slate-500 mt-1">Drag me to change location!</p>
+                      </div>
+                    </Popup>
+                  </Marker>
 
-                  {/* Patient Location Marker */}
-                  {userLoc && (
-                    <>
-                      <Marker position={[userLoc.lat, userLoc.lng]} icon={makePatientPin()}>
-                        <Popup>📍 Your Location</Popup>
-                      </Marker>
-                      <Circle
-                        center={[userLoc.lat, userLoc.lng]}
-                        radius={radiusKm * 1000}
-                        pathOptions={{
-                          color: "#7C3AED",
-                          fillColor: "#7C3AED",
-                          fillOpacity: 0.05,
-                          weight: 1.5,
-                          dashArray: "6 4",
-                        }}
-                      />
-                    </>
-                  )}
+                  <Circle
+                    center={[userLoc.lat, userLoc.lng]}
+                    radius={radiusKm * 1000}
+                    pathOptions={{
+                      color: "#7C3AED",
+                      fillColor: "#7C3AED",
+                      fillOpacity: 0.05,
+                      weight: 1.5,
+                      dashArray: "6 4",
+                    }}
+                  />
 
-                  {/* Doctor Markers */}
                   {nearbyDocs.map((doc) => (
                     <Marker
                       key={doc.id}
@@ -465,7 +541,6 @@ export function PatientDoctors() {
             </div>
           </div>
         ) : (
-          /* ── GRID VIEW MODE ────────────────────────────────────────────────── */
           isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {[...Array(6)].map((_, i) => <DoctorCardSkeleton key={i} />)}
