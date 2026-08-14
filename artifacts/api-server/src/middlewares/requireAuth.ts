@@ -20,6 +20,15 @@ export const requireAuth = async (
   const clerkId = auth?.userId;
 
   if (!clerkId) {
+    logger.warn(
+      {
+        path: req.path,
+        method: req.method,
+        hasAuthHeader: Boolean(req.headers.authorization),
+        authReason: (auth as any)?.authReason,
+      },
+      "Unauthorized API request"
+    );
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
