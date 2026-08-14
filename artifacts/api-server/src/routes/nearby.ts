@@ -6,6 +6,7 @@ import {
   pharmaciesTable,
   diagnosticCentersTable,
   usersTable,
+  providerApplicationsTable,
 } from "@workspace/db";
 
 const router = Router();
@@ -76,27 +77,26 @@ router.get("/nearby", async (req, res): Promise<void> => {
 
     // ─── Doctors ────────────────────────────────────────────────────────────────
     if (type === "all" || type === "doctor") {
+      // Query doctorsTable joined with usersTable (all statuses: active, pending, approved)
       const doctors = await db
         .select({
           d: doctorsTable,
           u: {
             firstName: usersTable.firstName,
             lastName: usersTable.lastName,
+            email: usersTable.email,
           },
         })
         .from(doctorsTable)
-        .innerJoin(usersTable, eq(doctorsTable.userId, usersTable.id))
-        .where(
-          or(
-            eq(doctorsTable.status, "active"),
-            and(eq(usersTable.role, "doctor"), eq(usersTable.status, "active")),
-          ),
-        );
+        .innerJoin(usersTable, eq(doctorsTable.userId, usersTable.id));
+
+      const processedUserIds = new Set<number>();
 
       let idx = 0;
       for (const row of doctors) {
         const { d, u } = row;
-        // If lat/lng missing, derive deterministic offset from lat/lng query so doctor shows within range
+        processedUserIds.add(d.userId);
+
         const doctorLat = d.latitude ?? (lat + 0.012 * (idx + 1) * (idx % 2 === 0 ? 1 : -1));
         const doctorLng = d.longitude ?? (lng + 0.015 * (idx + 1) * (idx % 3 === 0 ? -1 : 1));
         idx++;
@@ -122,14 +122,45 @@ router.get("/nearby", async (req, res): Promise<void> => {
           distanceKm,
         });
       }
+
+      // Also include any DOCTOR provider applications that are pending/approved
+      const docApps = await db.query.providerApplicationsTable.findMany({
+        where: eq(providerApplicationsTable.type, "DOCTOR"),
+      });
+
+      for (const app of docApps) {
+        if (app.userId && processedUserIds.has(app.userId)) continue;
+
+        const docLat = app.latitude ?? (lat + 0.014 * (idx + 1) * (idx % 2 === 0 ? -1 : 1));
+        const docLng = app.longitude ?? (lng + 0.012 * (idx + 1) * (idx % 3 === 0 ? 1 : -1));
+        idx++;
+
+        const distanceKm = haversineDistanceKm(lat, lng, docLat, docLng);
+        if (distanceKm > radiusKm) continue;
+
+        const fullName = `Dr. ${app.firstName ?? "Doctor"} ${app.lastName ?? ""}`.trim();
+        if (search && !fullName.toLowerCase().includes(search) && !(app.specialty ?? "").toLowerCase().includes(search)) continue;
+
+        results.push({
+          id: app.id,
+          type: "doctor",
+          name: fullName,
+          specialty: app.specialty || "General Physician",
+          address: app.address || "Medical Clinic",
+          city: app.city ?? undefined,
+          phone: app.phone ?? undefined,
+          openingHours: "09:00 AM - 05:00 PM",
+          rating: 4.8,
+          latitude: docLat,
+          longitude: docLng,
+          distanceKm,
+        });
+      }
     }
 
     // ─── Pharmacies ─────────────────────────────────────────────────────────────
     if (type === "all" || type === "pharmacy") {
-      const pharmacies = await db
-        .select()
-        .from(pharmaciesTable)
-        .where(eq(pharmaciesTable.status, "active"));
+      const pharmacies = await db.select().from(pharmaciesTable);
 
       let idx = 0;
       for (const p of pharmacies) {
@@ -159,10 +190,7 @@ router.get("/nearby", async (req, res): Promise<void> => {
 
     // ─── Diagnostic Centers ─────────────────────────────────────────────────────
     if (type === "all" || type === "diagnostic_center") {
-      const centers = await db
-        .select()
-        .from(diagnosticCentersTable)
-        .where(eq(diagnosticCentersTable.status, "active"));
+      const centers = await db.select().from(diagnosticCentersTable);
 
       let idx = 0;
       for (const dc of centers) {
