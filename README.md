@@ -21,7 +21,7 @@ A modern, AI-powered healthcare management platform built with React, Vite, Tail
 - **Authentication**: Clerk Authentication
 - **Icons & Styling**: Lucide React, Custom HSL Healthcare Theme
 
-## Getting Started
+## Getting Started with our Platform
 
 ### Prerequisites
 
