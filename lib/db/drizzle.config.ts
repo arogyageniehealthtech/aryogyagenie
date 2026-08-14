@@ -38,6 +38,6 @@ export default defineConfig({
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
-    ssl: isRemoteDb ? "require" : undefined,
+    ssl: isRemoteDb ? { rejectUnauthorized: false } : undefined,
   },
 });
