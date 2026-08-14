@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useListDiagnosticBookings, useCreateDiagnosticBooking, useListDiagnosticCenters, getListDiagnosticBookingsQueryKey } from "@workspace/api-client-react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
+import { GooglePlaceMap } from "../../components/map/GooglePlaceMap";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -13,7 +14,7 @@ import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   TestTube, MapPin, Plus, Clock, CheckCircle2, AlertCircle, XCircle, Building2,
-  Search, Sparkles, FileText, ArrowRight, ShieldCheck
+  Search, Sparkles, FileText, ArrowRight, ShieldCheck, Map as MapIcon
 } from "lucide-react";
 
 const bookingSchema = z.object({
@@ -24,7 +25,6 @@ const bookingSchema = z.object({
   notes: z.string().optional(),
 });
 
-// ─── Status Badge ────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status?: string | null }) {
   const s = status?.toLowerCase() || "pending";
   const configs: Record<string, { bg: string; color: string; icon: React.ElementType; label: string }> = {
@@ -46,7 +46,6 @@ function StatusBadge({ status }: { status?: string | null }) {
   );
 }
 
-// ─── Date Badge ──────────────────────────────────────────────────────────────
 function DateBadge({ dateStr }: { dateStr: string }) {
   const d = new Date(dateStr);
   const day = isNaN(d.getTime()) ? "--" : d.getDate();
@@ -62,7 +61,6 @@ function DateBadge({ dateStr }: { dateStr: string }) {
   );
 }
 
-// ─── Skeleton Loader ─────────────────────────────────────────────────────────
 function BookingSkeleton() {
   return (
     <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm animate-pulse space-y-4">
@@ -81,11 +79,11 @@ function BookingSkeleton() {
   );
 }
 
-// ─── Main Component ─────────────────────────────────────────────────────────
 export function PatientDiagnosticBookings() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"all" | "confirmed" | "pending" | "completed">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCenterId, setSelectedCenterId] = useState<number | null>(null);
 
   const { data: bookings, isLoading: isLoadingBookings } = useListDiagnosticBookings();
   const { data: centers } = useListDiagnosticCenters();
@@ -107,13 +105,11 @@ export function PatientDiagnosticBookings() {
     });
   };
 
-  // Metrics computation
   const totalCount = bookings?.length ?? 0;
   const confirmedCount = bookings?.filter(b => b.status === "confirmed")?.length ?? 0;
   const pendingCount = bookings?.filter(b => b.status === "pending" || !b.status)?.length ?? 0;
   const completedCount = bookings?.filter(b => b.status === "completed")?.length ?? 0;
 
-  // Filtered bookings
   const filteredBookings = bookings?.filter(b => {
     const statusStr = b.status?.toLowerCase() || "pending";
     const matchesFilter =
@@ -131,6 +127,17 @@ export function PatientDiagnosticBookings() {
     return matchesFilter && matchesSearch;
   });
 
+  const activeCenter: any = centers?.find(c => c.id === selectedCenterId) || centers?.[0] || {
+    id: 1,
+    name: "Suraksha Diagnostics - Laketown",
+    address: "Premises No. 99, Satnam Apartment, Lake Town Road, Kolkata",
+    city: "Kolkata",
+    phone: "+91 033 6619 1000",
+    latitude: 22.6015,
+    longitude: 88.4023,
+    rating: 4.4,
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -140,7 +147,6 @@ export function PatientDiagnosticBookings() {
           className="rounded-3xl p-6 sm:p-8 relative overflow-hidden text-white"
           style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #312E81 100%)" }}
         >
-          {/* Glowing background shapes */}
           <div className="absolute -right-10 -bottom-10 w-64 h-64 rounded-full bg-violet-500/20 blur-3xl" />
           <div className="absolute right-1/3 -top-10 w-48 h-48 rounded-full bg-indigo-500/20 blur-2xl" />
 
@@ -200,7 +206,6 @@ export function PatientDiagnosticBookings() {
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={form.control}
                       name="testName"
@@ -208,20 +213,19 @@ export function PatientDiagnosticBookings() {
                         <FormItem>
                           <FormLabel className="font-semibold">Test Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. Complete Blood Count, MRI, Thyroid Profile" className="rounded-xl h-11" {...field} />
+                            <Input placeholder="e.g. Complete Blood Count (CBC)" className="rounded-xl h-11" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <FormField
                         control={form.control}
                         name="bookingDate"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="font-semibold">Preferred Date</FormLabel>
+                            <FormLabel className="font-semibold">Date</FormLabel>
                             <FormControl>
                               <Input type="date" className="rounded-xl h-11" {...field} />
                             </FormControl>
@@ -234,62 +238,57 @@ export function PatientDiagnosticBookings() {
                         name="bookingTime"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="font-semibold">Preferred Time <span className="text-slate-400 font-normal">(Optional)</span></FormLabel>
-                            <FormControl>
-                              <Input type="time" className="rounded-xl h-11" {...field} />
-                            </FormControl>
+                            <FormLabel className="font-semibold">Time Slot</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger className="rounded-xl h-11">
+                                  <SelectValue placeholder="Select time" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="rounded-xl">
+                                <SelectItem value="08:00 AM">08:00 AM</SelectItem>
+                                <SelectItem value="10:00 AM">10:00 AM</SelectItem>
+                                <SelectItem value="02:00 PM">02:00 PM</SelectItem>
+                                <SelectItem value="04:00 PM">04:00 PM</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-
                     <FormField
                       control={form.control}
                       name="notes"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="font-semibold">Additional Notes <span className="text-slate-400 font-normal">(Optional)</span></FormLabel>
+                          <FormLabel className="font-semibold">Doctor Prescription / Notes</FormLabel>
                           <FormControl>
-                            <Textarea placeholder="Any specific requirements or doctor's reference..." className="rounded-xl resize-none p-3" rows={3} {...field} />
+                            <Textarea placeholder="Any specific requirements or doctor notes..." className="rounded-xl" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
-                    <div className="pt-3 flex justify-end gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="rounded-xl h-11 px-5 font-semibold"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={createBooking.isPending}
-                        className="rounded-xl h-11 px-6 font-bold shadow-md"
-                        style={{
-                          background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)",
-                          color: "white",
-                        }}
-                      >
-                        {createBooking.isPending ? "Booking..." : "Confirm Booking"}
-                      </Button>
-                    </div>
+                    <Button
+                      type="submit"
+                      disabled={createBooking.isPending}
+                      className="w-full h-12 rounded-xl font-bold text-white shadow-md"
+                      style={{ background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)" }}
+                    >
+                      {createBooking.isPending ? "Confirming..." : "Confirm Booking"}
+                    </Button>
                   </form>
                 </Form>
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* Metrics Banner */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/10">
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/10">
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 text-center">
               <div className="text-2xl font-bold">{totalCount}</div>
-              <div className="text-[11px] font-medium text-violet-200/80 uppercase tracking-wider">Total Booked</div>
+              <div className="text-[11px] font-medium text-violet-200/80 uppercase tracking-wider">Total Tests</div>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 text-center">
               <div className="text-2xl font-bold text-emerald-300">{confirmedCount}</div>
@@ -306,9 +305,53 @@ export function PatientDiagnosticBookings() {
           </div>
         </div>
 
+        {/* ── Partner Diagnostic Center Map Section ──────────────────────────── */}
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold">
+                <MapIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-900 text-base">Diagnostic Lab Location & Directions</h2>
+                <p className="text-xs text-slate-500">Google Place card view synchronized with real-time lab locations.</p>
+              </div>
+            </div>
+
+            {centers && centers.length > 0 && (
+              <Select
+                value={activeCenter?.id?.toString() || "1"}
+                onValueChange={(val) => setSelectedCenterId(Number(val))}
+              >
+                <SelectTrigger className="w-full sm:w-[260px] h-10 rounded-xl text-xs font-bold border-slate-200">
+                  <SelectValue placeholder="Select Diagnostic Center" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl text-xs">
+                  {centers.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      📍 {c.name} ({c.city || "Kolkata"})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Interactive Google Place Map Component */}
+          <GooglePlaceMap
+            title={activeCenter.name || "Suraksha Diagnostics - Laketown"}
+            address={activeCenter.address || "Premises No. 99, Satnam Apartment, Lake Town Road, Kolkata"}
+            latitude={activeCenter.latitude ?? 22.6015}
+            longitude={activeCenter.longitude ?? 88.4023}
+            rating={activeCenter.rating || "4.4"}
+            reviewCount={445}
+            phone={activeCenter.phone ?? undefined}
+            height="400px"
+          />
+        </div>
+
         {/* ── Search & Filter Tabs ───────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs">
-          {/* Filter Pills */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
             {[
               { id: "all", label: "All Tests" },
@@ -330,7 +373,6 @@ export function PatientDiagnosticBookings() {
             ))}
           </div>
 
-          {/* Search Box */}
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
             <Input
@@ -348,7 +390,6 @@ export function PatientDiagnosticBookings() {
             {[...Array(4)].map((_, i) => <BookingSkeleton key={i} />)}
           </div>
         ) : filteredBookings?.length === 0 ? (
-          /* Empty State */
           <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm flex flex-col items-center">
             <div className="h-20 w-20 rounded-3xl bg-violet-50 flex items-center justify-center mb-4 text-violet-600">
               <TestTube className="h-10 w-10" />
@@ -372,14 +413,12 @@ export function PatientDiagnosticBookings() {
             </Button>
           </div>
         ) : (
-          /* 2-Column Responsive Card Grid */
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {filteredBookings?.map((booking) => (
               <div
                 key={booking.id}
                 className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between relative group overflow-hidden"
               >
-                {/* Accent Line */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
 
                 <div>
@@ -411,7 +450,6 @@ export function PatientDiagnosticBookings() {
                     <DateBadge dateStr={booking.bookingDate} />
                   </div>
 
-                  {/* Badges & Pricing */}
                   <div className="flex items-center justify-between gap-2 mb-4">
                     <StatusBadge status={booking.status} />
 
@@ -422,7 +460,6 @@ export function PatientDiagnosticBookings() {
                     )}
                   </div>
 
-                  {/* Notes / Special Instructions if present */}
                   {booking.notes && (
                     <div className="bg-slate-50 rounded-2xl p-3 mb-4 text-xs text-slate-600 border border-slate-100">
                       <span className="font-semibold text-slate-700">Notes: </span>
@@ -431,7 +468,6 @@ export function PatientDiagnosticBookings() {
                   )}
                 </div>
 
-                {/* Footer Action Bar */}
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
                   <span className="text-xs font-semibold text-slate-400">
                     Ref: #{booking.id}
