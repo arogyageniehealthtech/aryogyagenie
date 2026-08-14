@@ -28,96 +28,119 @@ export async function seedCoordinates() {
   ];
 
   // 1. Update Doctors
-  const doctors = await db.select().from(doctorsTable);
-  for (let i = 0; i < doctors.length; i++) {
-    const doc = doctors[i];
-    const coord = doctorCoords[i % doctorCoords.length];
-    await db.update(doctorsTable).set({
-      latitude: doc.latitude || coord.lat,
-      longitude: doc.longitude || coord.lng,
-      clinicAddress: doc.clinicAddress || coord.clinicAddress,
-      status: "active",
-    }).where(eq(doctorsTable.id, doc.id));
+  try {
+    const doctors = await db.select().from(doctorsTable);
+    for (let i = 0; i < doctors.length; i++) {
+      const doc = doctors[i];
+      const coord = doctorCoords[i % doctorCoords.length];
+      await db.update(doctorsTable).set({
+        latitude: doc.latitude || coord.lat,
+        longitude: doc.longitude || coord.lng,
+        clinicAddress: doc.clinicAddress || coord.clinicAddress,
+        status: "active",
+      }).where(eq(doctorsTable.id, doc.id));
+    }
+  } catch (e: any) {
+    console.warn("Doctor coordinate update warning:", e?.message);
   }
 
   // 2. Ensure Pharmacies
-  const existingPharms = await db.select().from(pharmaciesTable);
-  if (existingPharms.length === 0) {
-    let user = await db.query.usersTable.findFirst({ where: eq(usersTable.role, "pharmacy") });
-    if (!user) {
-      [user] = await db.insert(usersTable).values({
-        clerkId: `demo_pharmacy_${Date.now()}`,
-        email: "pharmacy.demo@arogyagenie.com",
-        firstName: "MedPlus",
-        lastName: "Pharmacy",
-        role: "pharmacy",
-        status: "active",
-      }).returning();
+  try {
+    const existingPharms = await db.select().from(pharmaciesTable);
+    if (existingPharms.length === 0) {
+      for (let i = 0; i < pharmacyCoords.length; i++) {
+        const p = pharmacyCoords[i];
+        const email = `pharmacy.seed.${i + 1}@arogyagenie.com`;
+        let user = await db.query.usersTable.findFirst({ where: eq(usersTable.email, email) });
+        if (!user) {
+          [user] = await db.insert(usersTable).values({
+            clerkId: `demo_pharmacy_${i + 1}_${Date.now()}`,
+            email,
+            firstName: p.name,
+            lastName: "",
+            role: "pharmacy",
+            status: "active",
+          }).returning();
+        }
+        const existingUserPharm = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, user.id) });
+        if (!existingUserPharm) {
+          await db.insert(pharmaciesTable).values({
+            userId: user.id,
+            name: p.name,
+            phone: p.phone,
+            address: p.address,
+            city: p.city,
+            latitude: p.lat,
+            longitude: p.lng,
+            openingHours: "08:00 AM - 10:00 PM",
+            status: "active",
+          });
+        }
+      }
+    } else {
+      for (let i = 0; i < existingPharms.length; i++) {
+        const p = existingPharms[i];
+        const coord = pharmacyCoords[i % pharmacyCoords.length];
+        await db.update(pharmaciesTable).set({
+          latitude: p.latitude || coord.lat,
+          longitude: p.longitude || coord.lng,
+          status: "active",
+        }).where(eq(pharmaciesTable.id, p.id));
+      }
     }
-    for (const p of pharmacyCoords) {
-      await db.insert(pharmaciesTable).values({
-        userId: user.id,
-        name: p.name,
-        phone: p.phone,
-        address: p.address,
-        city: p.city,
-        latitude: p.lat,
-        longitude: p.lng,
-        openingHours: "08:00 AM - 10:00 PM",
-        status: "active",
-      });
-    }
-  } else {
-    for (let i = 0; i < existingPharms.length; i++) {
-      const p = existingPharms[i];
-      const coord = pharmacyCoords[i % pharmacyCoords.length];
-      await db.update(pharmaciesTable).set({
-        latitude: p.latitude || coord.lat,
-        longitude: p.longitude || coord.lng,
-        status: "active",
-      }).where(eq(pharmaciesTable.id, p.id));
-    }
+  } catch (e: any) {
+    console.warn("Pharmacy seed warning:", e?.message);
   }
 
   // 3. Ensure Diagnostic Centers
-  const existingDiags = await db.select().from(diagnosticCentersTable);
-  if (existingDiags.length === 0) {
-    let user = await db.query.usersTable.findFirst({ where: eq(usersTable.role, "diagnostic_center") });
-    if (!user) {
-      [user] = await db.insert(usersTable).values({
-        clerkId: `demo_diag_${Date.now()}`,
-        email: "diagnostic.demo@arogyagenie.com",
-        firstName: "Suraksha",
-        lastName: "Diagnostics",
-        role: "diagnostic_center",
-        status: "active",
-      }).returning();
+  try {
+    const existingDiags = await db.select().from(diagnosticCentersTable);
+    if (existingDiags.length === 0) {
+      for (let i = 0; i < diagnosticCoords.length; i++) {
+        const d = diagnosticCoords[i];
+        const email = `diagnostic.seed.${i + 1}@arogyagenie.com`;
+        let user = await db.query.usersTable.findFirst({ where: eq(usersTable.email, email) });
+        if (!user) {
+          [user] = await db.insert(usersTable).values({
+            clerkId: `demo_diag_${i + 1}_${Date.now()}`,
+            email,
+            firstName: d.name,
+            lastName: "",
+            role: "diagnostic_center",
+            status: "active",
+          }).returning();
+        }
+        const existingUserDiag = await db.query.diagnosticCentersTable.findFirst({ where: eq(diagnosticCentersTable.userId, user.id) });
+        if (!existingUserDiag) {
+          await db.insert(diagnosticCentersTable).values({
+            userId: user.id,
+            name: d.name,
+            phone: d.phone,
+            address: d.address,
+            city: d.city,
+            latitude: d.lat,
+            longitude: d.lng,
+            openingHours: "07:00 AM - 09:00 PM",
+            rating: d.rating,
+            status: "active",
+          });
+        }
+      }
+    } else {
+      for (let i = 0; i < existingDiags.length; i++) {
+        const d = existingDiags[i];
+        const coord = diagnosticCoords[i % diagnosticCoords.length];
+        await db.update(diagnosticCentersTable).set({
+          latitude: d.latitude || coord.lat,
+          longitude: d.longitude || coord.lng,
+          status: "active",
+        }).where(eq(diagnosticCentersTable.id, d.id));
+      }
     }
-    for (const d of diagnosticCoords) {
-      await db.insert(diagnosticCentersTable).values({
-        userId: user.id,
-        name: d.name,
-        phone: d.phone,
-        address: d.address,
-        city: d.city,
-        latitude: d.lat,
-        longitude: d.lng,
-        openingHours: "07:00 AM - 09:00 PM",
-        rating: d.rating,
-        status: "active",
-      });
-    }
-  } else {
-    for (let i = 0; i < existingDiags.length; i++) {
-      const d = existingDiags[i];
-      const coord = diagnosticCoords[i % diagnosticCoords.length];
-      await db.update(diagnosticCentersTable).set({
-        latitude: d.latitude || coord.lat,
-        longitude: d.longitude || coord.lng,
-        status: "active",
-      }).where(eq(diagnosticCentersTable.id, d.id));
-    }
+  } catch (e: any) {
+    console.warn("Diagnostic center seed warning:", e?.message);
   }
 
   console.log("Database provider coordinates seeded successfully!");
 }
+
