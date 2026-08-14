@@ -12,6 +12,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import { logger } from "./lib/logger";
 import { globalRateLimiter } from "./middlewares/rateLimiter";
+import healthRouter from "./routes/health";
 import router from "./routes";
 
 const app = express();
@@ -105,6 +106,9 @@ app.use(
       ),
   })),
 );
+
+// Root Health Check Probes (/health, /healthz, /health/ready)
+app.use(healthRouter);
 
 // Apply Global API Rate Limiter
 app.use("/api", globalRateLimiter);
