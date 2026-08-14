@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, real, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,6 +11,8 @@ export const pharmaciesTable = pgTable("pharmacies", {
   city: text("city"),
   licenseNumber: text("license_number"),
   openingHours: text("opening_hours"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   status: text("status", { enum: ["pending", "active", "suspended", "rejected"] }).notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

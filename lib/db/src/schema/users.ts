@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -18,6 +18,8 @@ export const usersTable = pgTable("users", {
   address: text("address"),
   city: text("city"),
   state: text("state"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   bloodGroup: text("blood_group"),
   allergies: text("allergies"),
   existingConditions: text("existing_conditions"),

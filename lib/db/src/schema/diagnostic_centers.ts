@@ -12,6 +12,8 @@ export const diagnosticCentersTable = pgTable("diagnostic_centers", {
   accreditation: text("accreditation"),
   services: text("services"),
   openingHours: text("opening_hours"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   rating: real("rating").default(0),
   status: text("status", { enum: ["pending", "active", "suspended", "rejected"] }).notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -32,7 +32,9 @@ async function resolveUserFromReq(req: Request) {
 // POST /provider-applications (Public & Authenticated)
 router.post("/provider-applications", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { type, firstName, lastName, name, phone, email, specialty, address, city } = req.body;
+    const { type, firstName, lastName, name, phone, email, specialty, address, city, latitude, longitude } = req.body;
+    const lat = latitude != null ? parseFloat(latitude) : null;
+    const lng = longitude != null ? parseFloat(longitude) : null;
 
     if (!type || !["DOCTOR", "DIAGNOSTIC_CENTER", "PHARMACY"].includes(type)) {
       res.status(400).json({ error: "Valid type (DOCTOR, DIAGNOSTIC_CENTER, PHARMACY) is required." });
@@ -151,6 +153,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           specialty: specialty || null,
           address: address || null,
           city: city || null,
+          latitude: lat,
+          longitude: lng,
         })
         .returning();
       application = newApp;
@@ -166,13 +170,15 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
       if (existingDoc) {
         await db
           .update(doctorsTable)
-          .set({ specialty: specialty!, status: providerStatus })
+          .set({ specialty: specialty!, status: providerStatus, latitude: lat, longitude: lng })
           .where(eq(doctorsTable.id, existingDoc.id));
       } else {
         await db.insert(doctorsTable).values({
           userId: currentUser.id,
           specialty: specialty!,
           status: providerStatus,
+          latitude: lat,
+          longitude: lng,
         });
       }
     } else if (type === "DIAGNOSTIC_CENTER") {
@@ -191,6 +197,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           phone: cleanPhone,
           address: address!,
           city: city || null,
+          latitude: lat,
+          longitude: lng,
           status: providerStatus,
         });
       }
@@ -210,6 +218,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           phone: cleanPhone,
           address: address!,
           city: city || null,
+          latitude: lat,
+          longitude: lng,
           status: providerStatus,
         });
       }
@@ -373,6 +383,8 @@ router.post(
               userId: userIdToSync,
               specialty: application.specialty || "General Physician",
               status: "active",
+              latitude: application.latitude,
+              longitude: application.longitude,
             });
           }
         } else if (application.type === "DIAGNOSTIC_CENTER") {
@@ -391,6 +403,8 @@ router.post(
               address: application.address || "Main Address",
               phone: application.phone,
               city: application.city || undefined,
+              latitude: application.latitude,
+              longitude: application.longitude,
               status: "active",
             });
           }
@@ -410,6 +424,8 @@ router.post(
               address: application.address || "Main Address",
               phone: application.phone,
               city: application.city || undefined,
+              latitude: application.latitude,
+              longitude: application.longitude,
               status: "active",
             });
           }

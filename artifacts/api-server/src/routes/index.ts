@@ -16,6 +16,7 @@ import medicalKnowledgeRouter from "./medicalKnowledge";
 import ocrRouter from "./ocr";
 import healthIntelligenceRouter from "./healthIntelligence";
 import providerApplicationsRouter from "./providerApplications";
+import nearbyRouter from "./nearby";
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use(medicalKnowledgeRouter);
 router.use(ocrRouter);
 router.use(healthIntelligenceRouter);
 router.use(providerApplicationsRouter);
+router.use(nearbyRouter);
 
 export default router;

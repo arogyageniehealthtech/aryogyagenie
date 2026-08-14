@@ -6,6 +6,47 @@ import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
+// GET /pharmacies (public) - list active pharmacies
+router.get("/pharmacies", async (req, res): Promise<void> => {
+  const { search } = req.query as { search?: string };
+  const pagination = parsePaginationParams(req);
+
+  const rows = await db
+    .select({ p: pharmaciesTable, u: usersTable })
+    .from(pharmaciesTable)
+    .innerJoin(usersTable, eq(pharmaciesTable.userId, usersTable.id))
+    .where(eq(pharmaciesTable.status, "active"));
+
+  let result = rows.map((r) => ({
+    id: r.p.id,
+    userId: r.p.userId,
+    name: r.p.name,
+    email: r.u.email,
+    phone: r.p.phone,
+    address: r.p.address,
+    city: r.p.city,
+    licenseNumber: r.p.licenseNumber,
+    openingHours: r.p.openingHours,
+    latitude: r.p.latitude,
+    longitude: r.p.longitude,
+    status: r.p.status,
+  }));
+
+  if (search) {
+    const s = search.toLowerCase();
+    result = result.filter(
+      (p) =>
+        p.name.toLowerCase().includes(s) ||
+        (p.city ?? "").toLowerCase().includes(s)
+    );
+  }
+
+  const total = result.length;
+  setPaginationHeaders(res, total, pagination);
+  const paginatedResult = result.slice(pagination.offset, pagination.offset + pagination.limit);
+  res.json(paginatedResult);
+});
+
 // GET /pharmacies/me/profile
 router.get("/pharmacies/me/profile", requireAuth, requireRole(["pharmacy"]), async (req: AuthenticatedRequest, res): Promise<void> => {
   const row = await db

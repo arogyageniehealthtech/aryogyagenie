@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, real, integer, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,6 +16,8 @@ export const providerApplicationsTable = pgTable("provider_applications", {
   address: text("address"),
   city: text("city"),
   details: text("details"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   rejectionReason: text("rejection_reason"),
   reviewedBy: integer("reviewed_by"),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),

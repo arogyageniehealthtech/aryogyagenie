@@ -18,6 +18,8 @@ export const doctorsTable = pgTable("doctors", {
   status: text("status", { enum: ["pending", "active", "suspended", "rejected"] }).notNull().default("pending"),
   availableDays: text("available_days"),
   availableHours: text("available_hours"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
