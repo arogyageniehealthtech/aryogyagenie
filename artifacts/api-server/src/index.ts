@@ -19,7 +19,7 @@ try {
 
 import app from "./app";
 import { logger } from "./lib/logger";
-import { pool } from "@workspace/db";
+import { pool, runMigrations } from "@workspace/db";
 
 const rawPort = process.env["PORT"] || "3000";
 
@@ -27,6 +27,13 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+// Auto-apply database migrations on server startup to provision fresh PostgreSQL DB instances
+try {
+  await runMigrations(false);
+} catch (err) {
+  logger.warn({ err }, "Startup database migration check warning");
 }
 
 const server = app.listen(port, (err) => {

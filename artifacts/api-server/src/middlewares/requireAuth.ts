@@ -75,8 +75,14 @@ export const requireAuth = async (
 
       user = newUser || (await db.query.usersTable.findFirst({
         where: eq(usersTable.clerkId, clerkId),
-      }))!;
+      }));
     }
+  }
+
+  if (!user) {
+    logger.error({ clerkId }, "Failed to find or initialize user record");
+    res.status(500).json({ error: "Failed to initialize user account" });
+    return;
   }
 
   // Auto-promote system admin email and remove doctor profile if present
