@@ -29,9 +29,12 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+import { seedCoordinates } from "./seed";
+
 // Auto-apply database migrations on server startup to provision fresh PostgreSQL DB instances
 try {
   await runMigrations(false);
+  await seedCoordinates();
 } catch (err) {
   logger.warn({ err }, "Startup database migration check warning");
 }
