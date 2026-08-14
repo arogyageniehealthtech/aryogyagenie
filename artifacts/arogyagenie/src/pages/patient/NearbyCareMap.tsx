@@ -5,11 +5,12 @@ import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import {
   MapPin, Stethoscope, Pill, TestTube, Locate, AlertCircle,
   Navigation, ExternalLink, Phone, Star, Search, X,
-  ChevronUp, ChevronDown, Loader2, Calendar, Edit3, Check,
+  ChevronUp, ChevronDown, Loader2, Calendar, Edit3, Check, MousePointerClick,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  MapContainer, TileLayer, Marker, Popup, Circle, useMap,
+  MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker, useMap, useMapEvents,
   Polyline,
 } from "react-leaflet";
 import { divIcon, type LatLngExpression, type Map as LeafletMap } from "leaflet";
@@ -35,8 +36,16 @@ interface NearbyProvider {
 type FilterType = "all" | "doctor" | "pharmacy" | "diagnostic_center";
 type SheetState = "collapsed" | "half" | "full";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const RADIUS_STEPS = [2, 4, 6, 8, 10, 12, 14, 16]; // km
+
+const QUICK_CITIES = [
+  { name: "Kolkata (Park St)", lat: 22.5532, lng: 88.3512 },
+  { name: "Salt Lake, Kolkata", lat: 22.5834, lng: 88.4123 },
+  { name: "Howrah, Kolkata", lat: 22.5958, lng: 88.2636 },
+  { name: "Durgapur", lat: 23.5204, lng: 87.3119 },
+  { name: "New Delhi", lat: 28.6139, lng: 77.2090 },
+  { name: "Bengaluru", lat: 12.9716, lng: 77.5946 },
+];
 
 const TYPE_CONFIG = {
   doctor: {
@@ -107,44 +116,29 @@ function makeProviderPin(
 function makeUserPin() {
   return divIcon({
     html: `
-      <div style="position:relative; width:28px; height:28px;">
+      <div style="position:relative; width:34px; height:34px;">
         <div style="
           position:absolute; top:50%; left:50%;
           transform: translate(-50%, -50%);
-          width:44px; height:44px;
-          background: rgba(59,130,246,0.2);
-          border-radius: 50%;
-          animation: pulseRing 2s ease-out infinite;
-        "></div>
-        <div style="
-          position:absolute; top:50%; left:50%;
-          transform: translate(-50%, -50%);
-          width:24px; height:24px;
+          width:34px; height:34px;
           background: #2563EB;
           border: 3.5px solid white;
           border-radius: 50%;
-          box-shadow: 0 3px 12px rgba(37,99,235,0.6);
+          box-shadow: 0 4px 16px rgba(37,99,235,0.7);
           display:flex; align-items:center; justify-content:center;
-          color:white; font-size:12px; font-weight:bold;
+          color:white; font-size:15px; font-weight:bold;
         ">🏠</div>
-      </div>
-      <style>
-        @keyframes pulseRing {
-          0% { transform: translate(-50%,-50%) scale(0.6); opacity:0.8; }
-          100% { transform: translate(-50%,-50%) scale(2.2); opacity:0; }
-        }
-      </style>`,
+      </div>`,
     className: "",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
   });
 }
 
-// ─── Map helpers ──────────────────────────────────────────────────────────────
 function MapFly({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo([lat, lng], zoom ?? map.getZoom(), { duration: 0.9 });
+    map.flyTo([lat, lng], zoom ?? 14, { duration: 1 });
   }, [lat, lng, zoom, map]);
   return null;
 }
@@ -155,12 +149,35 @@ function MapInit({ onReady }: { onReady: (m: LeafletMap) => void }) {
   return null;
 }
 
-// ─── Distance formatter ───────────────────────────────────────────────────────
+function MapClickListener({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 function fmtDist(km: number) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }
 
-// ─── Provider mini-card (in bottom sheet list) ────────────────────────────────
+async function fetchReverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+      headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
+    });
+    const data = await res.json();
+    if (data && data.display_name) {
+      const parts = data.display_name.split(",");
+      return parts.slice(0, 3).join(",").trim();
+    }
+  } catch {
+    // fallback
+  }
+  return `Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
+}
+
 function ProviderCard({
   p,
   selected,
@@ -210,7 +227,6 @@ function ProviderCard({
   );
 }
 
-// ─── Provider Detail Panel (inside bottom sheet when a provider is selected) ──
 function ProviderDetail({
   p,
   onClose,
@@ -310,18 +326,37 @@ function ProviderDetail({
   );
 }
 
+// Helper to read initial saved location
+function getSavedLocation(): { lat: number; lng: number; name: string } {
+  try {
+    const raw = localStorage.getItem("arogyagenie_user_location");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.lat && parsed.lng) {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { lat: 22.5726, lng: 88.3639, name: "Park Street, Kolkata" };
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export function NearbyCareMap() {
   const [, setLocation] = useLocation();
 
+  const initialLoc = useMemo(() => getSavedLocation(), []);
+
   // User location state
-  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number }>({ lat: 22.5726, lng: 88.3639 }); // Default Kolkata
-  const [locationName, setLocationName] = useState<string>("Current Location");
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number }>({ lat: initialLoc.lat, lng: initialLoc.lng });
+  const [locationName, setLocationName] = useState<string>(initialLoc.name);
   const [customAddressInput, setCustomAddressInput] = useState("");
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [showAddressBox, setShowAddressBox] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
+  const [clickNotice, setClickNotice] = useState<string | null>("💡 Click anywhere on the map or type address above to set your location pin!");
 
   // Providers state
   const [providers, setProviders] = useState<NearbyProvider[]>([]);
@@ -338,6 +373,17 @@ export function NearbyCareMap() {
   const mapRef = useRef<LeafletMap | null>(null);
   const userMarkerRef = useRef<any>(null);
   const radiusKm = RADIUS_STEPS[radiusIdx];
+
+  // Persist location helper
+  const updateAndSaveLocation = useCallback((lat: number, lng: number, name: string) => {
+    setUserLoc({ lat, lng });
+    setLocationName(name);
+    try {
+      localStorage.setItem("arogyagenie_user_location", JSON.stringify({ lat, lng, name }));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // ── Fetch nearby providers for userLoc ─────────────────────────────────────
   const fetchNearby = useCallback(async (lat: number, lng: number) => {
@@ -361,6 +407,15 @@ export function NearbyCareMap() {
     }
   }, [radiusKm, filter, search]);
 
+  // ── Update location from Map Click ──────────────────────────────────────────
+  const handleMapClick = useCallback(async (clickedLat: number, clickedLng: number) => {
+    setClickNotice(null);
+    setSelected(null);
+    fetchNearby(clickedLat, clickedLng);
+    const addr = await fetchReverseGeocode(clickedLat, clickedLng);
+    updateAndSaveLocation(clickedLat, clickedLng, addr);
+  }, [fetchNearby, updateAndSaveLocation]);
+
   // ── Geocode custom address typed by patient ────────────────────────────────
   const searchAddress = useCallback(async (queryAddress: string) => {
     if (!queryAddress.trim()) return;
@@ -375,56 +430,66 @@ export function NearbyCareMap() {
       if (data && data.length > 0) {
         const newLat = parseFloat(data[0].lat);
         const newLng = parseFloat(data[0].lon);
-        const displayName = data[0].display_name.split(",").slice(0, 2).join(",");
-        setUserLoc({ lat: newLat, lng: newLng });
-        setLocationName(displayName);
+        const displayName = data[0].display_name.split(",").slice(0, 3).join(",");
+        updateAndSaveLocation(newLat, newLng, displayName);
         setShowAddressBox(false);
         fetchNearby(newLat, newLng);
         if (mapRef.current) {
-          mapRef.current.flyTo([newLat, newLng], 13);
+          mapRef.current.flyTo([newLat, newLng], 14, { duration: 1 });
         }
       } else {
-        setLocError("Address not found. Please try entering city or area name.");
+        setLocError("Address not found. Try typing city or landmark name.");
       }
     } catch {
       setLocError("Failed to locate address.");
     } finally {
       setIsSearchingAddress(false);
     }
-  }, [fetchNearby]);
+  }, [fetchNearby, updateAndSaveLocation]);
+
+  // Quick City Select
+  const selectQuickCity = useCallback((city: typeof QUICK_CITIES[0]) => {
+    updateAndSaveLocation(city.lat, city.lng, city.name);
+    setShowAddressBox(false);
+    fetchNearby(city.lat, city.lng);
+    if (mapRef.current) {
+      mapRef.current.flyTo([city.lat, city.lng], 14, { duration: 1 });
+    }
+  }, [fetchNearby, updateAndSaveLocation]);
 
   // ── GPS locate ─────────────────────────────────────────────────────────────
   const locateGPS = useCallback(() => {
     setLocating(true);
     setLocError(null);
     if (!navigator.geolocation) {
-      setLocError("Geolocation not supported.");
+      setLocError("Geolocation not supported on this browser.");
       setLocating(false);
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserLoc(loc);
-        setLocationName("GPS Location");
         fetchNearby(loc.lat, loc.lng);
         setLocating(false);
+        const addr = await fetchReverseGeocode(loc.lat, loc.lng);
+        updateAndSaveLocation(loc.lat, loc.lng, addr);
         if (mapRef.current) {
-          mapRef.current.flyTo([loc.lat, loc.lng], 13);
+          mapRef.current.flyTo([loc.lat, loc.lng], 14, { duration: 1 });
         }
       },
       () => {
-        setLocError("GPS permission denied. You can search your address above!");
+        setLocError("GPS access unavailable. Select your city or type address above!");
         setLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
-  }, [fetchNearby]);
+  }, [fetchNearby, updateAndSaveLocation]);
 
-  // Auto-locate GPS on mount
-  useEffect(() => { locateGPS(); }, []);
+  // Initial fetch using saved/default location (WITHOUT forcing GPS auto-overwrite on mount)
+  useEffect(() => {
+    fetchNearby(userLoc.lat, userLoc.lng);
+  }, []);
 
-  // Re-fetch when filters or radius change
   useEffect(() => {
     if (userLoc) fetchNearby(userLoc.lat, userLoc.lng);
   }, [radiusKm, filter, fetchNearby]);
@@ -432,18 +497,18 @@ export function NearbyCareMap() {
   // ── Draggable user pin end event ───────────────────────────────────────────
   const userMarkerDragHandlers = useMemo(
     () => ({
-      dragend() {
+      async dragend() {
         const marker = userMarkerRef.current;
         if (marker != null) {
           const latLng = marker.getLatLng();
           const newLoc = { lat: latLng.lat, lng: latLng.lng };
-          setUserLoc(newLoc);
-          setLocationName("Custom Pinned Location");
           fetchNearby(newLoc.lat, newLoc.lng);
+          const addr = await fetchReverseGeocode(newLoc.lat, newLoc.lng);
+          updateAndSaveLocation(newLoc.lat, newLoc.lng, addr);
         }
       },
     }),
-    [fetchNearby],
+    [fetchNearby, updateAndSaveLocation],
   );
 
   const visible = providers.filter((p) => {
@@ -492,7 +557,7 @@ export function NearbyCareMap() {
         {/* ── Leaflet Map ─────────────────────────────────────────────────── */}
         <MapContainer
           center={[userLoc.lat, userLoc.lng]}
-          zoom={13}
+          zoom={14}
           style={{ height: "100%", width: "100%", zIndex: 0 }}
           zoomControl={false}
         >
@@ -503,7 +568,37 @@ export function NearbyCareMap() {
 
           <MapInit onReady={(m) => { mapRef.current = m; }} />
 
-          {/* Draggable Patient Location Marker */}
+          {/* Click anywhere on map to set location */}
+          <MapClickListener onMapClick={handleMapClick} />
+
+          {/* Smooth map fly component */}
+          <MapFly lat={userLoc.lat} lng={userLoc.lng} zoom={14} />
+
+          {/* Glowing Outer Blue Halo */}
+          <CircleMarker
+            center={[userLoc.lat, userLoc.lng]}
+            radius={22}
+            pathOptions={{
+              color: "#3B82F6",
+              fillColor: "#3B82F6",
+              fillOpacity: 0.22,
+              weight: 0,
+            }}
+          />
+
+          {/* Solid Vivid Blue Dot */}
+          <CircleMarker
+            center={[userLoc.lat, userLoc.lng]}
+            radius={10}
+            pathOptions={{
+              color: "#FFFFFF",
+              fillColor: "#2563EB",
+              fillOpacity: 1,
+              weight: 3,
+            }}
+          />
+
+          {/* Draggable Marker Pin */}
           <Marker
             draggable={true}
             eventHandlers={userMarkerDragHandlers}
@@ -512,9 +607,10 @@ export function NearbyCareMap() {
             ref={userMarkerRef}
           >
             <Popup>
-              <div className="text-xs font-bold text-center">
-                🏠 Your Location ({locationName})
-                <p className="font-normal text-slate-500 mt-1">Drag me anywhere to update location!</p>
+              <div className="text-xs font-bold text-center min-w-[150px]">
+                📍 Your Location
+                <p className="font-semibold text-blue-600 mt-1">{locationName}</p>
+                <p className="font-normal text-slate-400 mt-1 text-[10px]">Drag pin or click map to move!</p>
               </div>
             </Popup>
           </Marker>
@@ -584,27 +680,26 @@ export function NearbyCareMap() {
         <div className="absolute top-3 left-0 right-0 z-[1000] px-4 flex flex-col gap-2 pointer-events-none">
           {/* Top location bar & action buttons */}
           <div className="flex items-center gap-2 pointer-events-auto">
-            {/* Set address button / indicator */}
-            <div className="flex-1 bg-white rounded-full shadow-lg border border-slate-200 px-3.5 py-2 flex items-center gap-2 min-w-0">
-              <MapPin className="h-4 w-4 text-blue-600 shrink-0" />
-              <span className="text-xs font-bold text-slate-800 truncate">
+            <div className="flex-1 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-slate-200 px-3.5 py-2 flex items-center gap-2 min-w-0">
+              <span className="h-3 w-3 rounded-full bg-blue-600 border-2 border-white shadow-xs shrink-0 animate-pulse" />
+              <span className="text-xs font-bold text-slate-800 truncate" title={locationName}>
                 {locationName}
               </span>
               <button
                 onClick={() => setShowAddressBox((s) => !s)}
-                className="text-[11px] font-bold text-violet-600 hover:underline shrink-0 ml-auto flex items-center gap-1"
+                className="text-[11px] font-bold text-violet-600 hover:underline shrink-0 ml-auto flex items-center gap-1 bg-violet-50 px-2 py-0.5 rounded-full"
               >
                 <Edit3 className="h-3 w-3" />
-                Change
+                Change Location
               </button>
             </div>
 
-            {/* Locate GPS */}
+            {/* Locate GPS button */}
             <button
               onClick={locateGPS}
               disabled={locating}
               className="h-10 w-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-slate-200 transition-all hover:scale-105 shrink-0"
-              title="Use GPS Location"
+              title="Fly to Browser Location"
             >
               {locating ? (
                 <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
@@ -614,10 +709,30 @@ export function NearbyCareMap() {
             </button>
           </div>
 
-          {/* Manual Address Input Dropdown */}
+          {/* Click instruction prompt */}
+          {clickNotice && (
+            <div className="pointer-events-auto flex items-center justify-between gap-2 text-xs text-blue-800 bg-blue-50/95 backdrop-blur-md border border-blue-200 rounded-2xl px-3.5 py-1.5 shadow-md">
+              <span className="flex items-center gap-1.5 font-medium">
+                <MousePointerClick className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                {clickNotice}
+              </span>
+              <button onClick={() => setClickNotice(null)} className="text-blue-500 hover:text-blue-700">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Manual Address & Quick City Selector Dropdown */}
           {showAddressBox && (
-            <div className="bg-white rounded-2xl p-3 shadow-2xl border border-slate-200 pointer-events-auto space-y-2">
-              <p className="text-xs font-bold text-slate-700">Set your exact location / address:</p>
+            <div className="bg-white rounded-2xl p-3.5 shadow-2xl border border-slate-200 pointer-events-auto space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-800">Set your exact location:</p>
+                <button onClick={() => setShowAddressBox(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {/* Address input */}
               <div className="flex gap-2">
                 <input
                   autoFocus
@@ -627,20 +742,33 @@ export function NearbyCareMap() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") searchAddress(customAddressInput);
                   }}
-                  className="flex-1 px-3 py-1.5 rounded-xl text-xs border border-slate-200 outline-none focus:ring-2 focus:ring-violet-400"
+                  className="flex-1 px-3 py-1.5 rounded-xl text-xs border border-slate-200 outline-none focus:ring-2 focus:ring-violet-400 bg-slate-50"
                 />
                 <Button
                   size="sm"
                   onClick={() => searchAddress(customAddressInput)}
                   disabled={isSearchingAddress || !customAddressInput.trim()}
-                  className="h-8 text-xs font-bold bg-violet-600 text-white rounded-xl px-3"
+                  className="h-8 text-xs font-bold bg-violet-600 text-white rounded-xl px-3 shrink-0"
                 >
-                  {isSearchingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set"}
+                  {isSearchingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set Address"}
                 </Button>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Tip: You can also <strong>drag the blue 🏠 marker</strong> directly on the map!
-              </p>
+
+              {/* Quick City Buttons */}
+              <div className="space-y-1 pt-1">
+                <p className="text-[11px] font-semibold text-slate-400">Quick Select Metro Area:</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {QUICK_CITIES.map((c) => (
+                    <button
+                      key={c.name}
+                      onClick={() => selectQuickCity(c)}
+                      className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-violet-100 hover:text-violet-700 transition-all border border-slate-200/60"
+                    >
+                      📍 {c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -712,7 +840,6 @@ export function NearbyCareMap() {
           className="absolute bottom-0 left-0 right-0 z-[1000] bg-white rounded-t-3xl shadow-2xl transition-all duration-400 ease-out"
           style={{ height: sheetHeights[sheet] }}
         >
-          {/* Drag handle + toggle */}
           <div
             className="flex flex-col items-center pt-3 pb-2 cursor-pointer"
             onClick={() => {
@@ -754,7 +881,6 @@ export function NearbyCareMap() {
             </div>
           </div>
 
-          {/* Sheet content */}
           {sheet !== "collapsed" && (
             <div className="px-4 overflow-hidden" style={{ height: "calc(100% - 70px)" }}>
               {selected && sheet === "full" ? (
@@ -831,7 +957,6 @@ export function NearbyCareMap() {
           )}
         </div>
 
-        {/* Provider count badge */}
         {!loading && visible.length > 0 && (
           <div
             className="absolute top-24 right-4 z-[999] px-3 py-1.5 rounded-full text-xs font-black text-white shadow-lg"

@@ -7,15 +7,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import {
   Search, Star, MapPin, Stethoscope, ArrowRight, Award,
-  LayoutGrid, Map as MapIcon, Locate, Calendar, Navigation, Edit3, Loader2,
+  LayoutGrid, Map as MapIcon, Locate, Calendar, Navigation, Edit3, Loader2, MousePointerClick, X,
 } from "lucide-react";
 import { useLocation } from "wouter";
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker, useMap, useMapEvents } from "react-leaflet";
 import { divIcon, type LatLngExpression, type Map as LeafletMap } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const RADIUS_STEPS = [2, 4, 6, 8, 10, 12, 14, 16]; // km
+
+const QUICK_CITIES = [
+  { name: "Kolkata (Park St)", lat: 22.5532, lng: 88.3512 },
+  { name: "Salt Lake, Kolkata", lat: 22.5834, lng: 88.4123 },
+  { name: "Durgapur", lat: 23.5204, lng: 87.3119 },
+  { name: "New Delhi", lat: 28.6139, lng: 77.2090 },
+  { name: "Bengaluru", lat: 12.9716, lng: 77.5946 },
+];
 
 function makeDoctorPin(selected = false) {
   const sz = selected ? 46 : 38;
@@ -46,45 +54,71 @@ function makeDoctorPin(selected = false) {
 function makePatientPin() {
   return divIcon({
     html: `
-      <div style="position:relative; width:28px; height:28px;">
+      <div style="position:relative; width:34px; height:34px;">
         <div style="
           position:absolute; top:50%; left:50%;
           transform: translate(-50%, -50%);
-          width:44px; height:44px;
-          background: rgba(59,130,246,0.2);
-          border-radius: 50%;
-          animation: pulseRing 2s ease-out infinite;
-        "></div>
-        <div style="
-          position:absolute; top:50%; left:50%;
-          transform: translate(-50%, -50%);
-          width:24px; height:24px;
+          width:34px; height:34px;
           background: #2563EB;
           border: 3.5px solid white;
           border-radius: 50%;
-          box-shadow: 0 3px 12px rgba(37,99,235,0.6);
+          box-shadow: 0 4px 16px rgba(37,99,235,0.7);
           display:flex; align-items:center; justify-content:center;
-          color:white; font-size:12px; font-weight:bold;
+          color:white; font-size:15px; font-weight:bold;
         ">🏠</div>
-      </div>
-      <style>
-        @keyframes pulseRing {
-          0% { transform: translate(-50%,-50%) scale(0.6); opacity:0.8; }
-          100% { transform: translate(-50%,-50%) scale(2.2); opacity:0; }
-        }
-      </style>`,
+      </div>`,
     className: "",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
   });
 }
 
 function MapFly({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo([lat, lng], zoom ?? map.getZoom(), { duration: 0.9 });
+    map.flyTo([lat, lng], zoom ?? 14, { duration: 1 });
   }, [lat, lng, zoom, map]);
   return null;
+}
+
+function MapClickListener({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+async function fetchReverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+      headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
+    });
+    const data = await res.json();
+    if (data && data.display_name) {
+      const parts = data.display_name.split(",");
+      return parts.slice(0, 3).join(",").trim();
+    }
+  } catch {
+    // fallback
+  }
+  return `Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
+}
+
+function getSavedLocation(): { lat: number; lng: number; name: string } {
+  try {
+    const raw = localStorage.getItem("arogyagenie_user_location");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.lat && parsed.lng) {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { lat: 22.5726, lng: 88.3639, name: "Park Street, Kolkata" };
 }
 
 function DoctorCardSkeleton() {
@@ -122,9 +156,11 @@ export function PatientDoctors() {
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
   const [, setLocation] = useLocation();
 
+  const initialLoc = useMemo(() => getSavedLocation(), []);
+
   // Location state
-  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number }>({ lat: 22.5726, lng: 88.3639 }); // Default Kolkata
-  const [locationName, setLocationName] = useState<string>("Default Location");
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number }>({ lat: initialLoc.lat, lng: initialLoc.lng });
+  const [locationName, setLocationName] = useState<string>(initialLoc.name);
   const [customAddressInput, setCustomAddressInput] = useState("");
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [showAddressBox, setShowAddressBox] = useState(false);
@@ -138,6 +174,16 @@ export function PatientDoctors() {
   const userMarkerRef = useRef<any>(null);
   const radiusKm = RADIUS_STEPS[radiusIdx];
 
+  const updateAndSaveLocation = useCallback((lat: number, lng: number, name: string) => {
+    setUserLoc({ lat, lng });
+    setLocationName(name);
+    try {
+      localStorage.setItem("arogyagenie_user_location", JSON.stringify({ lat, lng, name }));
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const { data: doctors, isLoading } = useListDoctors({
     search: search.length > 0 ? search : undefined,
     specialty: specialty !== "all" ? specialty : undefined
@@ -147,28 +193,28 @@ export function PatientDoctors() {
     setLocating(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setUserLoc(newLoc);
-          setLocationName("GPS Location");
           setLocating(false);
+          const addr = await fetchReverseGeocode(newLoc.lat, newLoc.lng);
+          updateAndSaveLocation(newLoc.lat, newLoc.lng, addr);
           if (mapRef.current) {
-            mapRef.current.flyTo([newLoc.lat, newLoc.lng], 13);
+            mapRef.current.flyTo([newLoc.lat, newLoc.lng], 14, { duration: 1 });
           }
         },
         () => setLocating(false),
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     } else {
       setLocating(false);
     }
-  }, []);
+  }, [updateAndSaveLocation]);
 
-  useEffect(() => {
-    locateUserGPS();
-  }, [locateUserGPS]);
+  const handleMapClick = useCallback(async (clickedLat: number, clickedLng: number) => {
+    const addr = await fetchReverseGeocode(clickedLat, clickedLng);
+    updateAndSaveLocation(clickedLat, clickedLng, addr);
+  }, [updateAndSaveLocation]);
 
-  // Address Geocode Search
   const searchAddress = useCallback(async (queryAddress: string) => {
     if (!queryAddress.trim()) return;
     setIsSearchingAddress(true);
@@ -181,12 +227,11 @@ export function PatientDoctors() {
       if (data && data.length > 0) {
         const newLat = parseFloat(data[0].lat);
         const newLng = parseFloat(data[0].lon);
-        const displayName = data[0].display_name.split(",").slice(0, 2).join(",");
-        setUserLoc({ lat: newLat, lng: newLng });
-        setLocationName(displayName);
+        const displayName = data[0].display_name.split(",").slice(0, 3).join(",");
+        updateAndSaveLocation(newLat, newLng, displayName);
         setShowAddressBox(false);
         if (mapRef.current) {
-          mapRef.current.flyTo([newLat, newLng], 13);
+          mapRef.current.flyTo([newLat, newLng], 14, { duration: 1 });
         }
       }
     } catch {
@@ -194,24 +239,31 @@ export function PatientDoctors() {
     } finally {
       setIsSearchingAddress(false);
     }
-  }, []);
+  }, [updateAndSaveLocation]);
 
-  // Draggable marker handlers
+  const selectQuickCity = useCallback((city: typeof QUICK_CITIES[0]) => {
+    updateAndSaveLocation(city.lat, city.lng, city.name);
+    setShowAddressBox(false);
+    if (mapRef.current) {
+      mapRef.current.flyTo([city.lat, city.lng], 14, { duration: 1 });
+    }
+  }, [updateAndSaveLocation]);
+
   const userMarkerDragHandlers = useMemo(
     () => ({
-      dragend() {
+      async dragend() {
         const marker = userMarkerRef.current;
         if (marker != null) {
           const latLng = marker.getLatLng();
-          setUserLoc({ lat: latLng.lat, lng: latLng.lng });
-          setLocationName("Custom Pinned Location");
+          const newLoc = { lat: latLng.lat, lng: latLng.lng };
+          const addr = await fetchReverseGeocode(newLoc.lat, newLoc.lng);
+          updateAndSaveLocation(newLoc.lat, newLoc.lng, addr);
         }
       },
     }),
-    [],
+    [updateAndSaveLocation],
   );
 
-  // Fetch nearby doctors for map view
   const fetchNearbyDoctors = useCallback(async () => {
     setLoadingNearby(true);
     try {
@@ -263,9 +315,7 @@ export function PatientDoctors() {
               List View
             </button>
             <button
-              onClick={() => {
-                setViewMode("map");
-              }}
+              onClick={() => setViewMode("map")}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 viewMode === "map"
                   ? "bg-violet-600 text-white shadow-xs"
@@ -327,7 +377,6 @@ export function PatientDoctors() {
 
         {viewMode === "map" ? (
           <div className="space-y-3">
-            {/* Radius & Location Settings Bar */}
             <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -351,9 +400,8 @@ export function PatientDoctors() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                  {/* Location indicator */}
                   <div className="flex items-center gap-1.5 text-xs bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                    <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-blue-600 animate-pulse" />
                     <span className="font-bold text-slate-700 max-w-[140px] truncate">{locationName}</span>
                     <button
                       onClick={() => setShowAddressBox((s) => !s)}
@@ -377,35 +425,52 @@ export function PatientDoctors() {
               </div>
 
               {showAddressBox && (
-                <div className="pt-2 border-t border-slate-100 flex gap-2">
-                  <input
-                    placeholder="Enter city or area (e.g. Salt Lake, Kolkata)..."
-                    value={customAddressInput}
-                    onChange={(e) => setCustomAddressInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") searchAddress(customAddressInput);
-                    }}
-                    className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-violet-400"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => searchAddress(customAddressInput)}
-                    disabled={isSearchingAddress || !customAddressInput.trim()}
-                    className="h-8 text-xs font-bold bg-violet-600 text-white rounded-xl"
-                  >
-                    {isSearchingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set Location"}
-                  </Button>
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="Enter city or area (e.g. Salt Lake, Kolkata)..."
+                      value={customAddressInput}
+                      onChange={(e) => setCustomAddressInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") searchAddress(customAddressInput);
+                      }}
+                      className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-violet-400 bg-slate-50"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => searchAddress(customAddressInput)}
+                      disabled={isSearchingAddress || !customAddressInput.trim()}
+                      className="h-8 text-xs font-bold bg-violet-600 text-white rounded-xl"
+                    >
+                      {isSearchingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set Location"}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    <span className="text-[11px] font-semibold text-slate-400">Quick Select:</span>
+                    {QUICK_CITIES.map((c) => (
+                      <button
+                        key={c.name}
+                        onClick={() => selectQuickCity(c)}
+                        className="text-[11px] font-medium px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-violet-100 hover:text-violet-700 transition-all border border-slate-200/60"
+                      >
+                        📍 {c.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Map & Doctor List Split View */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[550px] rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
               <div className="lg:col-span-1 border-r border-slate-100 flex flex-col h-full bg-slate-50/50">
-                <div className="p-3 border-b border-slate-100 bg-white">
+                <div className="p-3 border-b border-slate-100 bg-white flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-500">
                     Doctors within {radiusKm} km ({nearbyDocs.length})
                   </p>
+                  <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
+                    <MousePointerClick className="h-3 w-3" /> Click map to move pin
+                  </span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
@@ -414,7 +479,7 @@ export function PatientDoctors() {
                   ) : nearbyDocs.length === 0 ? (
                     <div className="py-12 text-center text-slate-400 space-y-2">
                       <p className="text-sm font-semibold">No doctors within {radiusKm} km</p>
-                      <p className="text-xs max-w-xs mx-auto text-slate-400">Try expanding the range slider above or drag your blue location marker.</p>
+                      <p className="text-xs max-w-xs mx-auto text-slate-400">Click anywhere on the map or expand range slider.</p>
                     </div>
                   ) : (
                     nearbyDocs.map((doc) => {
@@ -475,7 +540,7 @@ export function PatientDoctors() {
               <div className="lg:col-span-2 relative h-full">
                 <MapContainer
                   center={[userLoc.lat, userLoc.lng]}
-                  zoom={13}
+                  zoom={14}
                   style={{ height: "100%", width: "100%", zIndex: 0 }}
                 >
                   <TileLayer
@@ -483,7 +548,31 @@ export function PatientDoctors() {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
 
-                  {/* Draggable Patient Marker */}
+                  <MapClickListener onMapClick={handleMapClick} />
+                  <MapFly lat={userLoc.lat} lng={userLoc.lng} zoom={14} />
+
+                  <CircleMarker
+                    center={[userLoc.lat, userLoc.lng]}
+                    radius={22}
+                    pathOptions={{
+                      color: "#3B82F6",
+                      fillColor: "#3B82F6",
+                      fillOpacity: 0.22,
+                      weight: 0,
+                    }}
+                  />
+
+                  <CircleMarker
+                    center={[userLoc.lat, userLoc.lng]}
+                    radius={10}
+                    pathOptions={{
+                      color: "#FFFFFF",
+                      fillColor: "#2563EB",
+                      fillOpacity: 1,
+                      weight: 3,
+                    }}
+                  />
+
                   <Marker
                     draggable={true}
                     eventHandlers={userMarkerDragHandlers}
@@ -493,8 +582,8 @@ export function PatientDoctors() {
                   >
                     <Popup>
                       <div className="text-xs font-bold text-center">
-                        🏠 Your Location
-                        <p className="font-normal text-slate-500 mt-1">Drag me to change location!</p>
+                        📍 You are here ({locationName})
+                        <p className="font-normal text-slate-500 mt-1">Drag pin or click map to move!</p>
                       </div>
                     </Popup>
                   </Marker>
