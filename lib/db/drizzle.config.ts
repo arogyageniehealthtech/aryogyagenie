@@ -27,6 +27,7 @@ if (!process.env.DATABASE_URL) {
 
 const isRemoteDb = Boolean(
   process.env.DATABASE_URL?.includes("render.com") ||
+  process.env.DATABASE_URL?.includes("dpg-") ||
   process.env.DATABASE_URL?.includes("sslmode=") ||
   process.env.NODE_ENV === "production"
 );
