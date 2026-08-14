@@ -17,7 +17,10 @@
     "rag:ingest": "npx tsx --tsconfig ./scripts/tsconfig.json ./scripts/src/ingestMedicalKnowledge.ts"
   },
   "private": true,
-  "dependencies": {},
+  "dependencies": {
+    "esbuild": "0.27.3",
+    "esbuild-plugin-pino": "^2.3.3"
+  },
   "devDependencies": {
     "prettier": "^3.9.6",
     "typescript": "~5.9.3"
