@@ -1,125 +1,19 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useListDoctors } from "@workspace/api-client-react";
 import { DOCTOR_SPECIALTIES } from "@/lib/specialties";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import {
   Search, Star, MapPin, Stethoscope, ArrowRight, Award,
   LayoutGrid, Map as MapIcon, Locate, Calendar, Navigation, Edit3, Loader2, MousePointerClick, X, Radio,
+  Sliders, ExternalLink,
 } from "lucide-react";
 import { useLocation } from "wouter";
-import { MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker, useMap, useMapEvents } from "react-leaflet";
-import { divIcon, type LatLngExpression, type Map as LeafletMap } from "leaflet";
-import "leaflet/dist/leaflet.css";
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-const RADIUS_STEPS = [2, 4, 6, 8, 10, 12, 14, 16]; // km
-
-const QUICK_CITIES = [
-  { name: "Kolkata (Park St)", lat: 22.5532, lng: 88.3512 },
-  { name: "Salt Lake, Kolkata", lat: 22.5834, lng: 88.4123 },
-  { name: "Durgapur", lat: 23.5204, lng: 87.3119 },
-  { name: "New Delhi", lat: 28.6139, lng: 77.2090 },
-  { name: "Bengaluru", lat: 12.9716, lng: 77.5946 },
-];
-
-function makeDoctorPin(selected = false) {
-  const sz = selected ? 46 : 38;
-  return divIcon({
-    html: `
-      <div style="
-        position:relative;
-        width:${sz}px; height:${sz}px;
-        background:white;
-        border:3px solid #7C3AED;
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        box-shadow: 0 ${selected ? 8 : 4}px ${selected ? 24 : 12}px rgba(124,58,237,${selected ? 0.4 : 0.25});
-        display:flex; align-items:center; justify-content:center;
-        transition: all 0.25s cubic-bezier(.34,1.56,.64,1);
-      ">
-        <span style="transform:rotate(45deg); font-size:${selected ? 22 : 18}px; line-height:1;">
-          🩺
-        </span>
-      </div>`,
-    className: "",
-    iconSize: [sz, sz],
-    iconAnchor: [sz / 2, sz],
-    popupAnchor: [0, -sz],
-  });
-}
-
-function makePatientPin() {
-  return divIcon({
-    html: `
-      <div style="position:relative; width:34px; height:34px;">
-        <div style="
-          position:absolute; top:50%; left:50%;
-          transform: translate(-50%, -50%);
-          width:34px; height:34px;
-          background: #2563EB;
-          border: 3.5px solid white;
-          border-radius: 50%;
-          box-shadow: 0 4px 16px rgba(37,99,235,0.7);
-          display:flex; align-items:center; justify-content:center;
-          color:white; font-size:15px; font-weight:bold;
-        ">🏠</div>
-      </div>`,
-    className: "",
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
-  });
-}
-
-function MapFly({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo([lat, lng], zoom ?? 14, { duration: 1 });
-  }, [lat, lng, zoom, map]);
-  return null;
-}
-
-function MapClickListener({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click(e) {
-      onMapClick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
-
-async function fetchReverseGeocode(lat: number, lng: number): Promise<string> {
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-      headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
-    });
-    const data = await res.json();
-    if (data && data.display_name) {
-      const parts = data.display_name.split(",");
-      return parts.slice(0, 3).join(",").trim();
-    }
-  } catch {
-    // fallback
-  }
-  return `Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
-}
-
-function getSavedLocation(): { lat: number; lng: number; name: string } {
-  try {
-    const raw = localStorage.getItem("arogyagenie_user_location");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.lat && parsed.lng) {
-        return parsed;
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return { lat: 22.5726, lng: 88.3639, name: "Park Street, Kolkata" };
-}
+import { useUserLocation, QUICK_CITIES, fmtDist } from "@/hooks/useUserLocation";
+import { GoogleMapView, type MapProviderItem } from "@/components/map/GoogleMapView";
 
 function DoctorCardSkeleton() {
   return (
@@ -144,11 +38,12 @@ function DoctorCardSkeleton() {
 export function PatientDoctors() {
   const urlParams = new URLSearchParams(window.location.search);
   const rawSpecialty = urlParams.get("specialty") || "all";
-  
-  const normalizedSpecialty = DOCTOR_SPECIALTIES.find(s => 
-    s.toLowerCase() === rawSpecialty.toLowerCase() ||
-    rawSpecialty.toLowerCase().includes(s.toLowerCase()) ||
-    s.toLowerCase().includes(rawSpecialty.toLowerCase())
+
+  const normalizedSpecialty = DOCTOR_SPECIALTIES.find(
+    (s) =>
+      s.toLowerCase() === rawSpecialty.toLowerCase() ||
+      rawSpecialty.toLowerCase().includes(s.toLowerCase()) ||
+      s.toLowerCase().includes(rawSpecialty.toLowerCase()),
   ) || (rawSpecialty === "all" ? "all" : rawSpecialty);
 
   const [search, setSearch] = useState("");
@@ -156,156 +51,50 @@ export function PatientDoctors() {
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
   const [, setLocation] = useLocation();
 
-  const initialLoc = useMemo(() => getSavedLocation(), []);
+  // Shared location hook
+  const {
+    userLoc,
+    locationName,
+    isLiveGps,
+    locating,
+    locError,
+    startLiveGPS,
+    handleMapClick,
+    searchAddress: hookSearchAddress,
+    selectQuickCity: hookSelectQuickCity,
+    isSearchingAddress,
+  } = useUserLocation();
 
-  // Location state
-  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number }>({ lat: initialLoc.lat, lng: initialLoc.lng });
-  const [locationName, setLocationName] = useState<string>(initialLoc.name);
   const [customAddressInput, setCustomAddressInput] = useState("");
-  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [showAddressBox, setShowAddressBox] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [isLiveGps, setIsLiveGps] = useState(false);
-  const [radiusIdx, setRadiusIdx] = useState(3); // default 8 km
-  const [nearbyDocs, setNearbyDocs] = useState<any[]>([]);
+  const [radiusKm, setRadiusKm] = useState(10); // 2 km to 18 km
+  const [nearbyDocs, setNearbyDocs] = useState<MapProviderItem[]>([]);
   const [loadingNearby, setLoadingNearby] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
 
-  const mapRef = useRef<LeafletMap | null>(null);
-  const userMarkerRef = useRef<any>(null);
-  const watchIdRef = useRef<number | null>(null);
-  const radiusKm = RADIUS_STEPS[radiusIdx];
-
-  const updateAndSaveLocation = useCallback((lat: number, lng: number, name: string) => {
-    setUserLoc({ lat, lng });
-    setLocationName(name);
-    try {
-      localStorage.setItem("arogyagenie_user_location", JSON.stringify({ lat, lng, name }));
-    } catch {
-      // ignore
-    }
-  }, []);
-
+  // List view data query
   const { data: doctors, isLoading } = useListDoctors({
     search: search.length > 0 ? search : undefined,
-    specialty: specialty !== "all" ? specialty : undefined
+    specialty: specialty !== "all" ? specialty : undefined,
   });
 
-  const startLiveGPS = useCallback(() => {
-    setLocating(true);
-    if (!navigator.geolocation) {
-      setLocating(false);
-      return;
-    }
-
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-    }
-
-    const id = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const freshLat = pos.coords.latitude;
-        const freshLng = pos.coords.longitude;
-        setLocating(false);
-        setIsLiveGps(true);
-        const addr = await fetchReverseGeocode(freshLat, freshLng);
-        updateAndSaveLocation(freshLat, freshLng, addr);
-        if (mapRef.current) {
-          mapRef.current.flyTo([freshLat, freshLng], 14, { duration: 1 });
-        }
-      },
-      () => {
-        setLocating(false);
-        setIsLiveGps(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-
-    watchIdRef.current = id;
-  }, [updateAndSaveLocation]);
-
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
-  }, []);
-
-  const handleMapClick = useCallback(async (clickedLat: number, clickedLng: number) => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      setIsLiveGps(false);
-    }
-    const addr = await fetchReverseGeocode(clickedLat, clickedLng);
-    updateAndSaveLocation(clickedLat, clickedLng, addr);
-  }, [updateAndSaveLocation]);
-
-  const searchAddress = useCallback(async (queryAddress: string) => {
-    if (!queryAddress.trim()) return;
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      setIsLiveGps(false);
-    }
-    setIsSearchingAddress(true);
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryAddress)}&format=json&limit=1`;
-      const res = await fetch(url, {
-        headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
-      });
-      const data = await res.json();
-      if (data && data.length > 0) {
-        const newLat = parseFloat(data[0].lat);
-        const newLng = parseFloat(data[0].lon);
-        const displayName = data[0].display_name.split(",").slice(0, 3).join(",");
-        updateAndSaveLocation(newLat, newLng, displayName);
-        setShowAddressBox(false);
-        if (mapRef.current) {
-          mapRef.current.flyTo([newLat, newLng], 14, { duration: 1 });
-        }
-      }
-    } catch {
-      // ignore
-    } finally {
-      setIsSearchingAddress(false);
-    }
-  }, [updateAndSaveLocation]);
-
-  const selectQuickCity = useCallback((city: typeof QUICK_CITIES[0]) => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      setIsLiveGps(false);
-    }
-    updateAndSaveLocation(city.lat, city.lng, city.name);
-    setShowAddressBox(false);
-    if (mapRef.current) {
-      mapRef.current.flyTo([city.lat, city.lng], 14, { duration: 1 });
-    }
-  }, [updateAndSaveLocation]);
-
-  const userMarkerDragHandlers = useMemo(
-    () => ({
-      async dragend() {
-        if (watchIdRef.current !== null) {
-          navigator.geolocation.clearWatch(watchIdRef.current);
-          watchIdRef.current = null;
-          setIsLiveGps(false);
-        }
-        const marker = userMarkerRef.current;
-        if (marker != null) {
-          const latLng = marker.getLatLng();
-          const newLoc = { lat: latLng.lat, lng: latLng.lng };
-          const addr = await fetchReverseGeocode(newLoc.lat, newLoc.lng);
-          updateAndSaveLocation(newLoc.lat, newLoc.lng, addr);
-        }
-      },
-    }),
-    [updateAndSaveLocation],
+  const searchAddress = useCallback(
+    async (queryAddress: string) => {
+      const found = await hookSearchAddress(queryAddress);
+      if (found) setShowAddressBox(false);
+    },
+    [hookSearchAddress],
   );
 
+  const selectQuickCity = useCallback(
+    (city: (typeof QUICK_CITIES)[number]) => {
+      hookSelectQuickCity(city);
+      setShowAddressBox(false);
+    },
+    [hookSelectQuickCity],
+  );
+
+  // Fetch nearby doctors for Map View from backend PostGIS
   const fetchNearbyDoctors = useCallback(async () => {
     setLoadingNearby(true);
     try {
@@ -314,7 +103,7 @@ export function PatientDoctors() {
         lng: userLoc.lng.toString(),
         radius: radiusKm.toString(),
         type: "doctor",
-        ...(specialty !== "all" ? { search: specialty } : {}),
+        ...(specialty !== "all" ? { specialty } : {}),
         ...(search ? { search } : {}),
       });
       const res = await fetch(`/api/nearby?${params}`);
@@ -327,20 +116,34 @@ export function PatientDoctors() {
     } finally {
       setLoadingNearby(false);
     }
-  }, [userLoc, radiusKm, specialty, search]);
+  }, [userLoc.lat, userLoc.lng, radiusKm, specialty, search]);
 
   useEffect(() => {
     if (viewMode === "map") {
       fetchNearbyDoctors();
     }
-  }, [viewMode, userLoc, radiusKm, specialty, search, fetchNearbyDoctors]);
+  }, [viewMode, userLoc.lat, userLoc.lng, radiusKm, specialty, search, fetchNearbyDoctors]);
+
+  const handleSelectDoctor = useCallback((doc: MapProviderItem | null) => {
+    setSelectedDocId(doc ? doc.id : null);
+    if (doc) {
+      const el = document.getElementById(`doc-list-item-${doc.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, []);
 
   return (
     <DashboardLayout>
       <div className="space-y-5">
+        {/* Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Find Doctors</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <Stethoscope className="w-6 h-6 text-primary" />
+              Find Doctors
+            </h1>
             <p className="text-sm text-slate-500 mt-0.5">Search verified medical specialists near you.</p>
           </div>
 
@@ -370,12 +173,13 @@ export function PatientDoctors() {
           </div>
         </div>
 
+        {/* Search & Specialty Filters */}
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-              <Input 
-                placeholder="Search by doctor name, specialty, clinic..." 
+              <Input
+                placeholder="Search by doctor name, specialty, clinic..."
                 className="pl-10 h-11 rounded-xl bg-white border-slate-200/80 shadow-xs focus-visible:ring-violet-500"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -395,56 +199,37 @@ export function PatientDoctors() {
               </SelectContent>
             </Select>
           </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
-            {["all", "General Physician", "Cardiologist", "Dermatologist", "Neurologist", "Pediatrician", "Orthopedist"].map((chip) => {
-              const isSelected = specialty.toLowerCase() === chip.toLowerCase();
-              return (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => setSpecialty(chip)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold shrink-0 transition-all ${
-                    isSelected
-                      ? "bg-violet-600 text-white shadow-xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:border-violet-300 hover:text-violet-700"
-                  }`}
-                >
-                  {chip === "all" ? "All" : chip}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
+        {/* ── View Toggle: Map vs Grid ────────────────────────────────────────── */}
         {viewMode === "map" ? (
-          <div className="space-y-3">
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <span className="text-xs font-bold text-slate-500 shrink-0">Distance Radius:</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={RADIUS_STEPS.length - 1}
-                    step={1}
-                    value={radiusIdx}
-                    onChange={(e) => setRadiusIdx(Number(e.target.value))}
-                    className="w-full sm:w-48 h-2 rounded-full appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, #7C3AED ${(radiusIdx / (RADIUS_STEPS.length - 1)) * 100}%, #E2E8F0 0%)`,
-                      accentColor: "#7C3AED",
-                    }}
+          <div className="space-y-4">
+            {/* Radius & Location Settings Bar */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 w-full sm:w-80">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0">
+                    <Sliders className="w-4 h-4 text-primary" />
+                    <span>Radius:</span>
+                    <span className="font-bold text-violet-700 px-2 py-0.5 rounded bg-violet-50 border border-violet-200">
+                      {radiusKm} km
+                    </span>
+                  </div>
+                  <Slider
+                    value={[radiusKm]}
+                    min={2}
+                    max={18}
+                    step={2}
+                    onValueChange={(v) => setRadiusKm(v[0])}
+                    className="flex-1"
                   />
-                  <span className="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-bold shrink-0">
-                    {radiusKm} km
-                  </span>
+                  <span className="text-[11px] text-slate-400 shrink-0">18km</span>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                  <div className="flex items-center gap-1.5 text-xs bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                    <span className={`h-2.5 w-2.5 rounded-full animate-pulse ${isLiveGps ? "bg-emerald-500" : "bg-blue-600"}`} />
-                    <span className="font-bold text-slate-700 max-w-[140px] truncate">{locationName}</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-xs bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700">
+                    <span className={`h-2 w-2 rounded-full ${isLiveGps ? "bg-emerald-500 animate-pulse" : "bg-primary"}`} />
+                    <span className="font-medium truncate max-w-[140px]">{locationName}</span>
                     <button
                       onClick={() => setShowAddressBox((s) => !s)}
                       className="text-violet-600 hover:underline font-bold ml-1"
@@ -460,7 +245,13 @@ export function PatientDoctors() {
                     disabled={locating}
                     className={`h-8 text-xs rounded-xl gap-1 font-bold ${isLiveGps ? "bg-emerald-600 text-white" : ""}`}
                   >
-                    {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isLiveGps ? <Radio className="h-3.5 w-3.5 animate-pulse text-white" /> : <Locate className="h-3.5 w-3.5 text-blue-500" />}
+                    {locating ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : isLiveGps ? (
+                      <Radio className="h-3.5 w-3.5 animate-pulse text-white" />
+                    ) : (
+                      <Locate className="h-3.5 w-3.5 text-blue-500" />
+                    )}
                     {isLiveGps ? "Live GPS" : "GPS"}
                   </Button>
                 </div>
@@ -504,10 +295,12 @@ export function PatientDoctors() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[550px] rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
-              <div className="lg:col-span-1 border-r border-slate-100 flex flex-col h-full bg-slate-50/50">
-                <div className="p-3 border-b border-slate-100 bg-white flex items-center justify-between">
-                  <p className="text-xs font-bold text-slate-500">
+            {/* Split List & Google Map View */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[550px]">
+              {/* Doctor List Column */}
+              <div className="lg:col-span-5 h-full overflow-y-auto pr-1 space-y-3">
+                <div className="p-3 border-b border-slate-100 bg-white rounded-xl flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-700">
                     Doctors within {radiusKm} km ({nearbyDocs.length})
                   </p>
                   <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
@@ -515,52 +308,79 @@ export function PatientDoctors() {
                   </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-                  {loadingNearby ? (
-                    <div className="py-12 text-center text-xs text-slate-400">Loading nearby doctors...</div>
-                  ) : nearbyDocs.length === 0 ? (
-                    <div className="py-12 text-center text-slate-400 space-y-2">
-                      <p className="text-sm font-semibold">No doctors within {radiusKm} km</p>
-                      <p className="text-xs max-w-xs mx-auto text-slate-400">Click anywhere on the map or expand range slider.</p>
-                    </div>
-                  ) : (
-                    nearbyDocs.map((doc) => {
-                      const isSelected = selectedDocId === doc.id;
-                      return (
-                        <div
-                          key={doc.id}
-                          onClick={() => {
-                            setSelectedDocId(doc.id);
-                            if (mapRef.current) {
-                              mapRef.current.flyTo([doc.latitude, doc.longitude], 15);
-                            }
-                          }}
-                          className={`p-3.5 rounded-xl cursor-pointer transition-all border ${
-                            isSelected
-                              ? "bg-violet-50/80 border-violet-500 shadow-xs"
-                              : "bg-white border-slate-200/80 hover:border-violet-200"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h4 className="font-bold text-sm text-slate-900">{doc.name}</h4>
-                              <p className="text-xs text-violet-600 font-semibold">{doc.specialty}</p>
-                            </div>
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 shrink-0">
-                              {doc.distanceKm < 1 ? `${Math.round(doc.distanceKm * 1000)}m` : `${doc.distanceKm.toFixed(1)} km`}
-                            </span>
-                          </div>
-                          
-                          <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                            <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
-                            <span className="truncate">{doc.address}</span>
-                          </p>
+                {loadingNearby ? (
+                  <div className="py-12 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    <span>Searching verified doctors near you...</span>
+                  </div>
+                ) : nearbyDocs.length === 0 ? (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center space-y-2">
+                    <p className="text-sm font-semibold text-slate-800">No doctors found within {radiusKm} km</p>
+                    <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                      Try expanding the search radius slider up to 18 km or selecting a different location.
+                    </p>
+                    {radiusKm < 18 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRadiusKm(18)}
+                        className="text-xs border-violet-200 text-violet-700"
+                      >
+                        Expand to 18 km
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  nearbyDocs.map((doc) => {
+                    const isSelected = selectedDocId === doc.id;
+                    const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLoc.lat},${userLoc.lng}&destination=${doc.latitude},${doc.longitude}`;
 
-                          <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-100">
-                            <span className="text-xs font-bold text-amber-600 flex items-center gap-0.5">
-                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                              {doc.rating || "4.8"}
-                            </span>
+                    return (
+                      <div
+                        id={`doc-list-item-${doc.id}`}
+                        key={doc.id}
+                        onClick={() => handleSelectDoctor(doc)}
+                        className={`p-3.5 rounded-xl cursor-pointer transition-all border ${
+                          isSelected
+                            ? "bg-violet-50/80 border-violet-500 shadow-xs ring-2 ring-violet-500/20"
+                            : "bg-white border-slate-200/80 hover:border-violet-200 shadow-2xs"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-bold text-sm text-slate-900">{doc.name}</h4>
+                            <p className="text-xs text-violet-600 font-semibold">{doc.specialty}</p>
+                          </div>
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 shrink-0">
+                            {fmtDist(doc.distanceKm)}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
+                          <span className="truncate">{doc.address}</span>
+                        </p>
+
+                        <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+                          <span className="text-xs font-bold text-amber-600 flex items-center gap-0.5">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            {doc.rating || "4.8"}
+                          </span>
+
+                          <div className="flex items-center gap-1.5">
+                            <a
+                              href={directionsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              title="Directions"
+                            >
+                              <Navigation className="w-3 h-3 text-blue-600" />
+                              Directions
+                            </a>
+
                             <Button
                               size="sm"
                               onClick={(e) => {
@@ -573,113 +393,37 @@ export function PatientDoctors() {
                             </Button>
                           </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
-              <div className="lg:col-span-2 relative h-full">
-                <MapContainer
-                  center={[userLoc.lat, userLoc.lng]}
-                  zoom={14}
-                  style={{ height: "100%", width: "100%", zIndex: 0 }}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-
-                  <MapClickListener onMapClick={handleMapClick} />
-                  <MapFly lat={userLoc.lat} lng={userLoc.lng} zoom={14} />
-
-                  <CircleMarker
-                    center={[userLoc.lat, userLoc.lng]}
-                    radius={22}
-                    pathOptions={{
-                      color: isLiveGps ? "#10B981" : "#3B82F6",
-                      fillColor: isLiveGps ? "#10B981" : "#3B82F6",
-                      fillOpacity: 0.22,
-                      weight: 0,
-                    }}
-                  />
-
-                  <CircleMarker
-                    center={[userLoc.lat, userLoc.lng]}
-                    radius={10}
-                    pathOptions={{
-                      color: "#FFFFFF",
-                      fillColor: isLiveGps ? "#059669" : "#2563EB",
-                      fillOpacity: 1,
-                      weight: 3,
-                    }}
-                  />
-
-                  <Marker
-                    draggable={true}
-                    eventHandlers={userMarkerDragHandlers}
-                    position={[userLoc.lat, userLoc.lng]}
-                    icon={makePatientPin()}
-                    ref={userMarkerRef}
-                  >
-                    <Popup>
-                      <div className="text-xs font-bold text-center">
-                        📍 You are here ({locationName})
-                        {isLiveGps && <p className="text-[10px] text-emerald-600 font-bold mt-1">🟢 Live Real-Time GPS Active</p>}
-                        <p className="font-normal text-slate-500 mt-1">Drag pin or click map to move!</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-
-                  <Circle
-                    center={[userLoc.lat, userLoc.lng]}
-                    radius={radiusKm * 1000}
-                    pathOptions={{
-                      color: "#7C3AED",
-                      fillColor: "#7C3AED",
-                      fillOpacity: 0.05,
-                      weight: 1.5,
-                      dashArray: "6 4",
-                    }}
-                  />
-
-                  {nearbyDocs.map((doc) => (
-                    <Marker
-                      key={doc.id}
-                      position={[doc.latitude, doc.longitude]}
-                      icon={makeDoctorPin(selectedDocId === doc.id)}
-                      eventHandlers={{ click: () => setSelectedDocId(doc.id) }}
-                    >
-                      <Popup>
-                        <div className="min-w-[160px]">
-                          <p className="font-bold text-sm text-slate-900">{doc.name}</p>
-                          <p className="text-xs text-violet-600 font-semibold">{doc.specialty}</p>
-                          <p className="text-xs text-slate-500 mt-1">📍 {doc.address}</p>
-                          <p className="text-xs font-bold text-blue-600 mt-1">
-                            {doc.distanceKm < 1 ? `${Math.round(doc.distanceKm * 1000)}m away` : `${doc.distanceKm.toFixed(1)} km away`}
-                          </p>
-                          <button
-                            onClick={() => setLocation(`/patient/appointments?doctorId=${doc.id}`)}
-                            className="mt-2 w-full py-1 text-xs font-bold text-white bg-violet-600 rounded-md"
-                          >
-                            Book Visit
-                          </button>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                </MapContainer>
+              {/* Google Map Column */}
+              <div className="lg:col-span-7 h-full">
+                <GoogleMapView
+                  userLoc={userLoc}
+                  radiusKm={radiusKm}
+                  providers={nearbyDocs}
+                  selectedId={selectedDocId}
+                  onSelectProvider={handleSelectDoctor}
+                  onMapClick={handleMapClick}
+                  className="w-full h-full min-h-[500px]"
+                />
               </div>
             </div>
           </div>
         ) : (
+          /* ── Grid View ────────────────────────────────────────────────────────── */
           isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {[...Array(6)].map((_, i) => <DoctorCardSkeleton key={i} />)}
+              {[...Array(6)].map((_, i) => (
+                <DoctorCardSkeleton key={i} />
+              ))}
             </div>
           ) : doctors?.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-100 shadow-xs">
-              <div 
+              <div
                 className="h-16 w-16 rounded-2xl flex items-center justify-center mb-4"
                 style={{ background: "hsl(243,75%,97%)" }}
               >
@@ -689,17 +433,20 @@ export function PatientDoctors() {
               <p className="text-sm text-slate-500 max-w-xs mb-4">
                 We couldn't find any doctors matching your current search or specialty filter.
               </p>
-              <Button 
+              <Button
                 variant="outline"
                 className="rounded-xl"
-                onClick={() => { setSearch(""); setSpecialty("all"); }}
+                onClick={() => {
+                  setSearch("");
+                  setSpecialty("all");
+                }}
               >
                 Reset Filters
               </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {doctors?.map(doc => {
+              {doctors?.map((doc) => {
                 const initials = `${doc.firstName?.[0] || ""}${doc.lastName?.[0] || ""}`.toUpperCase() || "DR";
                 const rating = doc.rating || "4.8";
                 const fee = doc.consultationFee || 500;
@@ -708,12 +455,12 @@ export function PatientDoctors() {
                 const exp = doc.experience || "10+";
 
                 return (
-                  <div 
-                    key={doc.id} 
+                  <div
+                    key={doc.id}
                     className="bg-white rounded-2xl overflow-hidden border border-slate-100/90 shadow-xs hover:shadow-md transition-all duration-180 flex flex-col justify-between group"
                   >
                     <div>
-                      <div 
+                      <div
                         className="h-24 relative p-4"
                         style={{
                           background: "linear-gradient(135deg, hsl(243,75%,96%), hsl(260,70%,93%))",
@@ -723,7 +470,7 @@ export function PatientDoctors() {
                           {doc.avatarUrl ? (
                             <img src={doc.avatarUrl} alt={doc.firstName} className="h-full w-full object-cover" />
                           ) : (
-                            <div 
+                            <div
                               className="h-full w-full flex items-center justify-center font-bold text-lg text-white"
                               style={{ background: "linear-gradient(135deg, hsl(243,75%,59%), hsl(260,70%,58%))" }}
                             >
@@ -743,18 +490,20 @@ export function PatientDoctors() {
                           <h3 className="font-bold text-base text-slate-900 group-hover:text-indigo-600 transition-colors">
                             Dr. {doc.firstName} {doc.lastName}
                           </h3>
-                          <span 
+                          <span
                             className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full mt-1"
                             style={{ background: "hsl(243,75%,96%)", color: "hsl(243,75%,50%)" }}
                           >
                             {doc.specialty}
                           </span>
                         </div>
-                        
+
                         <div className="space-y-1.5 text-xs text-slate-500 pt-1">
                           <div className="flex items-center gap-2">
                             <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate">{clinic}, {city}</span>
+                            <span className="truncate">
+                              {clinic}, {city}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Award className="h-3.5 w-3.5 text-slate-400 shrink-0" />
@@ -769,7 +518,7 @@ export function PatientDoctors() {
                         <span className="text-[10px] text-slate-400 uppercase font-semibold block">Fee</span>
                         <span className="font-bold text-slate-900 text-base">₹{fee}</span>
                       </div>
-                      <Button 
+                      <Button
                         onClick={() => setLocation(`/patient/appointments?doctorId=${doc.id}`)}
                         size="sm"
                         className="rounded-xl gap-1.5 font-semibold text-xs h-9 px-4 shadow-2xs"

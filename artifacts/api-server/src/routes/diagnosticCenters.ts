@@ -6,10 +6,37 @@ import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
-// GET /diagnostic-centers
+import { parseCoordinates, clampRadiusKm, searchNearbyDiagnosticCenters } from "../lib/locationService";
+
+// GET /diagnostic-centers (with optional location-based radius filtering)
 router.get("/diagnostic-centers", async (req, res): Promise<void> => {
-  const { search } = req.query as { search?: string };
+  const { search, service, lat, lng, radius } = req.query as {
+    search?: string;
+    service?: string;
+    lat?: string;
+    lng?: string;
+    radius?: string;
+  };
   const pagination = parsePaginationParams(req);
+
+  const coords = parseCoordinates(lat, lng);
+
+  if (coords) {
+    const radiusKm = clampRadiusKm(radius);
+    const { results, total } = await searchNearbyDiagnosticCenters({
+      lat: coords.lat,
+      lng: coords.lng,
+      radiusKm,
+      service,
+      search,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+
+    setPaginationHeaders(res, total, pagination);
+    res.json(results);
+    return;
+  }
 
   const rows = await db
     .select({ dc: diagnosticCentersTable, u: usersTable })
@@ -21,14 +48,25 @@ router.get("/diagnostic-centers", async (req, res): Promise<void> => {
     id: r.dc.id, userId: r.dc.userId,
     name: r.dc.name, email: r.u.email,
     phone: r.dc.phone, address: r.dc.address,
-    city: r.dc.city, accreditation: r.dc.accreditation,
+    city: r.dc.city, state: r.dc.state, pincode: r.dc.pincode,
+    accreditation: r.dc.accreditation,
     services: r.dc.services, openingHours: r.dc.openingHours,
+    latitude: r.dc.latitude, longitude: r.dc.longitude,
     rating: r.dc.rating, status: r.dc.status,
   }));
 
+  if (service && service.trim()) {
+    const s = service.toLowerCase().trim();
+    result = result.filter((c) => (c.services ?? "").toLowerCase().includes(s));
+  }
+
   if (search) {
-    const s = search.toLowerCase();
-    result = result.filter((c) => c.name.toLowerCase().includes(s) || (c.city ?? "").toLowerCase().includes(s));
+    const s = search.toLowerCase().trim();
+    result = result.filter((c) =>
+      c.name.toLowerCase().includes(s) ||
+      (c.city ?? "").toLowerCase().includes(s) ||
+      (c.services ?? "").toLowerCase().includes(s)
+    );
   }
 
   const total = result.length;

@@ -1,1026 +1,530 @@
-import {
-  useState, useEffect, useCallback, useRef, useMemo,
-} from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import {
   MapPin, Stethoscope, Pill, TestTube, Locate, AlertCircle,
   Navigation, ExternalLink, Phone, Star, Search, X,
-  ChevronUp, ChevronDown, Loader2, Calendar, Edit3, Check, MousePointerClick,
-  Building2, Radio,
+  Loader2, Calendar, Edit3, Check, CheckCircle2, ChevronRight,
+  Sliders, ShieldCheck, Sparkles, Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker, useMap, useMapEvents,
-  Polyline,
-} from "react-leaflet";
-import { divIcon, type LatLngExpression, type Map as LeafletMap } from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { useLocation } from "wouter";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface NearbyProvider {
-  id: number;
-  type: "doctor" | "pharmacy" | "diagnostic_center";
-  name: string;
-  specialty?: string;
-  address?: string;
-  city?: string;
-  phone?: string;
-  openingHours?: string;
-  rating?: number;
-  latitude: number;
-  longitude: number;
-  distanceKm: number;
-}
+import { useUserLocation, QUICK_CITIES, fmtDist } from "@/hooks/useUserLocation";
+import { GoogleMapView, type MapProviderItem } from "@/components/map/GoogleMapView";
 
 type FilterType = "all" | "doctor" | "pharmacy" | "diagnostic_center";
-type SheetState = "collapsed" | "half" | "full";
-
-const RADIUS_STEPS = [2, 4, 6, 8, 10, 12, 14, 16]; // km
-
-const QUICK_CITIES = [
-  { name: "Kolkata (Park St)", lat: 22.5532, lng: 88.3512 },
-  { name: "Salt Lake, Kolkata", lat: 22.5834, lng: 88.4123 },
-  { name: "Howrah, Kolkata", lat: 22.5958, lng: 88.2636 },
-  { name: "Durgapur", lat: 23.5204, lng: 87.3119 },
-  { name: "New Delhi", lat: 28.6139, lng: 77.2090 },
-  { name: "Bengaluru", lat: 12.9716, lng: 77.5946 },
-];
 
 const TYPE_CONFIG = {
   doctor: {
     label: "Doctor",
     emoji: "🩺",
-    color: "#7C3AED",
-    bg: "rgba(124,58,237,0.12)",
-    border: "rgba(124,58,237,0.3)",
-    icon: Stethoscope,
-  },
-  pharmacy: {
-    label: "Pharmacy",
-    emoji: "💊",
-    color: "#059669",
-    bg: "rgba(5,150,105,0.12)",
-    border: "rgba(5,150,105,0.3)",
-    icon: Pill,
+    color: "bg-violet-50 text-violet-700 border-violet-200",
+    badgeColor: "bg-violet-600 text-white",
   },
   diagnostic_center: {
     label: "Diagnostic Lab",
     emoji: "🔬",
-    color: "#D97706",
-    bg: "rgba(217,119,6,0.12)",
-    border: "rgba(217,119,6,0.3)",
-    icon: TestTube,
+    color: "bg-sky-50 text-sky-700 border-sky-200",
+    badgeColor: "bg-sky-600 text-white",
   },
-} as const;
+  pharmacy: {
+    label: "Pharmacy",
+    emoji: "💊",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    badgeColor: "bg-emerald-600 text-white",
+  },
+};
 
-// ─── Custom Map Markers ───────────────────────────────────────────────────────
-function makeProviderPin(
-  type: "doctor" | "pharmacy" | "diagnostic_center",
-  selected = false,
-) {
-  const cfg = TYPE_CONFIG[type];
-  const sz = selected ? 48 : 38;
-  return divIcon({
-    html: `
-      <div style="
-        position:relative;
-        width:${sz}px; height:${sz}px;
-        background:white;
-        border:3px solid ${cfg.color};
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        box-shadow: 0 ${selected ? 8 : 4}px ${selected ? 24 : 12}px rgba(0,0,0,${selected ? 0.35 : 0.2});
-        display:flex; align-items:center; justify-content:center;
-        transition: all 0.25s cubic-bezier(.34,1.56,.64,1);
-        ${selected ? `animation: pinBounce 0.4s cubic-bezier(.34,1.56,.64,1);` : ""}
-      ">
-        <span style="transform:rotate(45deg); font-size:${selected ? 22 : 17}px; line-height:1;">
-          ${cfg.emoji}
-        </span>
-      </div>
-      <style>
-        @keyframes pinBounce {
-          0% { transform: rotate(-45deg) scale(0.6); }
-          70% { transform: rotate(-45deg) scale(1.15); }
-          100% { transform: rotate(-45deg) scale(1); }
-        }
-      </style>`,
-    className: "",
-    iconSize: [sz, sz],
-    iconAnchor: [sz / 2, sz],
-    popupAnchor: [0, -sz],
-  });
-}
-
-function makeUserPin() {
-  return divIcon({
-    html: `
-      <div style="position:relative; width:34px; height:34px;">
-        <div style="
-          position:absolute; top:50%; left:50%;
-          transform: translate(-50%, -50%);
-          width:34px; height:34px;
-          background: #2563EB;
-          border: 3.5px solid white;
-          border-radius: 50%;
-          box-shadow: 0 4px 16px rgba(37,99,235,0.7);
-          display:flex; align-items:center; justify-content:center;
-          color:white; font-size:15px; font-weight:bold;
-        ">🏠</div>
-      </div>`,
-    className: "",
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
-  });
-}
-
-function MapFly({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo([lat, lng], zoom ?? 14, { duration: 1 });
-  }, [lat, lng, zoom, map]);
-  return null;
-}
-
-function MapInit({ onReady }: { onReady: (m: LeafletMap) => void }) {
-  const map = useMap();
-  useEffect(() => { onReady(map); }, [map, onReady]);
-  return null;
-}
-
-function MapClickListener({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click(e) {
-      onMapClick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
-
-function fmtDist(km: number) {
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
-}
-
-async function fetchReverseGeocode(lat: number, lng: number): Promise<string> {
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-      headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
-    });
-    const data = await res.json();
-    if (data && data.display_name) {
-      const parts = data.display_name.split(",");
-      return parts.slice(0, 3).join(",").trim();
-    }
-  } catch {
-    // fallback
-  }
-  return `Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
-}
-
-function ProviderCard({
-  p,
-  selected,
-  onClick,
-}: {
-  p: NearbyProvider;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const cfg = TYPE_CONFIG[p.type];
-  return (
-    <div
-      onClick={onClick}
-      className="flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all shrink-0 border"
-      style={{
-        minWidth: 260,
-        background: selected ? cfg.bg : "white",
-        borderColor: selected ? cfg.color : "rgba(226,232,240,0.8)",
-        boxShadow: selected ? `0 4px 20px ${cfg.bg}` : "0 1px 4px rgba(0,0,0,0.05)",
-      }}
-    >
-      <div
-        className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0 text-2xl"
-        style={{ background: cfg.bg }}
-      >
-        {cfg.emoji}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-slate-900 text-sm truncate">{p.name}</p>
-        {p.specialty && <p className="text-xs text-slate-500 truncate">{p.specialty}</p>}
-        <div className="flex items-center gap-2 mt-1">
-          <span
-            className="text-xs font-bold px-2 py-0.5 rounded-full"
-            style={{ background: cfg.bg, color: cfg.color }}
-          >
-            {fmtDist(p.distanceKm)}
-          </span>
-          {p.rating != null && p.rating > 0 && (
-            <span className="flex items-center gap-0.5 text-xs text-amber-600">
-              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-              {p.rating.toFixed(1)}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ProviderDetail({
-  p,
-  onClose,
-  onBook,
-}: {
-  p: NearbyProvider;
-  onClose: () => void;
-  onBook: () => void;
-}) {
-  const cfg = TYPE_CONFIG[p.type];
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`;
-  return (
-    <div className="px-4 pb-4 space-y-4">
-      <div className="flex items-start gap-3">
-        <div
-          className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 text-3xl"
-          style={{ background: cfg.bg }}
-        >
-          {cfg.emoji}
-        </div>
-        <div className="flex-1">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="font-bold text-slate-900 text-lg leading-tight">{p.name}</h2>
-              {p.specialty && <p className="text-sm text-slate-500">{p.specialty}</p>}
-            </div>
-            <button onClick={onClose} className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center ml-2 shrink-0">
-              <X className="h-4 w-4 text-slate-500" />
-            </button>
-          </div>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span
-              className="text-xs font-bold px-2.5 py-1 rounded-full"
-              style={{ background: cfg.bg, color: cfg.color }}
-            >
-              {cfg.label}
-            </span>
-            {p.rating != null && p.rating > 0 && (
-              <span className="flex items-center gap-0.5 text-xs text-amber-600 font-medium">
-                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                {p.rating.toFixed(1)}
-              </span>
-            )}
-            <span
-              className="text-xs font-bold px-2.5 py-1 rounded-full"
-              style={{ background: "rgba(59,130,246,0.1)", color: "#2563EB" }}
-            >
-              📍 {fmtDist(p.distanceKm)} away
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl bg-slate-50 p-3 space-y-2">
-        {p.address && (
-          <div className="flex items-start gap-2 text-sm text-slate-600">
-            <MapPin className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
-            <span>{p.address}{p.city ? `, ${p.city}` : ""}</span>
-          </div>
-        )}
-        {p.phone && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <Phone className="h-4 w-4 text-slate-400 shrink-0" />
-            <a href={`tel:${p.phone}`} className="text-blue-600 font-medium">{p.phone}</a>
-          </div>
-        )}
-        {p.openingHours && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <Star className="h-4 w-4 text-slate-400 shrink-0" />
-            <span>{p.openingHours}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <a
-          href={directionsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 h-12 rounded-2xl text-sm font-bold border-2 transition-all"
-          style={{ borderColor: cfg.color, color: cfg.color }}
-        >
-          <Navigation className="h-4 w-4" />
-          Directions
-          <ExternalLink className="h-3.5 w-3.5 opacity-70" />
-        </a>
-        <button
-          onClick={onBook}
-          className="flex items-center justify-center gap-2 h-12 rounded-2xl text-sm font-bold text-white transition-all shadow-lg active:scale-95"
-          style={{ background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)` }}
-        >
-          <Calendar className="h-4 w-4" />
-          Book Now
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function getSavedLocation(): { lat: number; lng: number; name: string } {
-  try {
-    const raw = localStorage.getItem("arogyagenie_user_location");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.lat && parsed.lng) {
-        return parsed;
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return { lat: 22.5726, lng: 88.3639, name: "Park Street, Kolkata" };
-}
-
-// ─── Main Page ─────────────────────────────────────────────────────────────────
 export function NearbyCareMap() {
   const [, setLocation] = useLocation();
 
-  const initialLoc = useMemo(() => getSavedLocation(), []);
+  // Location Hook
+  const {
+    userLoc,
+    locationName,
+    isLiveGps,
+    locating,
+    locError,
+    startLiveGPS,
+    handleMapClick,
+    searchAddress,
+    selectQuickCity,
+    isSearchingAddress,
+  } = useUserLocation();
 
-  // User location state
-  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number }>({ lat: initialLoc.lat, lng: initialLoc.lng });
-  const [locationName, setLocationName] = useState<string>(initialLoc.name);
   const [customAddressInput, setCustomAddressInput] = useState("");
-  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [showAddressBox, setShowAddressBox] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [isLiveGps, setIsLiveGps] = useState(false);
-  const [locError, setLocError] = useState<string | null>(null);
-  const [clickNotice, setClickNotice] = useState<string | null>("💡 Click anywhere on the map or type address to position your pin!");
 
-  const watchIdRef = useRef<number | null>(null);
+  // Discovery Filter State
+  const [radiusKm, setRadiusKm] = useState(10); // 2 km to 18 km
+  const [filterType, setFilterType] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [medicineQuery, setMedicineQuery] = useState("");
 
-  // Providers state
-  const [providers, setProviders] = useState<NearbyProvider[]>([]);
+  // Results State
+  const [providers, setProviders] = useState<MapProviderItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [mobileViewMode, setMobileViewMode] = useState<"split" | "map" | "list">("split");
 
-  // UI state
-  const [radiusIdx, setRadiusIdx] = useState(3); // default 8 km
-  const [filter, setFilter] = useState<FilterType>("all");
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<NearbyProvider | null>(null);
-  const [sheet, setSheet] = useState<SheetState>("half");
-  const [showSearch, setShowSearch] = useState(false);
+  const cardListRef = useRef<HTMLDivElement | null>(null);
 
-  const mapRef = useRef<LeafletMap | null>(null);
-  const userMarkerRef = useRef<any>(null);
-  const radiusKm = RADIUS_STEPS[radiusIdx];
+  // Fetch from backend location discovery API
+  const fetchNearby = useCallback(
+    async (lat: number, lng: number, rad: number, type: FilterType, search: string, med: string) => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          lat: lat.toString(),
+          lng: lng.toString(),
+          radius: rad.toString(),
+          type,
+          ...(search.trim() ? { search: search.trim() } : {}),
+          ...(med.trim() ? { medicine: med.trim() } : {}),
+        });
 
-  const updateAndSaveLocation = useCallback((lat: number, lng: number, name: string) => {
-    setUserLoc({ lat, lng });
-    setLocationName(name);
-    try {
-      localStorage.setItem("arogyagenie_user_location", JSON.stringify({ lat, lng, name }));
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const fetchNearby = useCallback(async (lat: number, lng: number) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        lat: lat.toString(),
-        lng: lng.toString(),
-        radius: radiusKm.toString(),
-        type: filter,
-        ...(search ? { search } : {}),
-      });
-      const res = await fetch(`/api/nearby?${params}`);
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
-      setProviders(data.results ?? []);
-    } catch {
-      setProviders([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [radiusKm, filter, search]);
-
-  const handleMapClick = useCallback(async (clickedLat: number, clickedLng: number) => {
-    // If user clicks map, stop live GPS watch so map stays where user clicked
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      setIsLiveGps(false);
-    }
-    setClickNotice(null);
-    setSelected(null);
-    fetchNearby(clickedLat, clickedLng);
-    const addr = await fetchReverseGeocode(clickedLat, clickedLng);
-    updateAndSaveLocation(clickedLat, clickedLng, addr);
-  }, [fetchNearby, updateAndSaveLocation]);
-
-  const searchAddress = useCallback(async (queryAddress: string) => {
-    if (!queryAddress.trim()) return;
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      setIsLiveGps(false);
-    }
-    setIsSearchingAddress(true);
-    setLocError(null);
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryAddress)}&format=json&limit=1`;
-      const res = await fetch(url, {
-        headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
-      });
-      const data = await res.json();
-      if (data && data.length > 0) {
-        const newLat = parseFloat(data[0].lat);
-        const newLng = parseFloat(data[0].lon);
-        const displayName = data[0].display_name.split(",").slice(0, 3).join(",");
-        updateAndSaveLocation(newLat, newLng, displayName);
-        setShowAddressBox(false);
-        fetchNearby(newLat, newLng);
-        if (mapRef.current) {
-          mapRef.current.flyTo([newLat, newLng], 14, { duration: 1 });
-        }
-      } else {
-        setLocError("Address not found. Try typing city or landmark name.");
+        const res = await fetch(`/api/nearby?${params}`);
+        if (!res.ok) throw new Error("Failed to fetch nearby providers");
+        const data = await res.json();
+        setProviders(data.results || []);
+      } catch {
+        setProviders([]);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setLocError("Failed to locate address.");
-    } finally {
-      setIsSearchingAddress(false);
-    }
-  }, [fetchNearby, updateAndSaveLocation]);
-
-  const selectQuickCity = useCallback((city: typeof QUICK_CITIES[0]) => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      setIsLiveGps(false);
-    }
-    updateAndSaveLocation(city.lat, city.lng, city.name);
-    setShowAddressBox(false);
-    fetchNearby(city.lat, city.lng);
-    if (mapRef.current) {
-      mapRef.current.flyTo([city.lat, city.lng], 14, { duration: 1 });
-    }
-  }, [fetchNearby, updateAndSaveLocation]);
-
-  // ── Live Continuous Real-Time GPS Tracking ─────────────────────────────────
-  const startLiveGPS = useCallback(() => {
-    setLocating(true);
-    setLocError(null);
-
-    if (!navigator.geolocation) {
-      setLocError("Geolocation not supported on this browser.");
-      setLocating(false);
-      return;
-    }
-
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-    }
-
-    // Force maximumAge: 0 to flush 1-week-old cached locations!
-    const id = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const freshLat = pos.coords.latitude;
-        const freshLng = pos.coords.longitude;
-
-        setLocating(false);
-        setIsLiveGps(true);
-        fetchNearby(freshLat, freshLng);
-
-        const addr = await fetchReverseGeocode(freshLat, freshLng);
-        updateAndSaveLocation(freshLat, freshLng, addr);
-
-        if (mapRef.current) {
-          mapRef.current.flyTo([freshLat, freshLng], 14, { duration: 1 });
-        }
-      },
-      () => {
-        setLocError("GPS access unavailable or cached location returned. Select your city or type address above!");
-        setLocating(false);
-        setIsLiveGps(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }, // maximumAge: 0 flushes stale cache!
-    );
-
-    watchIdRef.current = id;
-  }, [fetchNearby, updateAndSaveLocation]);
-
-  // Cleanup watchPosition on unmount
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
-  }, []);
-
-  // Initial fetch using saved location
-  useEffect(() => {
-    fetchNearby(userLoc.lat, userLoc.lng);
-  }, []);
-
-  useEffect(() => {
-    if (userLoc) fetchNearby(userLoc.lat, userLoc.lng);
-  }, [radiusKm, filter, fetchNearby]);
-
-  const userMarkerDragHandlers = useMemo(
-    () => ({
-      async dragend() {
-        if (watchIdRef.current !== null) {
-          navigator.geolocation.clearWatch(watchIdRef.current);
-          watchIdRef.current = null;
-          setIsLiveGps(false);
-        }
-        const marker = userMarkerRef.current;
-        if (marker != null) {
-          const latLng = marker.getLatLng();
-          const newLoc = { lat: latLng.lat, lng: latLng.lng };
-          fetchNearby(newLoc.lat, newLoc.lng);
-          const addr = await fetchReverseGeocode(newLoc.lat, newLoc.lng);
-          updateAndSaveLocation(newLoc.lat, newLoc.lng, addr);
-        }
-      },
-    }),
-    [fetchNearby, updateAndSaveLocation],
+    },
+    [],
   );
 
-  const visible = providers.filter((p) => {
-    if (filter !== "all" && p.type !== filter) return false;
-    if (search.trim()) {
-      const s = search.toLowerCase();
-      return (
-        p.name.toLowerCase().includes(s) ||
-        (p.specialty ?? "").toLowerCase().includes(s) ||
-        (p.city ?? "").toLowerCase().includes(s)
-      );
-    }
-    return true;
-  });
+  // Trigger query on location, radius, or filter change
+  useEffect(() => {
+    fetchNearby(userLoc.lat, userLoc.lng, radiusKm, filterType, searchQuery, medicineQuery);
+  }, [userLoc.lat, userLoc.lng, radiusKm, filterType, searchQuery, medicineQuery, fetchNearby]);
 
-  const selectProvider = useCallback((p: NearbyProvider) => {
-    setSelected(p);
-    setSheet("full");
-    if (mapRef.current) {
-      const midLat = (userLoc.lat + p.latitude) / 2;
-      const midLng = (userLoc.lng + p.longitude) / 2;
-      mapRef.current.flyTo([midLat, midLng], 14, { duration: 0.8 });
+  // Scroll to selected card when selected on map
+  const handleSelectProvider = useCallback((provider: MapProviderItem | null) => {
+    setSelectedId(provider ? provider.id : null);
+    if (provider) {
+      const el = document.getElementById(`provider-card-${provider.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
     }
-  }, [userLoc]);
+  }, []);
 
-  const handleBook = useCallback(() => {
-    if (!selected) return;
-    if (selected.type === "doctor") {
-      setLocation(`/patient/appointments?doctorId=${selected.id}`);
-    } else if (selected.type === "diagnostic_center") {
-      setLocation(`/patient/diagnostic-bookings`);
-    } else {
-      setLocation(`/patient/appointments`);
+  const handleAddressSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customAddressInput.trim()) return;
+    const success = await searchAddress(customAddressInput);
+    if (success) {
+      setShowAddressBox(false);
+      setCustomAddressInput("");
     }
-  }, [selected, setLocation]);
+  };
 
-  const sheetHeights: Record<SheetState, string> = {
-    collapsed: "80px",
-    half: "240px",
-    full: selected ? "420px" : "240px",
+  const handleQuickCitySelect = (city: (typeof QUICK_CITIES)[number]) => {
+    selectQuickCity(city);
+    setShowAddressBox(false);
   };
 
   return (
     <DashboardLayout>
-      <div className="relative overflow-hidden" style={{ height: "calc(100vh - 64px)" }}>
-        {/* ── Leaflet Map ─────────────────────────────────────────────────── */}
-        <MapContainer
-          center={[userLoc.lat, userLoc.lng]}
-          zoom={14}
-          style={{ height: "100%", width: "100%", zIndex: 0 }}
-          zoomControl={false}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+      <div className="space-y-4">
+        {/* ── Page Header ──────────────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <MapPin className="w-6 h-6 text-primary" />
+              Nearest Healthcare Discovery
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Locate verified doctors, diagnostic centers, and medicine-stocked pharmacies within {radiusKm} km.
+            </p>
+          </div>
 
-          <MapInit onReady={(m) => { mapRef.current = m; }} />
-          <MapClickListener onMapClick={handleMapClick} />
-          <MapFly lat={userLoc.lat} lng={userLoc.lng} zoom={14} />
-
-          {/* Glowing Outer Blue Halo */}
-          <CircleMarker
-            center={[userLoc.lat, userLoc.lng]}
-            radius={22}
-            pathOptions={{
-              color: isLiveGps ? "#10B981" : "#3B82F6",
-              fillColor: isLiveGps ? "#10B981" : "#3B82F6",
-              fillOpacity: 0.22,
-              weight: 0,
-            }}
-          />
-
-          {/* Solid Vivid Blue/Green Dot */}
-          <CircleMarker
-            center={[userLoc.lat, userLoc.lng]}
-            radius={10}
-            pathOptions={{
-              color: "#FFFFFF",
-              fillColor: isLiveGps ? "#059669" : "#2563EB",
-              fillOpacity: 1,
-              weight: 3,
-            }}
-          />
-
-          {/* Draggable Marker Pin */}
-          <Marker
-            draggable={true}
-            eventHandlers={userMarkerDragHandlers}
-            position={[userLoc.lat, userLoc.lng]}
-            icon={makeUserPin()}
-            ref={userMarkerRef}
-          >
-            <Popup>
-              <div className="text-xs font-bold text-center min-w-[150px]">
-                📍 Your Location
-                <p className="font-semibold text-blue-600 mt-1">{locationName}</p>
-                {isLiveGps && <p className="text-[10px] text-emerald-600 font-bold mt-1">🟢 Live Real-Time GPS Active</p>}
-                <p className="font-normal text-slate-400 mt-1 text-[10px]">Drag pin or click map to move!</p>
-              </div>
-            </Popup>
-          </Marker>
-
-          {/* Animated radius ring */}
-          <Circle
-            center={[userLoc.lat, userLoc.lng]}
-            radius={radiusKm * 1000}
-            pathOptions={{
-              color: "#7C3AED",
-              fillColor: "#7C3AED",
-              fillOpacity: 0.04,
-              weight: 2,
-              dashArray: "8 5",
-            }}
-          />
-
-          {/* Provider markers */}
-          {visible.map((p) => {
-            const isSelected = selected?.id === p.id && selected?.type === p.type;
-            const cfg = TYPE_CONFIG[p.type];
-            return (
-              <Marker
-                key={`${p.type}-${p.id}`}
-                position={[p.latitude, p.longitude]}
-                icon={makeProviderPin(p.type, isSelected)}
-                eventHandlers={{ click: () => selectProvider(p) }}
-              >
-                <Popup>
-                  <div style={{ minWidth: 170 }}>
-                    <p className="font-bold text-sm">{p.name}</p>
-                    {p.specialty && <p className="text-xs text-gray-500">{p.specialty}</p>}
-                    <p className="text-xs font-bold mt-1" style={{ color: cfg.color }}>
-                      {cfg.label} · {fmtDist(p.distanceKm)} away
-                    </p>
-                    <button
-                      onClick={() => selectProvider(p)}
-                      className="mt-2 text-xs font-bold px-3 py-1 rounded-lg text-white"
-                      style={{ background: cfg.color }}
-                    >
-                      View Details
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
-
-          {/* Straight-line route */}
-          {selected && (
-            <Polyline
-              positions={[
-                [userLoc.lat, userLoc.lng],
-                [selected.latitude, selected.longitude],
-              ]}
-              pathOptions={{
-                color: TYPE_CONFIG[selected.type].color,
-                weight: 3,
-                opacity: 0.7,
-                dashArray: "10 8",
-              }}
-            />
-          )}
-        </MapContainer>
-
-        {/* ── Floating top HUD ──────────────────────────────────────────────── */}
-        <div className="absolute top-3 left-0 right-0 z-[1000] px-4 flex flex-col gap-2 pointer-events-none">
-          <div className="flex items-center gap-2 pointer-events-auto">
-            <div className="flex-1 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-slate-200 px-3.5 py-2 flex items-center gap-2 min-w-0">
-              <span className={`h-3 w-3 rounded-full border-2 border-white shadow-xs shrink-0 animate-pulse ${isLiveGps ? "bg-emerald-500" : "bg-blue-600"}`} />
-              <span className="text-xs font-bold text-slate-800 truncate" title={locationName}>
+          {/* Location Indicator & Change Location Button */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-xs font-medium text-slate-700">
+              <span className={`w-2 h-2 rounded-full ${isLiveGps ? "bg-emerald-500 animate-pulse" : "bg-primary"}`} />
+              <span className="truncate max-w-[180px]" title={locationName}>
                 {locationName}
               </span>
-              <button
-                onClick={() => setShowAddressBox((s) => !s)}
-                className="text-[11px] font-bold text-violet-600 hover:underline shrink-0 ml-auto flex items-center gap-1 bg-violet-50 px-2 py-0.5 rounded-full"
-              >
-                <Edit3 className="h-3 w-3" />
-                Change Location
-              </button>
             </div>
 
-            {/* Live Real-time GPS button */}
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddressBox(!showAddressBox)}
+              className="text-xs h-9 gap-1.5 border-slate-200"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Change
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
               onClick={startLiveGPS}
               disabled={locating}
-              className={`h-10 w-10 rounded-full shadow-lg flex items-center justify-center border transition-all hover:scale-105 shrink-0 ${
-                isLiveGps
-                  ? "bg-emerald-500 text-white border-emerald-600 shadow-emerald-200"
-                  : "bg-white text-blue-600 border-slate-200"
-              }`}
-              title="Activate Real-Time Live GPS"
+              className="text-xs h-9 gap-1.5 bg-primary hover:bg-primary/90 text-white"
             >
-              {locating ? (
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              ) : isLiveGps ? (
-                <Radio className="h-4 w-4 animate-pulse text-white" />
-              ) : (
-                <Locate className="h-4 w-4 text-blue-500" />
-              )}
-            </button>
+              {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Locate className="w-3.5 h-3.5" />}
+              {locating ? "Locating..." : "Use GPS"}
+            </Button>
           </div>
+        </div>
 
-          {clickNotice && (
-            <div className="pointer-events-auto flex items-center justify-between gap-2 text-xs text-blue-800 bg-blue-50/95 backdrop-blur-md border border-blue-200 rounded-2xl px-3.5 py-1.5 shadow-md">
-              <span className="flex items-center gap-1.5 font-medium">
-                <MousePointerClick className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                {clickNotice}
-              </span>
-              <button onClick={() => setClickNotice(null)} className="text-blue-500 hover:text-blue-700">
-                <X className="h-3.5 w-3.5" />
+        {/* ── Location Change Box (Collapsible) ─────────────────────────────────── */}
+        {showAddressBox && (
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-md space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                Select or Search Location
+              </h3>
+              <button
+                onClick={() => setShowAddressBox(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
-          )}
 
-          {showAddressBox && (
-            <div className="bg-white rounded-2xl p-3.5 shadow-2xl border border-slate-200 pointer-events-auto space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold text-slate-800">Set your exact location:</p>
-                <button onClick={() => setShowAddressBox(false)} className="text-slate-400 hover:text-slate-600">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  autoFocus
-                  placeholder="e.g. Salt Lake Sector V, Kolkata..."
-                  value={customAddressInput}
-                  onChange={(e) => setCustomAddressInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") searchAddress(customAddressInput);
-                  }}
-                  className="flex-1 px-3 py-1.5 rounded-xl text-xs border border-slate-200 outline-none focus:ring-2 focus:ring-violet-400 bg-slate-50"
-                />
-                <Button
-                  size="sm"
-                  onClick={() => searchAddress(customAddressInput)}
-                  disabled={isSearchingAddress || !customAddressInput.trim()}
-                  className="h-8 text-xs font-bold bg-violet-600 text-white rounded-xl px-3 shrink-0"
-                >
-                  {isSearchingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set Address"}
-                </Button>
-              </div>
-
-              <div className="space-y-1 pt-1">
-                <p className="text-[11px] font-semibold text-slate-400">Quick Select Metro Area:</p>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {QUICK_CITIES.map((c) => (
-                    <button
-                      key={c.name}
-                      onClick={() => selectQuickCity(c)}
-                      className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-violet-100 hover:text-violet-700 transition-all border border-slate-200/60"
-                    >
-                      📍 {c.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 pointer-events-auto overflow-x-auto pb-0.5 scrollbar-none">
-            <button
-              onClick={() => setShowSearch((s) => !s)}
-              className="h-9 w-9 rounded-full bg-white shadow-lg flex items-center justify-center border border-slate-200 transition-all shrink-0"
-            >
-              {showSearch ? <X className="h-3.5 w-3.5 text-slate-600" /> : <Search className="h-3.5 w-3.5 text-slate-600" />}
-            </button>
-
-            {(["all", "doctor", "pharmacy", "diagnostic_center"] as const).map((t) => {
-              const isAll = t === "all";
-              const cfg = isAll ? null : TYPE_CONFIG[t];
-              const active = filter === t;
-              return (
-                <button
-                  key={t}
-                  onClick={() => { setFilter(t); setSelected(null); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg transition-all border shrink-0 hover:scale-105"
-                  style={
-                    active
-                      ? {
-                          background: cfg?.color ?? "#7C3AED",
-                          color: "white",
-                          borderColor: "transparent",
-                        }
-                      : { background: "white", color: "#475569", borderColor: "rgba(226,232,240,0.8)" }
-                  }
-                >
-                  {isAll ? "🗺️" : cfg!.emoji}
-                  {isAll ? "All" : cfg!.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {showSearch && (
-            <div className="relative pointer-events-auto">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-              <input
-                autoFocus
-                placeholder="Search doctors, pharmacies, labs…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 rounded-2xl text-xs shadow-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-violet-300"
+            <form onSubmit={handleAddressSubmit} className="flex gap-2">
+              <Input
+                placeholder="Enter city, locality, or landmark (e.g. Salt Lake Sector V, Kolkata)..."
+                value={customAddressInput}
+                onChange={(e) => setCustomAddressInput(e.target.value)}
+                className="text-xs h-9 flex-1"
               />
-              {search && (
-                <button onClick={() => setSearch("")} className="absolute right-3 top-2.5 text-slate-400">
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          )}
-
-          {locError && (
-            <div className="pointer-events-auto flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2 shadow-lg">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {locError}
-            </div>
-          )}
-        </div>
-
-        {/* ── Bottom Sheet ──────────────────────────────────────────────────── */}
-        <div
-          className="absolute bottom-0 left-0 right-0 z-[1000] bg-white rounded-t-3xl shadow-2xl transition-all duration-400 ease-out"
-          style={{ height: sheetHeights[sheet] }}
-        >
-          <div
-            className="flex flex-col items-center pt-3 pb-2 cursor-pointer"
-            onClick={() => {
-              if (sheet === "collapsed") setSheet(selected ? "full" : "half");
-              else if (sheet === "half") setSheet(selected ? "full" : "collapsed");
-              else setSheet("half");
-            }}
-          >
-            <div className="w-10 h-1 rounded-full bg-slate-200 mb-2" />
-            <div className="w-full px-5 flex items-center gap-3">
-              <span className="text-xs text-slate-400 font-bold shrink-0">2km</span>
-              <div className="relative flex-1">
-                <input
-                  type="range"
-                  min={0}
-                  max={RADIUS_STEPS.length - 1}
-                  step={1}
-                  value={radiusIdx}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    setRadiusIdx(Number(e.target.value));
-                    setSelected(null);
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, #7C3AED ${(radiusIdx / (RADIUS_STEPS.length - 1)) * 100}%, #E2E8F0 0%)`,
-                    accentColor: "#7C3AED",
-                  }}
-                />
-              </div>
-              <span className="text-xs text-slate-400 font-bold shrink-0">16km</span>
-              <div
-                className="px-3 py-1 rounded-full text-xs font-black text-white shrink-0"
-                style={{ background: "#7C3AED", minWidth: 52, textAlign: "center" }}
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSearchingAddress || !customAddressInput.trim()}
+                className="text-xs h-9 gap-1.5"
               >
-                {radiusKm} km
+                {isSearchingAddress ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                Search
+              </Button>
+            </form>
+
+            <div>
+              <span className="text-[11px] font-semibold text-slate-400 block mb-1.5">
+                Quick Select City:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_CITIES.map((city) => (
+                  <button
+                    key={city.name}
+                    type="button"
+                    onClick={() => handleQuickCitySelect(city)}
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-violet-700 border border-slate-200 hover:border-violet-200 transition-colors"
+                  >
+                    📍 {city.name}
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
 
-          {sheet !== "collapsed" && (
-            <div className="px-4 overflow-hidden" style={{ height: "calc(100% - 70px)" }}>
-              {selected && sheet === "full" ? (
-                <ProviderDetail
-                  p={selected}
-                  onClose={() => { setSelected(null); setSheet("half"); }}
-                  onBook={handleBook}
-                />
-              ) : (
-                <div className="flex flex-col h-full">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-bold text-slate-800">
-                      {loading ? (
-                        <span className="flex items-center gap-2 text-slate-400">
-                          <Loader2 className="h-4 w-4 animate-spin" /> Searching…
-                        </span>
-                      ) : visible.length === 0 ? (
-                        "No providers in this range"
-                      ) : (
-                        `${visible.length} provider${visible.length !== 1 ? "s" : ""} within ${radiusKm} km`
-                      )}
-                    </p>
-                    {sheet === "half" && visible.length > 0 && (
-                      <button
-                        onClick={() => setSheet("full")}
-                        className="text-xs font-bold text-violet-600 flex items-center gap-1"
-                      >
-                        See all <ChevronUp className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {visible.length > 0 ? (
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none flex-1">
-                      {visible.map((p) => (
-                        <ProviderCard
-                          key={`${p.type}-${p.id}`}
-                          p={p}
-                          selected={selected?.id === p.id && selected?.type === p.type}
-                          onClick={() => selectProvider(p)}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center py-4 text-center">
-                      <div className="text-4xl mb-2">🗺️</div>
-                      <p className="text-slate-600 font-semibold text-sm">
-                        No providers found within {radiusKm} km
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                        Try expanding the radius range slider above or search a different area.
-                      </p>
-                      {radiusKm < 16 && (
-                        <button
-                          className="mt-3 text-xs font-bold px-4 py-2 rounded-full text-white"
-                          style={{ background: "#7C3AED" }}
-                          onClick={() => setRadiusIdx((i) => Math.min(i + 1, RADIUS_STEPS.length - 1))}
-                        >
-                          Expand to {RADIUS_STEPS[Math.min(radiusIdx + 1, RADIUS_STEPS.length - 1)]} km
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {sheet === "collapsed" && (
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-              <ChevronUp className="h-3.5 w-3.5" />
-              {visible.length} provider{visible.length !== 1 ? "s" : ""} · {radiusKm} km radius
-            </div>
-          )}
-        </div>
-
-        {!loading && visible.length > 0 && (
-          <div
-            className="absolute top-24 right-4 z-[999] px-3 py-1.5 rounded-full text-xs font-black text-white shadow-lg"
-            style={{ background: "linear-gradient(135deg, #7C3AED, #5B21B6)" }}
-          >
-            {visible.length} nearby
+            {locError && (
+              <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {locError}
+              </p>
+            )}
           </div>
         )}
-      </div>
 
-      <style>{`
-        input[type=range]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #7C3AED;
-          border: 3px solid white;
-          box-shadow: 0 2px 8px rgba(124,58,237,0.45);
-          cursor: pointer;
-          transition: transform 0.15s;
-        }
-        input[type=range]::-webkit-slider-thumb:hover {
-          transform: scale(1.2);
-        }
-        .scrollbar-none::-webkit-scrollbar { display: none; }
-        .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+        {/* ── Filter Controls Bar ──────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-4">
+          {/* Category Tabs */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setFilterType("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterType === "all" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                ✨ All Providers ({providers.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType("doctor")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  filterType === "doctor" ? "bg-violet-600 text-white shadow-xs" : "text-slate-600 hover:text-violet-700"
+                }`}
+              >
+                🩺 Doctors
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType("diagnostic_center")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  filterType === "diagnostic_center" ? "bg-sky-600 text-white shadow-xs" : "text-slate-600 hover:text-sky-700"
+                }`}
+              >
+                🔬 Diagnostic Labs
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType("pharmacy")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  filterType === "pharmacy" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-emerald-700"
+                }`}
+              >
+                💊 Pharmacies & Medicines
+              </button>
+            </div>
+
+            {/* Keyword / Specialty / Medicine Search */}
+            <div className="flex items-center gap-2 flex-1 max-w-md">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder={
+                    filterType === "pharmacy"
+                      ? "Search medicine (e.g. Paracetamol 650, Amoxicillin)..."
+                      : filterType === "doctor"
+                      ? "Search doctor name or specialty (e.g. Cardiology)..."
+                      : filterType === "diagnostic_center"
+                      ? "Search test or center (e.g. Blood Test, MRI)..."
+                      : "Search any doctor, lab, or medicine..."
+                  }
+                  value={filterType === "pharmacy" ? medicineQuery : searchQuery}
+                  onChange={(e) => {
+                    if (filterType === "pharmacy") {
+                      setMedicineQuery(e.target.value);
+                    } else {
+                      setSearchQuery(e.target.value);
+                    }
+                  }}
+                  className="pl-8 text-xs h-9 bg-slate-50 border-slate-200"
+                />
+                {(searchQuery || medicineQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setMedicineQuery("");
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Radius Slider: 2 km to 18 km ────────────────────────────────────── */}
+          <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Sliders className="w-4 h-4 text-primary" />
+              <span>Search Radius:</span>
+              <span className="font-bold text-slate-900 px-2 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">
+                {radiusKm} km
+              </span>
+              <span className="text-[11px] text-slate-400">(Min: 2 km • Max: 18 km)</span>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-72">
+              <span className="text-[11px] font-semibold text-slate-400 shrink-0">2 km</span>
+              <Slider
+                value={[radiusKm]}
+                min={2}
+                max={18}
+                step={2}
+                onValueChange={(vals) => setRadiusKm(vals[0])}
+                className="flex-1"
+              />
+              <span className="text-[11px] font-semibold text-slate-400 shrink-0">18 km</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Main Discovery Area (List + Map) ─────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-280px)] min-h-[500px]">
+          {/* Provider List Column */}
+          <div
+            ref={cardListRef}
+            className="lg:col-span-5 h-full overflow-y-auto pr-1 space-y-3"
+          >
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs animate-pulse space-y-3"
+                  >
+                    <div className="h-4 bg-slate-200 rounded w-2/3" />
+                    <div className="h-3 bg-slate-100 rounded w-1/2" />
+                    <div className="h-3 bg-slate-100 rounded w-4/5" />
+                  </div>
+                ))}
+              </div>
+            ) : providers.length === 0 ? (
+              <div className="p-8 rounded-2xl bg-white border border-slate-200 shadow-2xs text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                  <MapPin className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-sm">No providers found in this radius</h3>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                  Try expanding the search radius slider to 18 km or selecting a different location above.
+                </p>
+                {radiusKm < 18 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRadiusKm(18)}
+                    className="text-xs gap-1.5 border-violet-200 text-violet-700 hover:bg-violet-50"
+                  >
+                    Expand to 18 km
+                  </Button>
+                )}
+              </div>
+            ) : (
+              providers.map((p) => {
+                const isSelected = p.id === selectedId;
+                const typeCfg = TYPE_CONFIG[p.type] || TYPE_CONFIG.doctor;
+                const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLoc.lat},${userLoc.lng}&destination=${p.latitude},${p.longitude}`;
+
+                return (
+                  <div
+                    id={`provider-card-${p.id}`}
+                    key={`${p.type}-${p.id}`}
+                    onClick={() => handleSelectProvider(p)}
+                    className={`p-4 rounded-2xl bg-white border transition-all cursor-pointer ${
+                      isSelected
+                        ? "border-violet-500 shadow-md ring-2 ring-violet-500/20 bg-violet-50/20"
+                        : "border-slate-200/90 hover:border-slate-300 shadow-2xs hover:shadow-xs"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold border ${typeCfg.color}`}>
+                          {typeCfg.emoji} {typeCfg.label}
+                        </span>
+                        {p.rating ? (
+                          <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            {p.rating}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {/* Distance Badge */}
+                      <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                        {fmtDist(p.distanceKm)}
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-slate-900 text-sm mb-1">{p.name}</h3>
+
+                    {p.specialty && (
+                      <p className="text-xs text-violet-700 font-semibold mb-1">{p.specialty}</p>
+                    )}
+
+                    {p.address && (
+                      <p className="text-xs text-slate-500 flex items-start gap-1 mb-2">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                        <span className="line-clamp-1">{p.address}</span>
+                      </p>
+                    )}
+
+                    {/* Matched Medicine Badge for Pharmacy */}
+                    {p.matchedMedicine && (
+                      <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 mb-2.5 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>In Stock: {p.matchedMedicine.medicineName}</span>
+                        </div>
+                        {p.matchedMedicine.price && (
+                          <span className="font-bold text-emerald-900">₹{p.matchedMedicine.price}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Card Actions */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                      {p.type === "doctor" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/patient/appointments?doctorId=${p.id}`);
+                          }}
+                          className="h-8 text-xs font-semibold bg-primary text-white hover:bg-primary/90 flex-1"
+                        >
+                          Book Appointment
+                        </Button>
+                      )}
+
+                      {p.type === "diagnostic_center" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/patient/diagnostic-bookings?centerId=${p.id}`);
+                          }}
+                          className="h-8 text-xs font-semibold bg-sky-600 text-white hover:bg-sky-700 flex-1"
+                        >
+                          Book Test
+                        </Button>
+                      )}
+
+                      {p.type === "pharmacy" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/patient/prescriptions`);
+                          }}
+                          className="h-8 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 flex-1"
+                        >
+                          Order Medicine
+                        </Button>
+                      )}
+
+                      {/* Get Directions Action */}
+                      <a
+                        href={directionsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shrink-0"
+                        title="Open in Google Maps"
+                      >
+                        <Navigation className="w-3.5 h-3.5 text-blue-600" />
+                        Directions
+                      </a>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Interactive Google Map Column */}
+          <div className="lg:col-span-7 h-full">
+            <GoogleMapView
+              userLoc={userLoc}
+              radiusKm={radiusKm}
+              providers={providers}
+              selectedId={selectedId}
+              onSelectProvider={handleSelectProvider}
+              onMapClick={handleMapClick}
+              className="w-full h-full min-h-[450px]"
+            />
+          </div>
+        </div>
+      </div>
     </DashboardLayout>
   );
 }

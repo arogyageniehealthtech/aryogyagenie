@@ -1,41 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import { divIcon, type LatLngExpression } from "leaflet";
-import { Star, Navigation, ExternalLink, Info, Layers, Plus, Minus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
-import "leaflet/dist/leaflet.css";
-
-// ─── Google Red Marker Pin ───────────────────────────────────────────────────
-function makeGooglePin() {
-  return divIcon({
-    html: `
-      <div style="position: relative; width: 36px; height: 36px;">
-        <div style="
-          width: 32px; height: 32px;
-          background: #EA4335;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          border: 2px solid white;
-          box-shadow: 0 4px 14px rgba(234,67,53,0.45);
-          display: flex; align-items: center; justify-content: center;
-          margin: 0 auto;
-        ">
-          <div style="width: 10px; height: 10px; background: white; border-radius: 50%;"></div>
-        </div>
-      </div>`,
-    className: "",
-    iconSize: [36, 36],
-    iconAnchor: [18, 36],
-    popupAnchor: [0, -36],
-  });
-}
-
-function MapFly({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo([lat, lng], zoom ?? 15, { duration: 1 });
-  }, [lat, lng, zoom, map]);
-  return null;
-}
+import React, { useEffect, useRef, useState } from "react";
+import { loadGoogleMaps, getGoogleMapsApiKey } from "@/lib/googleMapsLoader";
+import { Star, Navigation, ExternalLink, Info, Layers, Loader2, MapPin } from "lucide-react";
 
 export interface GooglePlaceMapProps {
   title: string;
@@ -52,55 +17,140 @@ export interface GooglePlaceMapProps {
 export function GooglePlaceMap({
   title,
   address,
-  rating = 4.4,
-  reviewCount = 445,
+  rating = 4.8,
+  reviewCount = 12,
   latitude,
   longitude,
   phone,
   className = "",
   height = "450px",
 }: GooglePlaceMapProps) {
-  const [mapType, setMapType] = useState<"standard" | "satellite">("standard");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
 
-  const center: LatLngExpression = [latitude, longitude];
+  const [isLoading, setIsLoading] = useState(true);
+  const [mapType, setMapType] = useState<"roadmap" | "satellite">("roadmap");
+  const [hasApiKey, setHasApiKey] = useState(true);
+
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
   const shareUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+
+  useEffect(() => {
+    let isMounted = true;
+    const apiKey = getGoogleMapsApiKey();
+
+    if (!apiKey) {
+      setHasApiKey(false);
+      setIsLoading(false);
+      return;
+    }
+
+    setHasApiKey(true);
+    setIsLoading(true);
+
+    loadGoogleMaps(apiKey)
+      .then((maps) => {
+        if (!isMounted || !containerRef.current) return;
+
+        const pos = new maps.LatLng(latitude, longitude);
+
+        if (!mapInstanceRef.current) {
+          const map = new maps.Map(containerRef.current, {
+            center: pos,
+            zoom: 15,
+            mapTypeId: mapType,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+            zoomControl: true,
+          });
+
+          const marker = new maps.Marker({
+            position: pos,
+            map,
+            title,
+            animation: maps.Animation.DROP,
+          });
+
+          const infoWindow = new maps.InfoWindow({
+            content: `
+              <div style="font-family: inherit; padding: 4px;">
+                <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 2px;">${title}</div>
+                <div style="font-size: 11px; color: #64748b; margin-bottom: 6px;">${address}</div>
+                <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: #2563eb; font-weight: 700; text-decoration: none;">Get Directions ↗</a>
+              </div>
+            `,
+          });
+
+          marker.addListener("click", () => {
+            infoWindow.open(map, marker);
+          });
+
+          mapInstanceRef.current = map;
+          markerRef.current = marker;
+        } else {
+          mapInstanceRef.current.setCenter(pos);
+          markerRef.current?.setPosition(pos);
+        }
+
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [latitude, longitude, title, address, directionsUrl, mapType]);
+
+  const toggleMapType = () => {
+    const nextType = mapType === "roadmap" ? "satellite" : "roadmap";
+    setMapType(nextType);
+    if (mapInstanceRef.current && window.google?.maps) {
+      mapInstanceRef.current.setMapTypeId(nextType);
+    }
+  };
 
   return (
     <div
       className={`relative w-full rounded-2xl overflow-hidden border border-slate-200 shadow-md bg-slate-100 font-sans ${className}`}
       style={{ height }}
     >
-      {/* ── Leaflet Map Engine ──────────────────────────────────────────────── */}
-      <MapContainer
-        center={center}
-        zoom={15}
-        style={{ height: "100%", width: "100%", zIndex: 0 }}
-        zoomControl={false}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url={
-            mapType === "standard"
-              ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          }
-        />
+      {/* ── Map Container ─────────────────────────────────────────────────── */}
+      <div ref={containerRef} className="w-full h-full" />
 
-        <MapFly lat={latitude} lng={longitude} zoom={15} />
+      {isLoading && (
+        <div className="absolute inset-0 z-10 bg-slate-100 flex items-center justify-center text-slate-500 gap-2">
+          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+          <span className="text-xs font-medium">Loading map...</span>
+        </div>
+      )}
 
-        <Marker position={center} icon={makeGooglePin()}>
-          <Popup>
-            <div className="p-1 min-w-[160px]">
-              <strong className="text-slate-900 text-sm block font-bold">{title}</strong>
-              <span className="text-xs text-slate-500 block mt-1">{address}</span>
-            </div>
-          </Popup>
-        </Marker>
-      </MapContainer>
+      {/* ── Fallback banner if API key is missing ─────────────────────────── */}
+      {!hasApiKey && (
+        <div className="absolute inset-0 z-10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-center text-white">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary mb-2">
+            <MapPin className="w-5 h-5" />
+          </div>
+          <h4 className="font-bold text-sm text-slate-100 mb-1">{title}</h4>
+          <p className="text-xs text-slate-400 max-w-sm mb-4">{address}</p>
+          <a
+            href={directionsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md transition-transform hover:scale-105"
+          >
+            <Navigation className="w-3.5 h-3.5 fill-white text-white" />
+            Get Directions in Google Maps
+          </a>
+        </div>
+      )}
 
       {/* ── Top-Left Floating Google Place Card ──────────────────────────────── */}
-      <div className="absolute top-3 left-3 z-[1000] bg-white rounded-xl shadow-xl border border-slate-200/90 p-3.5 max-w-[320px] w-full space-y-2 pointer-events-auto">
+      <div className="absolute top-3 left-3 z-[1000] bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-slate-200/90 p-3 max-w-[300px] w-full space-y-2 pointer-events-auto">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-slate-900 text-sm tracking-tight truncate" title={title}>
@@ -111,90 +161,53 @@ export function GooglePlaceMap({
             </p>
           </div>
 
-          {/* Action Buttons: Share & Directions */}
           <div className="flex items-center gap-1.5 shrink-0">
             <a
               href={shareUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-blue-600 flex items-center justify-center transition-all border border-slate-200/60"
-              title="Open in Maps"
+              className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-blue-600 flex items-center justify-center transition-all border border-slate-200/60"
+              title="Open in Google Maps"
             >
-              <ExternalLink className="h-4 w-4" />
+              <ExternalLink className="h-3.5 w-3.5" />
             </a>
             <a
               href={directionsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md transition-transform hover:scale-105"
+              className="h-7 w-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-sm transition-transform hover:scale-105"
               title="Get Directions"
             >
-              <Navigation className="h-4 w-4 fill-white text-white" />
+              <Navigation className="h-3.5 w-3.5 fill-white text-white" />
             </a>
           </div>
         </div>
 
-        {/* Rating & Info Bar */}
         <div className="flex items-center gap-1.5 text-xs pt-0.5 border-t border-slate-100">
           <span className="font-bold text-slate-800">{rating}</span>
           <div className="flex text-amber-400">
-            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
           </div>
           <a
             href={directionsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 font-semibold hover:underline"
+            className="text-blue-600 font-semibold hover:underline text-[11px]"
           >
-            ({reviewCount})
+            ({reviewCount} reviews)
           </a>
-          <Info className="h-3.5 w-3.5 text-slate-400 ml-auto cursor-pointer hover:text-slate-600" />
         </div>
       </div>
 
       {/* ── Bottom-Left Satellite Layer Toggle ───────────────────────────────── */}
       <button
-        onClick={() => setMapType((t) => (t === "standard" ? "satellite" : "standard"))}
-        className="absolute bottom-3 left-3 z-[1000] h-10 w-10 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 transition-all pointer-events-auto"
-        title={mapType === "standard" ? "Switch to Satellite" : "Switch to Standard"}
+        type="button"
+        onClick={toggleMapType}
+        className="absolute bottom-3 left-3 z-[1000] h-9 w-9 rounded-xl bg-white/95 backdrop-blur-sm shadow-md border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-white transition-all pointer-events-auto"
+        title={mapType === "roadmap" ? "Switch to Satellite" : "Switch to Map"}
       >
-        <Layers className="h-5 w-5 text-slate-700" />
+        <Layers className="h-4 w-4 text-slate-700" />
       </button>
-
-      {/* ── Bottom-Right Navigation Compass & Zoom Controller ────────────────── */}
-      <div className="absolute bottom-3 right-3 z-[1000] bg-white rounded-2xl shadow-xl border border-slate-200/90 p-2 flex flex-col items-center gap-2 pointer-events-auto">
-        {/* Navigation D-Pad */}
-        <div className="relative h-14 w-14 bg-slate-50 rounded-full border border-slate-200 flex items-center justify-center">
-          <ChevronUp className="absolute top-0.5 h-3.5 w-3.5 text-slate-500 cursor-pointer hover:text-slate-800" />
-          <ChevronDown className="absolute bottom-0.5 h-3.5 w-3.5 text-slate-500 cursor-pointer hover:text-slate-800" />
-          <ChevronLeft className="absolute left-0.5 h-3.5 w-3.5 text-slate-500 cursor-pointer hover:text-slate-800" />
-          <ChevronRight className="absolute right-0.5 h-3.5 w-3.5 text-slate-500 cursor-pointer hover:text-slate-800" />
-          <div className="h-2 w-2 rounded-full bg-slate-400" />
-        </div>
-
-        <div className="w-10 h-[1px] bg-slate-200" />
-
-        {/* Directions Link */}
-        <a
-          href={directionsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
-          title="Open Directions"
-        >
-          <Maximize2 className="h-4 w-4" />
-        </a>
-      </div>
-
-      {/* Google Attribution watermark */}
-      <div className="absolute bottom-1 right-24 z-[999] text-[10px] font-bold text-slate-600 bg-white/80 backdrop-blur-xs px-2 py-0.5 rounded-md shadow-2xs">
-        <span className="text-blue-600">G</span>
-        <span className="text-red-500">o</span>
-        <span className="text-amber-500">o</span>
-        <span className="text-blue-600">g</span>
-        <span className="text-green-600">l</span>
-        <span className="text-red-500">e</span> Maps Style
-      </div>
     </div>
   );
 }

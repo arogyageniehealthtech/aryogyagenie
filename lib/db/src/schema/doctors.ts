@@ -18,6 +18,8 @@ export const doctorsTable = pgTable("doctors", {
   status: text("status", { enum: ["pending", "active", "suspended", "rejected"] }).notNull().default("pending"),
   availableDays: text("available_days"),
   availableHours: text("available_hours"),
+  state: text("state"),
+  pincode: text("pincode"),
   latitude: real("latitude"),
   longitude: real("longitude"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

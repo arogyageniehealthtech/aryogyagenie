@@ -12,6 +12,8 @@ export const diagnosticCentersTable = pgTable("diagnostic_centers", {
   accreditation: text("accreditation"),
   services: text("services"),
   openingHours: text("opening_hours"),
+  state: text("state"),
+  pincode: text("pincode"),
   latitude: real("latitude"),
   longitude: real("longitude"),
   rating: real("rating").default(0),

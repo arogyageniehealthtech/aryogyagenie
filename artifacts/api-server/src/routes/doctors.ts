@@ -24,11 +24,40 @@ function matchDoctorSpecialty(docSpec: string | null | undefined, filterSpec: st
 import { inArray } from "drizzle-orm";
 import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
-// GET /doctors - list approved doctors
+import { parseCoordinates, clampRadiusKm, searchNearbyDoctors } from "../lib/locationService";
+
+// GET /doctors - list approved doctors (with optional location-based radius filtering)
 router.get("/doctors", async (req, res): Promise<void> => {
-  const { specialty, search } = req.query as { specialty?: string; search?: string };
+  const { specialty, search, lat, lng, radius } = req.query as {
+    specialty?: string;
+    search?: string;
+    lat?: string;
+    lng?: string;
+    radius?: string;
+  };
   const pagination = parsePaginationParams(req);
 
+  const coords = parseCoordinates(lat, lng);
+
+  // If patient coordinates are supplied, perform location-based discovery via PostGIS
+  if (coords) {
+    const radiusKm = clampRadiusKm(radius);
+    const { results, total } = await searchNearbyDoctors({
+      lat: coords.lat,
+      lng: coords.lng,
+      radiusKm,
+      specialty: specialty !== "all" ? specialty : undefined,
+      search,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+
+    setPaginationHeaders(res, total, pagination);
+    res.json(results);
+    return;
+  }
+
+  // Standard non-location listing
   const rows = await db
     .select({
       d: doctorsTable,
@@ -63,6 +92,8 @@ router.get("/doctors", async (req, res): Promise<void> => {
     licenseNumber: r.d.licenseNumber,
     clinicName: r.d.clinicName || "ArogyaGenie Medical Center",
     clinicAddress: r.d.clinicAddress || "Health Tech City",
+    state: r.d.state,
+    pincode: r.d.pincode,
     consultationFee: r.d.consultationFee || 500,
     experience: r.d.experience || 5,
     bio: r.d.bio,
@@ -71,6 +102,8 @@ router.get("/doctors", async (req, res): Promise<void> => {
     status: "active",
     availableDays: r.d.availableDays || ["Mon", "Tue", "Wed", "Thu", "Fri"],
     availableHours: r.d.availableHours || "09:00 AM - 05:00 PM",
+    latitude: r.d.latitude,
+    longitude: r.d.longitude,
   }));
 
   if (specialty && specialty !== "all") {

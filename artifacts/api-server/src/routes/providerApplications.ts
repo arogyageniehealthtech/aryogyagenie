@@ -376,12 +376,16 @@ router.post(
               .set({
                 status: "active",
                 specialty: application.specialty || doc.specialty || "General Physician",
+                clinicAddress: doc.clinicAddress || application.address,
+                latitude: doc.latitude || application.latitude,
+                longitude: doc.longitude || application.longitude,
               })
               .where(eq(doctorsTable.userId, userIdToSync));
           } else {
             await db.insert(doctorsTable).values({
               userId: userIdToSync,
               specialty: application.specialty || "General Physician",
+              clinicAddress: application.address,
               status: "active",
               latitude: application.latitude,
               longitude: application.longitude,
@@ -394,7 +398,13 @@ router.post(
           if (center) {
             await db
               .update(diagnosticCentersTable)
-              .set({ status: "active" })
+              .set({
+                status: "active",
+                address: center.address || application.address || "Main Address",
+                city: center.city || application.city,
+                latitude: center.latitude || application.latitude,
+                longitude: center.longitude || application.longitude,
+              })
               .where(eq(diagnosticCentersTable.userId, userIdToSync));
           } else {
             await db.insert(diagnosticCentersTable).values({
@@ -415,7 +425,13 @@ router.post(
           if (pharm) {
             await db
               .update(pharmaciesTable)
-              .set({ status: "active" })
+              .set({
+                status: "active",
+                address: pharm.address || application.address || "Main Address",
+                city: pharm.city || application.city,
+                latitude: pharm.latitude || application.latitude,
+                longitude: pharm.longitude || application.longitude,
+              })
               .where(eq(pharmaciesTable.userId, userIdToSync));
           } else {
             await db.insert(pharmaciesTable).values({

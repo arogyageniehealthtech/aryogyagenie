@@ -6,10 +6,37 @@ import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
-// GET /pharmacies (public) - list active pharmacies
+import { parseCoordinates, clampRadiusKm, searchNearbyPharmacies } from "../lib/locationService";
+
+// GET /pharmacies (public) - list active pharmacies (with optional location-based and medicine-inventory radius filtering)
 router.get("/pharmacies", async (req, res): Promise<void> => {
-  const { search } = req.query as { search?: string };
+  const { search, medicine, lat, lng, radius } = req.query as {
+    search?: string;
+    medicine?: string;
+    lat?: string;
+    lng?: string;
+    radius?: string;
+  };
   const pagination = parsePaginationParams(req);
+
+  const coords = parseCoordinates(lat, lng);
+
+  if (coords) {
+    const radiusKm = clampRadiusKm(radius);
+    const { results, total } = await searchNearbyPharmacies({
+      lat: coords.lat,
+      lng: coords.lng,
+      radiusKm,
+      medicine: medicine || search,
+      search: !medicine ? search : undefined,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+
+    setPaginationHeaders(res, total, pagination);
+    res.json(results);
+    return;
+  }
 
   const rows = await db
     .select({ p: pharmaciesTable, u: usersTable })
@@ -25,6 +52,8 @@ router.get("/pharmacies", async (req, res): Promise<void> => {
     phone: r.p.phone,
     address: r.p.address,
     city: r.p.city,
+    state: r.p.state,
+    pincode: r.p.pincode,
     licenseNumber: r.p.licenseNumber,
     openingHours: r.p.openingHours,
     latitude: r.p.latitude,
@@ -37,7 +66,8 @@ router.get("/pharmacies", async (req, res): Promise<void> => {
     result = result.filter(
       (p) =>
         p.name.toLowerCase().includes(s) ||
-        (p.city ?? "").toLowerCase().includes(s)
+        (p.city ?? "").toLowerCase().includes(s) ||
+        (p.address ?? "").toLowerCase().includes(s)
     );
   }
 

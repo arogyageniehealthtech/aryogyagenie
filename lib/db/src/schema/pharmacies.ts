@@ -11,6 +11,8 @@ export const pharmaciesTable = pgTable("pharmacies", {
   city: text("city"),
   licenseNumber: text("license_number"),
   openingHours: text("opening_hours"),
+  state: text("state"),
+  pincode: text("pincode"),
   latitude: real("latitude"),
   longitude: real("longitude"),
   status: text("status", { enum: ["pending", "active", "suspended", "rejected"] }).notNull().default("pending"),

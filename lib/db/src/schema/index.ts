@@ -13,3 +13,5 @@ export * from "./health_episodes";
 export * from "./patient_ai_summaries";
 export * from "./knowledge_vectors";
 export * from "./provider_applications";
+export * from "./medicines";
+export * from "./pharmacy_inventory";
