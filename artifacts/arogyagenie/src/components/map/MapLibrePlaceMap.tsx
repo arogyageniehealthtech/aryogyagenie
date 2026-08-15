@@ -4,8 +4,12 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { Star, Navigation, ExternalLink, Layers, Loader2, MapPin } from "lucide-react";
 
-if (maplibregl.config) {
-  maplibregl.config.WORKER_URL = maplibreWorkerUrl;
+// Explicitly configure MapLibre worker URL to prevent SPA fallback MIME type errors
+const WORKER_URL = maplibreWorkerUrl || "https://unpkg.com/maplibre-gl@6.3.0/dist/maplibre-gl-worker.mjs";
+if (typeof (maplibregl as any).setWorkerUrl === "function") {
+  (maplibregl as any).setWorkerUrl(WORKER_URL);
+} else if (maplibregl.config) {
+  maplibregl.config.WORKER_URL = WORKER_URL;
 }
 
 export interface MapLibrePlaceMapProps {
