@@ -141,7 +141,7 @@ export async function searchNearbyDoctors(options: {
   let paramIdx = 4;
 
   let whereClauses = `
-    d.status = 'active'
+    LOWER(COALESCE(d.status, 'active')) IN ('active', 'approved')
     AND d.latitude IS NOT NULL
     AND d.longitude IS NOT NULL
     AND ST_DWithin(
@@ -172,7 +172,7 @@ export async function searchNearbyDoctors(options: {
   const countQuery = `
     SELECT COUNT(*)::int as total
     FROM doctors d
-    JOIN users u ON d.user_id = u.id
+    LEFT JOIN users u ON d.user_id = u.id
     WHERE ${whereClauses}
   `;
 
@@ -208,7 +208,7 @@ export async function searchNearbyDoctors(options: {
         2
       )::float as "distanceKm"
     FROM doctors d
-    JOIN users u ON d.user_id = u.id
+    LEFT JOIN users u ON d.user_id = u.id
     WHERE ${whereClauses}
     ORDER BY "distanceKm" ASC
     LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
@@ -273,7 +273,7 @@ export async function searchNearbyDiagnosticCenters(options: {
   let paramIdx = 4;
 
   let whereClauses = `
-    dc.status = 'active'
+    LOWER(COALESCE(dc.status, 'active')) IN ('active', 'approved')
     AND dc.latitude IS NOT NULL
     AND dc.longitude IS NOT NULL
     AND ST_DWithin(
@@ -303,7 +303,7 @@ export async function searchNearbyDiagnosticCenters(options: {
   const countQuery = `
     SELECT COUNT(*)::int as total
     FROM diagnostic_centers dc
-    JOIN users u ON dc.user_id = u.id
+    LEFT JOIN users u ON dc.user_id = u.id
     WHERE ${whereClauses}
   `;
 
@@ -332,7 +332,7 @@ export async function searchNearbyDiagnosticCenters(options: {
         2
       )::float as "distanceKm"
     FROM diagnostic_centers dc
-    JOIN users u ON dc.user_id = u.id
+    LEFT JOIN users u ON dc.user_id = u.id
     WHERE ${whereClauses}
     ORDER BY "distanceKm" ASC
     LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
@@ -394,7 +394,7 @@ export async function searchNearbyPharmacies(options: {
   const hasMedicineSearch = Boolean(medicine && medicine.trim());
 
   let whereClauses = `
-    p.status = 'active'
+    LOWER(COALESCE(p.status, 'active')) IN ('active', 'approved')
     AND p.latitude IS NOT NULL
     AND p.longitude IS NOT NULL
     AND ST_DWithin(
@@ -434,7 +434,7 @@ export async function searchNearbyPharmacies(options: {
     countQuery = `
       SELECT COUNT(*)::int as total
       FROM pharmacies p
-      JOIN users u ON p.user_id = u.id
+      LEFT JOIN users u ON p.user_id = u.id
       JOIN pharmacy_inventory pi ON p.id = pi.pharmacy_id
       JOIN medicines m ON pi.medicine_id = m.id
       WHERE ${whereClauses}
@@ -469,7 +469,7 @@ export async function searchNearbyPharmacies(options: {
         pi.in_stock as "inStock",
         pi.quantity as "medicineQuantity"
       FROM pharmacies p
-      JOIN users u ON p.user_id = u.id
+      LEFT JOIN users u ON p.user_id = u.id
       JOIN pharmacy_inventory pi ON p.id = pi.pharmacy_id
       JOIN medicines m ON pi.medicine_id = m.id
       WHERE ${whereClauses}
@@ -480,7 +480,7 @@ export async function searchNearbyPharmacies(options: {
     countQuery = `
       SELECT COUNT(*)::int as total
       FROM pharmacies p
-      JOIN users u ON p.user_id = u.id
+      LEFT JOIN users u ON p.user_id = u.id
       WHERE ${whereClauses}
     `;
 
@@ -504,9 +504,16 @@ export async function searchNearbyPharmacies(options: {
             ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
           ) / 1000.0)::numeric,
           2
-        )::float as "distanceKm"
+        )::float as "distanceKm",
+        NULL as "medicineId",
+        NULL as "medicineName",
+        NULL as "genericName",
+        NULL as "medicineCategory",
+        NULL as "medicinePrice",
+        NULL as "inStock",
+        NULL as "medicineQuantity"
       FROM pharmacies p
-      JOIN users u ON p.user_id = u.id
+      LEFT JOIN users u ON p.user_id = u.id
       WHERE ${whereClauses}
       ORDER BY "distanceKm" ASC
       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
