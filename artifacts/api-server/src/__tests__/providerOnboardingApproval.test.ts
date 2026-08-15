@@ -15,6 +15,32 @@
  * 11. Patient registration & login -> remains active immediately, zero impact on patients.
  */
 
+import fs from "node:fs";
+import path from "node:path";
+
+try {
+  let dir = process.cwd();
+  while (dir) {
+    const envPath = path.join(dir, ".env");
+    if (fs.existsSync(envPath)) {
+      process.loadEnvFile?.(envPath);
+      break;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+} catch {
+  // .env file is optional
+}
+
+if (!process.env.CLERK_PUBLISHABLE_KEY || !process.env.CLERK_PUBLISHABLE_KEY.startsWith("pk_")) {
+  process.env.CLERK_PUBLISHABLE_KEY = "pk_test_Y2xlcmsuYXJvZ3lhZ2VuaWUuY29tJA";
+}
+if (!process.env.CLERK_SECRET_KEY) {
+  process.env.CLERK_SECRET_KEY = "sk_test_mock_secret_key";
+}
+
 import app from "../app";
 import type { Server } from "node:http";
 import { db, usersTable, doctorsTable, diagnosticCentersTable, pharmaciesTable, providerApplicationsTable } from "@workspace/db";

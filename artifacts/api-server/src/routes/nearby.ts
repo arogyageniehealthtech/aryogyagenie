@@ -19,12 +19,12 @@ const router = Router();
  * Query parameters:
  *   lat        - Patient latitude (required, between -90 and 90)
  *   lng        - Patient longitude (required, between -180 and 180)
- *   radius     - Search radius in km (enforced range: 2 km min to 18 km max, default: 10 km)
+ *   radius     - Search radius in km (enforced range: 0 km min to 18 km max, default: 10 km)
  *   type       - 'all' | 'doctor' | 'pharmacy' | 'diagnostic_center' (default: 'all')
- *   specialty  - Optional doctor specialty filter (e.g., 'Cardiology', 'Pediatrics')
+ *   specialty  - Optional doctor specialty filter (e.g., 'Cardiologist', 'General Physician')
  *   service    - Optional diagnostic center service filter (e.g., 'Blood Test', 'MRI')
  *   medicine   - Optional medicine name filter (only returns pharmacies stocking that medicine)
- *   search     - Optional general text keyword search
+ *   search     - Optional general text keyword search (matches provider names, doctor names, clinic names, addresses)
  *   limit      - Max results per type (default: 50, max: 200)
  *   offset     - Pagination offset (default: 0)
  */
@@ -45,10 +45,14 @@ router.get("/nearby", async (req, res): Promise<void> => {
 
     const radiusKm = clampRadiusKm(req.query.radius, DEFAULT_RADIUS_KM);
     const type = (req.query.type as string) || "all";
-    const specialty = req.query.specialty as string | undefined;
-    const service = req.query.service as string | undefined;
-    const medicine = (req.query.medicine as string | undefined) || (type === "pharmacy" && req.query.search ? String(req.query.search) : undefined);
-    const search = req.query.search as string | undefined;
+    const rawSpecialty = req.query.specialty as string | undefined;
+    const specialty = rawSpecialty && rawSpecialty !== "all" ? rawSpecialty.trim() : undefined;
+    const rawService = req.query.service as string | undefined;
+    const service = rawService && rawService !== "all" ? rawService.trim() : undefined;
+    const rawMedicine = req.query.medicine as string | undefined;
+    const medicine = rawMedicine && rawMedicine.trim() ? rawMedicine.trim() : undefined;
+    const rawSearch = req.query.search as string | undefined;
+    const search = rawSearch && rawSearch.trim() ? rawSearch.trim() : undefined;
     const limit = Math.min(Math.max(parseInt((req.query.limit as string) || "50", 10), 1), 200);
     const offset = Math.max(parseInt((req.query.offset as string) || "0", 10), 0);
 
@@ -61,11 +65,11 @@ router.get("/nearby", async (req, res): Promise<void> => {
           lat: coords.lat,
           lng: coords.lng,
           radiusKm,
-          specialty: specialty || (type === "doctor" ? search : undefined),
+          specialty,
           search,
           limit,
           offset,
-        }).then((res) => ({ type: "doctor", ...res })),
+        }).then((r) => ({ type: "doctor", ...r })),
       );
     }
 
@@ -76,11 +80,11 @@ router.get("/nearby", async (req, res): Promise<void> => {
           lat: coords.lat,
           lng: coords.lng,
           radiusKm,
-          service: service || (type === "diagnostic_center" ? search : undefined),
+          service,
           search,
           limit,
           offset,
-        }).then((res) => ({ type: "diagnostic_center", ...res })),
+        }).then((r) => ({ type: "diagnostic_center", ...r })),
       );
     }
 
@@ -92,10 +96,10 @@ router.get("/nearby", async (req, res): Promise<void> => {
           lng: coords.lng,
           radiusKm,
           medicine,
-          search: !medicine ? search : undefined,
+          search,
           limit,
           offset,
-        }).then((res) => ({ type: "pharmacy", ...res })),
+        }).then((r) => ({ type: "pharmacy", ...r })),
       );
     }
 

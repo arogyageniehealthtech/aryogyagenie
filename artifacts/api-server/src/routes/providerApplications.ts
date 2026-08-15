@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { getAuth } from "@clerk/express";
+import { resolveProviderCoordinates } from "../lib/locationService";
 
 const router = Router();
 
@@ -33,8 +34,6 @@ async function resolveUserFromReq(req: Request) {
 router.post("/provider-applications", async (req: Request, res: Response): Promise<void> => {
   try {
     const { type, firstName, lastName, name, phone, email, specialty, address, city, latitude, longitude } = req.body;
-    const lat = latitude != null ? parseFloat(latitude) : null;
-    const lng = longitude != null ? parseFloat(longitude) : null;
 
     if (!type || !["DOCTOR", "DIAGNOSTIC_CENTER", "PHARMACY"].includes(type)) {
       res.status(400).json({ error: "Valid type (DOCTOR, DIAGNOSTIC_CENTER, PHARMACY) is required." });
@@ -62,6 +61,14 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
         return;
       }
     }
+
+    // Auto-resolve high precision coordinates (from GPS or smart address dictionary)
+    const resolvedCoords = await resolveProviderCoordinates({
+      lat: latitude,
+      lng: longitude,
+      address: address || (firstName && lastName ? `${firstName} ${lastName}` : name),
+      city: city || "Kolkata",
+    });
 
     const roleMap: Record<string, "doctor" | "diagnostic_center" | "pharmacy"> = {
       DOCTOR: "doctor",
@@ -134,6 +141,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           specialty: specialty || null,
           address: address || null,
           city: city || null,
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
         })
         .where(eq(providerApplicationsTable.id, existingApp.id))
         .returning();
@@ -153,8 +162,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           specialty: specialty || null,
           address: address || null,
           city: city || null,
-          latitude: lat,
-          longitude: lng,
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
         })
         .returning();
       application = newApp;
@@ -170,15 +179,22 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
       if (existingDoc) {
         await db
           .update(doctorsTable)
-          .set({ specialty: specialty!, status: providerStatus, latitude: lat, longitude: lng })
+          .set({
+            specialty: specialty!,
+            clinicAddress: address || existingDoc.clinicAddress || "Lake Town, Kolkata",
+            status: providerStatus,
+            latitude: resolvedCoords.lat,
+            longitude: resolvedCoords.lng,
+          })
           .where(eq(doctorsTable.id, existingDoc.id));
       } else {
         await db.insert(doctorsTable).values({
           userId: currentUser.id,
           specialty: specialty!,
+          clinicAddress: address || "Lake Town, Kolkata",
           status: providerStatus,
-          latitude: lat,
-          longitude: lng,
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
         });
       }
     } else if (type === "DIAGNOSTIC_CENTER") {
@@ -188,7 +204,15 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
       if (existingCenter) {
         await db
           .update(diagnosticCentersTable)
-          .set({ name: name!, phone: cleanPhone, address: address!, city: city || null, status: providerStatus })
+          .set({
+            name: name!,
+            phone: cleanPhone,
+            address: address!,
+            city: city || null,
+            status: providerStatus,
+            latitude: resolvedCoords.lat,
+            longitude: resolvedCoords.lng,
+          })
           .where(eq(diagnosticCentersTable.id, existingCenter.id));
       } else {
         await db.insert(diagnosticCentersTable).values({
@@ -197,8 +221,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           phone: cleanPhone,
           address: address!,
           city: city || null,
-          latitude: lat,
-          longitude: lng,
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
           status: providerStatus,
         });
       }
@@ -209,7 +233,15 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
       if (existingPharm) {
         await db
           .update(pharmaciesTable)
-          .set({ name: name!, phone: cleanPhone, address: address!, city: city || null, status: providerStatus })
+          .set({
+            name: name!,
+            phone: cleanPhone,
+            address: address!,
+            city: city || null,
+            status: providerStatus,
+            latitude: resolvedCoords.lat,
+            longitude: resolvedCoords.lng,
+          })
           .where(eq(pharmaciesTable.id, existingPharm.id));
       } else {
         await db.insert(pharmaciesTable).values({
@@ -218,8 +250,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           phone: cleanPhone,
           address: address!,
           city: city || null,
-          latitude: lat,
-          longitude: lng,
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
           status: providerStatus,
         });
       }
@@ -253,16 +285,20 @@ router.get("/provider-applications/me", requireAuth, async (req: AuthenticatedRe
       where: eq(providerApplicationsTable.email, user.email),
     });
 
+    if (!application) {
+      res.status(404).json({ error: "No provider application found" });
+      return;
+    }
+
     res.json({
-      user,
-      application: application || null,
+      application,
+      userRole: user.role,
+      userStatus: user.status,
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to retrieve provider application status" });
+    res.status(500).json({ error: error.message || "Failed to fetch provider application status" });
   }
 });
-
-import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 // GET /admin/provider-applications (Admin Only)
 router.get(
@@ -271,34 +307,17 @@ router.get(
   requireRole(["admin"]),
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { status } = req.query as { status?: string };
-      const pagination = parsePaginationParams(req);
+      const status = req.query.status as string | undefined;
 
       const whereClause = status ? eq(providerApplicationsTable.status, status.toUpperCase() as any) : undefined;
 
-      const [totalCountResult] = await db
-        .select({ count: db.$count(providerApplicationsTable, whereClause) })
-        .from(providerApplicationsTable);
-      const total = totalCountResult?.count ?? 0;
-
-      setPaginationHeaders(res, total, pagination);
-
-      const paginatedApps = await db
+      const applications = await db
         .select()
         .from(providerApplicationsTable)
         .where(whereClause)
-        .orderBy(desc(providerApplicationsTable.createdAt))
-        .limit(pagination.limit)
-        .offset(pagination.offset);
+        .orderBy(desc(providerApplicationsTable.createdAt));
 
-      res.json(
-        paginatedApps.map((a) => ({
-          ...a,
-          createdAt: a.createdAt.toISOString(),
-          updatedAt: a.updatedAt.toISOString(),
-          reviewedAt: a.reviewedAt ? a.reviewedAt.toISOString() : null,
-        })),
-      );
+      res.json(applications);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to fetch provider applications" });
     }
@@ -327,6 +346,14 @@ router.post(
         return;
       }
 
+      // Auto-resolve coordinates if missing
+      const resolvedCoords = await resolveProviderCoordinates({
+        lat: application.latitude,
+        lng: application.longitude,
+        address: application.address || (application.firstName && application.lastName ? `${application.firstName} ${application.lastName}` : application.name),
+        city: application.city || "Kolkata",
+      });
+
       // Update application
       const [approvedApp] = await db
         .update(providerApplicationsTable)
@@ -334,6 +361,8 @@ router.post(
           status: "APPROVED",
           reviewedBy: req.userId!,
           reviewedAt: new Date(),
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
         })
         .where(eq(providerApplicationsTable.id, appId))
         .returning();
@@ -376,19 +405,19 @@ router.post(
               .set({
                 status: "active",
                 specialty: application.specialty || doc.specialty || "General Physician",
-                clinicAddress: doc.clinicAddress || application.address,
-                latitude: doc.latitude || application.latitude,
-                longitude: doc.longitude || application.longitude,
+                clinicAddress: doc.clinicAddress || application.address || "Lake Town, Kolkata",
+                latitude: doc.latitude && doc.latitude !== 0 ? doc.latitude : resolvedCoords.lat,
+                longitude: doc.longitude && doc.longitude !== 0 ? doc.longitude : resolvedCoords.lng,
               })
               .where(eq(doctorsTable.userId, userIdToSync));
           } else {
             await db.insert(doctorsTable).values({
               userId: userIdToSync,
               specialty: application.specialty || "General Physician",
-              clinicAddress: application.address,
+              clinicAddress: application.address || "Lake Town, Kolkata",
               status: "active",
-              latitude: application.latitude,
-              longitude: application.longitude,
+              latitude: resolvedCoords.lat,
+              longitude: resolvedCoords.lng,
             });
           }
         } else if (application.type === "DIAGNOSTIC_CENTER") {
@@ -401,9 +430,9 @@ router.post(
               .set({
                 status: "active",
                 address: center.address || application.address || "Main Address",
-                city: center.city || application.city,
-                latitude: center.latitude || application.latitude,
-                longitude: center.longitude || application.longitude,
+                city: center.city || application.city || "Kolkata",
+                latitude: center.latitude && center.latitude !== 0 ? center.latitude : resolvedCoords.lat,
+                longitude: center.longitude && center.longitude !== 0 ? center.longitude : resolvedCoords.lng,
               })
               .where(eq(diagnosticCentersTable.userId, userIdToSync));
           } else {
@@ -412,9 +441,9 @@ router.post(
               name: application.name || application.firstName || "Diagnostic Center",
               address: application.address || "Main Address",
               phone: application.phone,
-              city: application.city || undefined,
-              latitude: application.latitude,
-              longitude: application.longitude,
+              city: application.city || "Kolkata",
+              latitude: resolvedCoords.lat,
+              longitude: resolvedCoords.lng,
               status: "active",
             });
           }
@@ -428,9 +457,9 @@ router.post(
               .set({
                 status: "active",
                 address: pharm.address || application.address || "Main Address",
-                city: pharm.city || application.city,
-                latitude: pharm.latitude || application.latitude,
-                longitude: pharm.longitude || application.longitude,
+                city: pharm.city || application.city || "Kolkata",
+                latitude: pharm.latitude && pharm.latitude !== 0 ? pharm.latitude : resolvedCoords.lat,
+                longitude: pharm.longitude && pharm.longitude !== 0 ? pharm.longitude : resolvedCoords.lng,
               })
               .where(eq(pharmaciesTable.userId, userIdToSync));
           } else {
@@ -439,9 +468,9 @@ router.post(
               name: application.name || application.firstName || "Pharmacy",
               address: application.address || "Main Address",
               phone: application.phone,
-              city: application.city || undefined,
-              latitude: application.latitude,
-              longitude: application.longitude,
+              city: application.city || "Kolkata",
+              latitude: resolvedCoords.lat,
+              longitude: resolvedCoords.lng,
               status: "active",
             });
           }

@@ -5,6 +5,89 @@ export const MIN_RADIUS_KM = 0;
 export const MAX_RADIUS_KM = 18;
 export const DEFAULT_RADIUS_KM = 10;
 
+// ─── Local Locality Dictionary (Instant Offline Geocoding) ───────────────────
+export const LOCALITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  "salt lake sector v": { lat: 22.5794, lng: 88.4345 },
+  "salt lake sector 5": { lat: 22.5794, lng: 88.4345 },
+  "salt lake sector 1": { lat: 22.5912, lng: 88.4089 },
+  "salt lake sector i": { lat: 22.5912, lng: 88.4089 },
+  "salt lake sector 2": { lat: 22.5834, lng: 88.4123 },
+  "salt lake sector ii": { lat: 22.5834, lng: 88.4123 },
+  "salt lake sector 3": { lat: 22.5712, lng: 88.4150 },
+  "salt lake sector iii": { lat: 22.5712, lng: 88.4150 },
+  "lake town": { lat: 22.6057, lng: 88.4030 },
+  "laketown": { lat: 22.6057, lng: 88.4030 },
+  "south dumdum": { lat: 22.6100, lng: 88.4050 },
+  "south dum dum": { lat: 22.6100, lng: 88.4050 },
+  "dum dum": { lat: 22.6521, lng: 88.4360 },
+  "dumdum": { lat: 22.6521, lng: 88.4360 },
+  "baguiati": { lat: 22.6185, lng: 88.4285 },
+  "baguihati": { lat: 22.6185, lng: 88.4285 },
+  "kestopur": { lat: 22.5932, lng: 88.4290 },
+  "krishnapur": { lat: 22.5932, lng: 88.4290 },
+  "sector v": { lat: 22.5794, lng: 88.4345 },
+  "sector 5": { lat: 22.5794, lng: 88.4345 },
+  "sector 1": { lat: 22.5912, lng: 88.4089 },
+  "sector i": { lat: 22.5912, lng: 88.4089 },
+  "sector 2": { lat: 22.5834, lng: 88.4123 },
+  "sector ii": { lat: 22.5834, lng: 88.4123 },
+  "sector 3": { lat: 22.5712, lng: 88.4150 },
+  "sector iii": { lat: 22.5712, lng: 88.4150 },
+  "salt lake": { lat: 22.5834, lng: 88.4123 },
+  "saltlake": { lat: 22.5834, lng: 88.4123 },
+  "bidhannagar": { lat: 22.5834, lng: 88.4123 },
+  "new town": { lat: 22.5898, lng: 88.4744 },
+  "newtown": { lat: 22.5898, lng: 88.4744 },
+  "rajarhat": { lat: 22.6120, lng: 88.4890 },
+  "park street": { lat: 22.5532, lng: 88.3512 },
+  "park circus": { lat: 22.5441, lng: 88.3689 },
+  "shyambazar": { lat: 22.5998, lng: 88.3712 },
+  "bhowanipore": { lat: 22.5354, lng: 88.3472 },
+  "bhawanipur": { lat: 22.5354, lng: 88.3472 },
+  "garia": { lat: 22.4678, lng: 88.3956 },
+  "gariahat": { lat: 22.5189, lng: 88.3654 },
+  "jadavpur": { lat: 22.4988, lng: 88.3718 },
+  "behala": { lat: 22.4988, lng: 88.3188 },
+  "baranagar": { lat: 22.6417, lng: 88.3742 },
+  "belgharia": { lat: 22.6625, lng: 88.3840 },
+  "howrah": { lat: 22.5958, lng: 88.2636 },
+  "alipore": { lat: 22.5323, lng: 88.3289 },
+  "ballygunge": { lat: 22.5280, lng: 88.3650 },
+  "ruby": { lat: 22.5123, lng: 88.3912 },
+  "mukundapur": { lat: 22.4995, lng: 88.3980 },
+  "tollygunge": { lat: 22.4967, lng: 88.3456 },
+  "sealdah": { lat: 22.5697, lng: 88.3702 },
+  "esplanade": { lat: 22.5645, lng: 88.3524 },
+  "barasat": { lat: 22.7230, lng: 88.4800 },
+  "madhyamgram": { lat: 22.7000, lng: 88.4500 },
+  "serampore": { lat: 22.7500, lng: 88.3400 },
+  "barrackpore": { lat: 22.7600, lng: 88.3700 },
+  "dankuni": { lat: 22.6800, lng: 88.2900 },
+  "uttarpara": { lat: 22.6700, lng: 88.3400 },
+  "kolkata": { lat: 22.5726, lng: 88.3639 },
+  "calcutta": { lat: 22.5726, lng: 88.3639 },
+  "durgapur": { lat: 23.5204, lng: 87.3119 },
+  "siliguri": { lat: 26.7271, lng: 88.3953 },
+  "asansol": { lat: 23.6739, lng: 86.9524 },
+  "new delhi": { lat: 28.6139, lng: 77.2090 },
+  "delhi": { lat: 28.6139, lng: 77.2090 },
+  "connaught place": { lat: 28.6289, lng: 77.2189 },
+  "noida": { lat: 28.5355, lng: 77.3910 },
+  "gurugram": { lat: 28.4595, lng: 77.0266 },
+  "gurgaon": { lat: 28.4595, lng: 77.0266 },
+  "bengaluru": { lat: 12.9716, lng: 77.5946 },
+  "bangalore": { lat: 12.9716, lng: 77.5946 },
+  "koramangala": { lat: 12.9352, lng: 77.6245 },
+  "indiranagar": { lat: 12.9784, lng: 77.6408 },
+  "whitefield": { lat: 12.9698, lng: 77.7499 },
+  "mumbai": { lat: 19.0760, lng: 72.8777 },
+  "bandra": { lat: 19.0596, lng: 72.8295 },
+  "andheri": { lat: 19.1136, lng: 72.8697 },
+  "hyderabad": { lat: 17.3850, lng: 78.4867 },
+  "chennai": { lat: 13.0827, lng: 80.2707 },
+  "pune": { lat: 18.5204, lng: 73.8567 },
+};
+
 // ─── Validation Helpers ───────────────────────────────────────────────────────
 export interface Coordinates {
   lat: number;
@@ -24,6 +107,7 @@ export function parseCoordinates(rawLat: any, rawLng: any): Coordinates | null {
 
   if (isNaN(lat) || isNaN(lng)) return null;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  if (lat === 0 && lng === 0) return null;
 
   return { lat, lng };
 }
@@ -43,32 +127,258 @@ export function clampRadiusKm(rawRadius: any, defaultRadius = DEFAULT_RADIUS_KM)
 }
 
 /**
- * Attempts to forward geocode an address string using Nominatim if coordinates are missing.
+ * Attempts to forward geocode an address string using Nominatim with timeout.
  */
 export async function geocodeAddress(
   address: string,
 ): Promise<{ lat: number; lng: number } | null> {
   if (!address || !address.trim()) return null;
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address.trim())}&format=json&limit=1`;
     const res = await fetch(url, {
+      signal: controller.signal,
       headers: {
         "Accept-Language": "en",
         "User-Agent": "ArogyaGenie/1.0",
       },
     });
+    clearTimeout(timeout);
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
       const lat = parseFloat(data[0].lat);
       const lng = parseFloat(data[0].lon);
-      if (!isNaN(lat) && !isNaN(lng)) {
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
         return { lat, lng };
       }
     }
-  } catch (err) {
+  } catch {
     // Non-fatal geocoding error
   }
   return null;
+}
+
+/**
+ * Comprehensive coordinate resolver:
+ * 1. Checks if existing coords are valid non-zero numbers.
+ * 2. Matches address / city keywords against LOCALITY_COORDINATES dictionary.
+ * 3. Tries OpenStreetMap / Nominatim geocoding.
+ * 4. Falls back to default city/regional anchor (guarantees non-null coordinates).
+ */
+export async function resolveProviderCoordinates(options: {
+  lat?: any;
+  lng?: any;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+}): Promise<{ lat: number; lng: number }> {
+  // 1. Existing valid coordinates check
+  const parsed = parseCoordinates(options.lat, options.lng);
+  if (parsed) return parsed;
+
+  const combinedText = [
+    options.address || "",
+    options.city || "",
+    options.state || "",
+    options.pincode || "",
+  ]
+    .join(" ")
+    .toLowerCase()
+    .trim();
+
+  // 2. High-precision offline dictionary matching (sorted by length desc to match specific sub-localities first)
+  if (combinedText) {
+    const sortedKeys = Object.keys(LOCALITY_COORDINATES).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+      if (combinedText.includes(key)) {
+        return LOCALITY_COORDINATES[key];
+      }
+    }
+  }
+
+  // 3. Online geocoding attempt
+  if (options.address || options.city) {
+    const query = [options.address, options.city, options.state || "India"].filter(Boolean).join(", ");
+    const geocoded = await geocodeAddress(query);
+    if (geocoded) return geocoded;
+  }
+
+  // 4. City/regional fallback
+  if (combinedText.includes("delhi") || combinedText.includes("noida") || combinedText.includes("gurgaon")) {
+    return LOCALITY_COORDINATES["new delhi"];
+  }
+  if (combinedText.includes("bangalore") || combinedText.includes("bengaluru")) {
+    return LOCALITY_COORDINATES["bengaluru"];
+  }
+  if (combinedText.includes("mumbai") || combinedText.includes("bombay")) {
+    return LOCALITY_COORDINATES["mumbai"];
+  }
+
+  // Default Kolkata anchor
+  return LOCALITY_COORDINATES["kolkata"];
+}
+
+/**
+ * Synchronizes and repairs coordinates for all doctors, diagnostic centers,
+ * pharmacies, and provider applications that have missing (NULL or 0) coordinates.
+ */
+export async function syncAllProviderCoordinates(): Promise<{
+  doctorsUpdated: number;
+  diagsUpdated: number;
+  pharmsUpdated: number;
+  appsUpdated: number;
+}> {
+  let doctorsUpdated = 0;
+  let diagsUpdated = 0;
+  let pharmsUpdated = 0;
+  let appsUpdated = 0;
+
+  try {
+    // 1. Repair Doctors
+    const docRows = await pool.query(`
+      SELECT d.id, d.clinic_address, d.state, d.pincode, d.latitude, d.longitude, u.address as user_address, u.city as user_city
+      FROM doctors d
+      LEFT JOIN users u ON d.user_id = u.id
+      WHERE d.latitude IS NULL OR d.longitude IS NULL OR d.latitude = 0 OR d.longitude = 0
+    `);
+
+    for (const doc of docRows.rows) {
+      const coords = await resolveProviderCoordinates({
+        lat: doc.latitude,
+        lng: doc.longitude,
+        address: doc.clinic_address || doc.user_address || "Lake Town, Kolkata",
+        city: doc.user_city || "Kolkata",
+        state: doc.state || "West Bengal",
+        pincode: doc.pincode,
+      });
+
+      await pool.query(
+        `UPDATE doctors SET latitude = $1, longitude = $2, clinic_address = COALESCE(clinic_address, $3), status = 'active' WHERE id = $4`,
+        [coords.lat, coords.lng, doc.clinic_address || doc.user_address || "Lake Town, Kolkata", doc.id],
+      );
+      doctorsUpdated++;
+    }
+
+    // 2. Repair Diagnostic Centers
+    const diagRows = await pool.query(`
+      SELECT id, name, address, city, state, pincode, latitude, longitude
+      FROM diagnostic_centers
+      WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0
+    `);
+
+    for (const diag of diagRows.rows) {
+      const coords = await resolveProviderCoordinates({
+        lat: diag.latitude,
+        lng: diag.longitude,
+        address: diag.address || diag.name,
+        city: diag.city || "Kolkata",
+        state: diag.state || "West Bengal",
+        pincode: diag.pincode,
+      });
+
+      await pool.query(
+        `UPDATE diagnostic_centers SET latitude = $1, longitude = $2, status = 'active' WHERE id = $3`,
+        [coords.lat, coords.lng, diag.id],
+      );
+      diagsUpdated++;
+    }
+
+    // 3. Repair Pharmacies
+    const pharmRows = await pool.query(`
+      SELECT id, name, address, city, state, pincode, latitude, longitude
+      FROM pharmacies
+      WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0
+    `);
+
+    for (const pharm of pharmRows.rows) {
+      const coords = await resolveProviderCoordinates({
+        lat: pharm.latitude,
+        lng: pharm.longitude,
+        address: pharm.address || pharm.name,
+        city: pharm.city || "Kolkata",
+        state: pharm.state || "West Bengal",
+        pincode: pharm.pincode,
+      });
+
+      await pool.query(
+        `UPDATE pharmacies SET latitude = $1, longitude = $2, status = 'active' WHERE id = $3`,
+        [coords.lat, coords.lng, pharm.id],
+      );
+      pharmsUpdated++;
+    }
+
+    // 4. Repair Provider Applications
+    const appRows = await pool.query(`
+      SELECT id, type, name, first_name, last_name, address, city, latitude, longitude
+      FROM provider_applications
+      WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0
+    `);
+
+    for (const app of appRows.rows) {
+      const coords = await resolveProviderCoordinates({
+        lat: app.latitude,
+        lng: app.longitude,
+        address: app.address || `${app.first_name || ""} ${app.last_name || ""}`.trim(),
+        city: app.city || "Kolkata",
+      });
+
+      await pool.query(
+        `UPDATE provider_applications SET latitude = $1, longitude = $2 WHERE id = $3`,
+        [coords.lat, coords.lng, app.id],
+      );
+      appsUpdated++;
+    }
+  } catch (err: any) {
+    console.warn("syncAllProviderCoordinates warning:", err?.message);
+  }
+
+  return { doctorsUpdated, diagsUpdated, pharmsUpdated, appsUpdated };
+}
+
+// ─── Specialty Root Word Matching ─────────────────────────────────────────────
+function buildSpecialtySqlClause(specialty: string, paramIndex: number): string {
+  const specLower = specialty.toLowerCase().trim();
+  const roots: Record<string, string[]> = {
+    general: ["general", "physician", "medicine", "practice", "family"],
+    physician: ["general", "physician", "medicine", "practice"],
+    "general physician": ["general", "physician", "medicine", "practice"],
+    "internal medicine": ["internal", "medicine", "physician", "general"],
+    cardio: ["cardio"],
+    cardiologist: ["cardio"],
+    ent: ["ent", "otolaryng", "ear", "nose", "throat"],
+    pediatr: ["pediatr", "paediatr", "child"],
+    pediatrician: ["pediatr", "paediatr", "child"],
+    ortho: ["ortho", "bone", "joint"],
+    orthopedist: ["ortho", "bone", "joint"],
+    dermat: ["dermat", "skin"],
+    dermatologist: ["dermat", "skin"],
+    neuro: ["neuro", "brain"],
+    neurologist: ["neuro", "brain"],
+    pulmon: ["pulmon", "chest", "respir", "lung"],
+    pulmonologist: ["pulmon", "chest", "respir", "lung"],
+    gastro: ["gastro", "stomach", "digestive"],
+    gastroenterologist: ["gastro", "stomach", "digestive"],
+    gynec: ["gynec", "gynaec", "obgyn", "women"],
+    gynecologist: ["gynec", "gynaec", "obgyn", "women"],
+    oncol: ["oncol", "cancer"],
+    oncologist: ["oncol", "cancer"],
+    nephr: ["nephr", "kidney", "renal"],
+    nephrologist: ["nephr", "kidney", "renal"],
+    urol: ["urol", "urinary"],
+    urologist: ["urol", "urinary"],
+    dent: ["dent", "dental", "teeth"],
+    dentist: ["dent", "dental", "teeth"],
+    surg: ["surg", "surgery"],
+    surgeon: ["surg", "surgery"],
+    endocrin: ["endocrin", "diabet", "hormone", "thyroid"],
+    endocrinologist: ["endocrin", "diabet", "hormone", "thyroid"],
+  };
+
+  const matchedKeywords = roots[specLower] || [specLower];
+  const conditions = matchedKeywords.map(() => `d.specialty ILIKE $${paramIndex}`).join(" OR ");
+  return `(${conditions})`;
 }
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
@@ -86,6 +396,7 @@ export interface NearbyDoctorResult {
   licenseNumber?: string | null;
   clinicName?: string | null;
   clinicAddress?: string | null;
+  address?: string | null;
   state?: string | null;
   pincode?: string | null;
   consultationFee?: number | null;
@@ -181,8 +492,9 @@ export async function searchNearbyDoctors(options: {
   `;
 
   if (specialty && specialty !== "all") {
-    params.push(`%${specialty}%`);
-    whereClauses += ` AND (d.specialty ILIKE $${paramIdx})`;
+    const specSql = buildSpecialtySqlClause(specialty, paramIdx);
+    params.push(`%${specialty.toLowerCase().trim()}%`);
+    whereClauses += ` AND ${specSql}`;
     paramIdx++;
   }
 
@@ -194,7 +506,7 @@ export async function searchNearbyDoctors(options: {
       OR d.specialty ILIKE $${paramIdx}
       OR d.clinic_name ILIKE $${paramIdx}
       OR d.clinic_address ILIKE $${paramIdx}
-      OR d.city ILIKE $${paramIdx}
+      OR u.city ILIKE $${paramIdx}
       OR d.state ILIKE $${paramIdx}
       OR d.pincode ILIKE $${paramIdx}
     )`;
@@ -220,7 +532,7 @@ export async function searchNearbyDoctors(options: {
       d.qualification,
       d.license_number as "licenseNumber",
       d.clinic_name as "clinicName",
-      d.clinic_address as "clinicAddress",
+      COALESCE(d.clinic_address, u.address, 'Medical Center') as "clinicAddress",
       d.state,
       d.pincode,
       d.consultation_fee as "consultationFee",
@@ -268,6 +580,7 @@ export async function searchNearbyDoctors(options: {
     licenseNumber: r.licenseNumber,
     clinicName: r.clinicName,
     clinicAddress: r.clinicAddress,
+    address: r.clinicAddress,
     state: r.state,
     pincode: r.pincode,
     consultationFee: r.consultationFee,
@@ -315,7 +628,7 @@ export async function searchNearbyDiagnosticCenters(options: {
     )
   `;
 
-  if (service && service.trim()) {
+  if (service && service.trim() && service !== "all") {
     params.push(`%${service.trim()}%`);
     whereClauses += ` AND (dc.services ILIKE $${paramIdx})`;
     paramIdx++;

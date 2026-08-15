@@ -61,6 +61,8 @@ router.get("/users/me", requireAuth, async (req: AuthenticatedRequest, res): Pro
   });
 });
 
+import { resolveProviderCoordinates } from "../lib/locationService";
+
 // PUT /users/me
 router.put("/users/me", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   const {
@@ -73,6 +75,22 @@ router.put("/users/me", requireAuth, async (req: AuthenticatedRequest, res): Pro
     .set({ firstName, lastName, phone, dateOfBirth, age, gender, address, city, state, bloodGroup, allergies, existingConditions, currentMedications, previousIllnesses, emergencyContact, avatarUrl })
     .where(eq(usersTable.id, req.userId!))
     .returning();
+
+  // If user is a provider and address/city was updated, sync coordinates to provider tables
+  if (address || city) {
+    try {
+      const coords = await resolveProviderCoordinates({ address, city, state });
+      if (user.role === "doctor") {
+        await db.update(doctorsTable).set({ clinicAddress: address, latitude: coords.lat, longitude: coords.lng }).where(eq(doctorsTable.userId, user.id));
+      } else if (user.role === "diagnostic_center") {
+        await db.update(diagnosticCentersTable).set({ address, city, latitude: coords.lat, longitude: coords.lng }).where(eq(diagnosticCentersTable.userId, user.id));
+      } else if (user.role === "pharmacy") {
+        await db.update(pharmaciesTable).set({ address, city, latitude: coords.lat, longitude: coords.lng }).where(eq(pharmaciesTable.userId, user.id));
+      }
+    } catch {
+      // Non-fatal
+    }
+  }
 
   res.json({
     ...user,
@@ -128,9 +146,14 @@ router.post("/users/me/onboard", requireAuth, async (req: AuthenticatedRequest, 
   // Create role-specific profile & provider application if applicable
   if (role === "doctor") {
     const docSpecialty = specialty || "General Physician";
+    const coords = await resolveProviderCoordinates({ address: address || user.address || "Lake Town, Kolkata", city: user.city || "Kolkata" });
+
     await db.insert(doctorsTable).values({
       userId: user.id,
       specialty: docSpecialty,
+      clinicAddress: address || user.address || "Lake Town, Kolkata",
+      latitude: coords.lat,
+      longitude: coords.lng,
       status: initialStatus,
     }).onConflictDoNothing();
 
@@ -147,15 +170,22 @@ router.post("/users/me/onboard", requireAuth, async (req: AuthenticatedRequest, 
         email: user.email,
         phone: user.phone || phone || "",
         specialty: docSpecialty,
+        address: address || user.address || "Lake Town, Kolkata",
+        latitude: coords.lat,
+        longitude: coords.lng,
       });
     }
   } else if (role === "diagnostic_center") {
     const cName = centerName || `${user.firstName} ${user.lastName || ""} Diagnostics`.trim();
+    const coords = await resolveProviderCoordinates({ address: address || user.address || cName, city: user.city || "Kolkata" });
+
     await db.insert(diagnosticCentersTable).values({
       userId: user.id,
       name: cName,
       phone: user.phone || phone,
-      address: address || user.address,
+      address: address || user.address || "Main Address",
+      latitude: coords.lat,
+      longitude: coords.lng,
       status: initialStatus,
     }).onConflictDoNothing();
 
@@ -171,15 +201,21 @@ router.post("/users/me/onboard", requireAuth, async (req: AuthenticatedRequest, 
         email: user.email,
         phone: user.phone || phone || "",
         address: address || user.address,
+        latitude: coords.lat,
+        longitude: coords.lng,
       });
     }
   } else if (role === "pharmacy") {
     const pName = pharmacyName || `${user.firstName} ${user.lastName || ""} Pharmacy`.trim();
+    const coords = await resolveProviderCoordinates({ address: address || user.address || pName, city: user.city || "Kolkata" });
+
     await db.insert(pharmaciesTable).values({
       userId: user.id,
       name: pName,
       phone: user.phone || phone,
-      address: address || user.address,
+      address: address || user.address || "Main Address",
+      latitude: coords.lat,
+      longitude: coords.lng,
       status: initialStatus,
     }).onConflictDoNothing();
 
@@ -195,6 +231,8 @@ router.post("/users/me/onboard", requireAuth, async (req: AuthenticatedRequest, 
         email: user.email,
         phone: user.phone || phone || "",
         address: address || user.address,
+        latitude: coords.lat,
+        longitude: coords.lng,
       });
     }
   }

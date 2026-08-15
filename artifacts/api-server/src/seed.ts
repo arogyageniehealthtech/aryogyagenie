@@ -10,6 +10,8 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
+import { syncAllProviderCoordinates } from "./lib/locationService";
+
 export async function seedCoordinates() {
   console.log("Seeding coordinates and spatial data for database providers...");
 
@@ -243,6 +245,14 @@ export async function seedCoordinates() {
     console.log("✅ Medicines catalog and pharmacy inventory seeded successfully!");
   } catch (e: any) {
     console.warn("Medicine/inventory seeding warning:", e?.message);
+  }
+
+  // 5. Automatic provider coordinate synchronization for all existing and onboarded providers
+  try {
+    const stats = await syncAllProviderCoordinates();
+    console.log("✅ Provider coordinates synchronization check complete:", stats);
+  } catch (e: any) {
+    console.warn("Provider coordinates synchronization warning:", e?.message);
   }
 
   console.log("Database provider coordinates and location discovery system seeded successfully!");

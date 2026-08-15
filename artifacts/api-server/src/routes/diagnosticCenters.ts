@@ -6,7 +6,7 @@ import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
-import { parseCoordinates, clampRadiusKm, searchNearbyDiagnosticCenters } from "../lib/locationService";
+import { parseCoordinates, clampRadiusKm, searchNearbyDiagnosticCenters, resolveProviderCoordinates } from "../lib/locationService";
 
 // GET /diagnostic-centers (with optional location-based radius filtering)
 router.get("/diagnostic-centers", async (req, res): Promise<void> => {
@@ -27,8 +27,8 @@ router.get("/diagnostic-centers", async (req, res): Promise<void> => {
       lat: coords.lat,
       lng: coords.lng,
       radiusKm,
-      service,
-      search,
+      service: service && service !== "all" ? service : undefined,
+      search: search && search.trim() ? search.trim() : undefined,
       limit: pagination.limit,
       offset: pagination.offset,
     });
@@ -55,17 +55,18 @@ router.get("/diagnostic-centers", async (req, res): Promise<void> => {
     rating: r.dc.rating, status: r.dc.status,
   }));
 
-  if (service && service.trim()) {
+  if (service && service.trim() && service !== "all") {
     const s = service.toLowerCase().trim();
     result = result.filter((c) => (c.services ?? "").toLowerCase().includes(s));
   }
 
-  if (search) {
+  if (search && search.trim()) {
     const s = search.toLowerCase().trim();
     result = result.filter((c) =>
       c.name.toLowerCase().includes(s) ||
       (c.city ?? "").toLowerCase().includes(s) ||
-      (c.services ?? "").toLowerCase().includes(s)
+      (c.services ?? "").toLowerCase().includes(s) ||
+      (c.address ?? "").toLowerCase().includes(s)
     );
   }
 
@@ -93,7 +94,31 @@ router.get("/diagnostic-centers/me/profile", requireAuth, requireRole(["diagnost
 // PUT /diagnostic-centers/me/profile
 router.put("/diagnostic-centers/me/profile", requireAuth, requireRole(["diagnostic_center"]), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { name, phone, address, city, accreditation, services, openingHours } = req.body;
-  const [dc] = await db.update(diagnosticCentersTable).set({ name, phone, address, city, accreditation, services, openingHours }).where(eq(diagnosticCentersTable.userId, req.userId!)).returning();
+  const existingDc = await db.query.diagnosticCentersTable.findFirst({ where: eq(diagnosticCentersTable.userId, req.userId!) });
+
+  const resolvedCoords = await resolveProviderCoordinates({
+    lat: existingDc?.latitude,
+    lng: existingDc?.longitude,
+    address: address || existingDc?.address || name,
+    city: city || existingDc?.city || "Kolkata",
+  });
+
+  const [dc] = await db
+    .update(diagnosticCentersTable)
+    .set({
+      name,
+      phone,
+      address,
+      city,
+      accreditation,
+      services,
+      openingHours,
+      latitude: resolvedCoords.lat,
+      longitude: resolvedCoords.lng,
+    })
+    .where(eq(diagnosticCentersTable.userId, req.userId!))
+    .returning();
+
   const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
   res.json({ id: dc.id, userId: dc.userId, name: dc.name, email: u?.email ?? "", phone: dc.phone, address: dc.address, city: dc.city, accreditation: dc.accreditation, services: dc.services, openingHours: dc.openingHours, rating: dc.rating, status: dc.status });
 });

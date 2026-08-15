@@ -6,7 +6,7 @@ import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 
-import { parseCoordinates, clampRadiusKm, searchNearbyPharmacies } from "../lib/locationService";
+import { parseCoordinates, clampRadiusKm, searchNearbyPharmacies, resolveProviderCoordinates } from "../lib/locationService";
 
 // GET /pharmacies (public) - list active pharmacies (with optional location-based and medicine-inventory radius filtering)
 router.get("/pharmacies", async (req, res): Promise<void> => {
@@ -27,8 +27,8 @@ router.get("/pharmacies", async (req, res): Promise<void> => {
       lat: coords.lat,
       lng: coords.lng,
       radiusKm,
-      medicine: medicine || search,
-      search: !medicine ? search : undefined,
+      medicine: medicine && medicine.trim() ? medicine.trim() : undefined,
+      search: search && search.trim() ? search.trim() : undefined,
       limit: pagination.limit,
       offset: pagination.offset,
     });
@@ -61,8 +61,8 @@ router.get("/pharmacies", async (req, res): Promise<void> => {
     status: r.p.status,
   }));
 
-  if (search) {
-    const s = search.toLowerCase();
+  if (search && search.trim()) {
+    const s = search.toLowerCase().trim();
     result = result.filter(
       (p) =>
         p.name.toLowerCase().includes(s) ||
@@ -94,7 +94,30 @@ router.get("/pharmacies/me/profile", requireAuth, requireRole(["pharmacy"]), asy
 // PUT /pharmacies/me/profile
 router.put("/pharmacies/me/profile", requireAuth, requireRole(["pharmacy"]), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { name, phone, address, city, licenseNumber, openingHours } = req.body;
-  const [p] = await db.update(pharmaciesTable).set({ name, phone, address, city, licenseNumber, openingHours }).where(eq(pharmaciesTable.userId, req.userId!)).returning();
+  const existingPharm = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
+
+  const resolvedCoords = await resolveProviderCoordinates({
+    lat: existingPharm?.latitude,
+    lng: existingPharm?.longitude,
+    address: address || existingPharm?.address || name,
+    city: city || existingPharm?.city || "Kolkata",
+  });
+
+  const [p] = await db
+    .update(pharmaciesTable)
+    .set({
+      name,
+      phone,
+      address,
+      city,
+      licenseNumber,
+      openingHours,
+      latitude: resolvedCoords.lat,
+      longitude: resolvedCoords.lng,
+    })
+    .where(eq(pharmaciesTable.userId, req.userId!))
+    .returning();
+
   const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
   res.json({ id: p.id, userId: p.userId, name: p.name, email: u?.email ?? "", phone: p.phone, address: p.address, city: p.city, licenseNumber: p.licenseNumber, openingHours: p.openingHours, status: p.status });
 });

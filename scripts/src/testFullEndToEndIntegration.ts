@@ -86,7 +86,7 @@ async function runEndToEndIntegrationTests() {
     // 3.3 Verify doctor card data model completeness
     const docSample = allDocs10km.results[0];
     assert(
-      Boolean(docSample.id && docSample.name && docSample.specialty && docSample.distanceKm && docSample.distanceType === "straight_line_geographic"),
+      Boolean(docSample.id && docSample.name && docSample.specialty && typeof docSample.distanceKm === "number" && docSample.distanceType === "straight_line_geographic"),
       "Doctor card contains all required metadata (id, name, specialty, distanceKm, distanceType)",
       docSample
     );
@@ -136,7 +136,7 @@ async function runEndToEndIntegrationTests() {
     // 4.4 Verify card fields
     const diagSample = diagBlood.results[0];
     assert(
-      Boolean(diagSample.id && diagSample.name && diagSample.services && diagSample.distanceKm),
+      Boolean(diagSample.id && diagSample.name && diagSample.services && typeof diagSample.distanceKm === "number"),
       "Diagnostic center contains id, name, services, and distanceKm",
       diagSample
     );

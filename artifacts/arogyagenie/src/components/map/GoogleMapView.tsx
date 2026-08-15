@@ -101,7 +101,7 @@ export function GoogleMapView({
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const userMarkerRef = useRef<google.maps.Marker | null>(null);
   const circleRef = useRef<google.maps.Circle | null>(null);
-  const providerMarkersRef = useRef<Map<number, google.maps.Marker>>(new Map());
+  const providerMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -136,7 +136,8 @@ export function GoogleMapView({
             },
             {
               featureType: "poi.business",
-              stylers: [{ visibility: "off" }],
+              elementType: "geometry",
+              stylers: [{ color: "#f8fafc" }],
             },
           ],
         });
@@ -219,12 +220,12 @@ export function GoogleMapView({
     const map = mapInstanceRef.current;
     if (!map || !mapLoaded || typeof google === "undefined") return;
 
-    // Remove markers that are no longer present in providers list
-    const currentIds = new Set(providers.map((p) => p.id));
-    providerMarkersRef.current.forEach((marker, id) => {
-      if (!currentIds.has(id)) {
+    // Composite keys (type_id) to avoid collision between doctor, pharmacy, and diagnostic center
+    const currentKeys = new Set(providers.map((p) => `${p.type || "doctor"}_${p.id}`));
+    providerMarkersRef.current.forEach((marker, key) => {
+      if (!currentKeys.has(key)) {
         marker.setMap(null);
-        providerMarkersRef.current.delete(id);
+        providerMarkersRef.current.delete(key);
       }
     });
 
@@ -232,11 +233,12 @@ export function GoogleMapView({
     providers.forEach((p) => {
       if (!p.latitude || !p.longitude) return;
 
+      const markerKey = `${p.type || "doctor"}_${p.id}`;
       const isSelected = p.id === selectedId;
       const typeCfg = TYPE_CONFIG[p.type] || TYPE_CONFIG.doctor;
       const pos = { lat: p.latitude, lng: p.longitude };
 
-      let marker = providerMarkersRef.current.get(p.id);
+      let marker = providerMarkersRef.current.get(markerKey);
 
       if (!marker) {
         marker = new google.maps.Marker({
@@ -255,7 +257,7 @@ export function GoogleMapView({
           onSelectProvider(p);
         });
 
-        providerMarkersRef.current.set(p.id, marker);
+        providerMarkersRef.current.set(markerKey, marker);
       } else {
         marker.setPosition(pos);
         marker.setIcon({

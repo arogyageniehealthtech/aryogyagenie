@@ -112,10 +112,12 @@ async function seed() {
         qualification: "MD Cardiology, FACC",
         licenseNumber: "LIC-CARD-88421",
         clinicName: "Arogya Heart & General Care Clinic",
-        clinicAddress: "102 Healthcare Avenue, Medical District",
+        clinicAddress: "102 Healthcare Avenue, Medical District, Kolkata",
         consultationFee: 50.0,
         experience: 12,
         bio: "Specialist in preventative cardiology, internal medicine, and chronic disease management.",
+        latitude: 22.5726,
+        longitude: 88.3639,
         status: "active",
       })
       .onConflictDoNothing()
@@ -131,8 +133,10 @@ async function seed() {
         userId: diagUserId,
         name: "Metro Advanced Diagnostic Lab",
         accreditation: "NABL Accredited #LAB-9921",
-        address: "505 Science Park Road",
+        address: "505 Science Park Road, Salt Lake, Kolkata",
         services: "Complete Blood Count (CBC), Lipid Profile, Fasting Blood Sugar, Thyroid Panel",
+        latitude: 22.5834,
+        longitude: 88.4123,
         status: "active",
       })
       .onConflictDoNothing()
@@ -148,7 +152,9 @@ async function seed() {
         userId: pharmacyUserId,
         name: "HealthFirst Express Pharmacy",
         licenseNumber: "PHARM-LIC-5521",
-        address: "707 Wellness Boulevard",
+        address: "707 Wellness Boulevard, Park Street, Kolkata",
+        latitude: 22.5532,
+        longitude: 88.3512,
         status: "active",
       })
       .onConflictDoNothing();

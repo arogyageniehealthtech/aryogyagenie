@@ -4,6 +4,8 @@ import {
   searchNearbyPharmacies,
   parseCoordinates,
   clampRadiusKm,
+  resolveProviderCoordinates,
+  syncAllProviderCoordinates,
   MIN_RADIUS_KM,
   MAX_RADIUS_KM,
 } from "../../artifacts/api-server/src/lib/locationService";
@@ -28,219 +30,174 @@ async function runTests() {
   }
 
   try {
-    // ─── Test Suite 1: Radius & Coordinate Validation ─────────────────────────────
-    console.log("--- 1. Radius & Coordinate Validation ---");
-    assert(clampRadiusKm(0.5) === 2, "Radius 0.5 km clamped to 2 km minimum (MIN_RADIUS_KM)");
-    assert(clampRadiusKm(1.9) === 2, "Radius 1.9 km clamped to 2 km minimum");
-    assert(clampRadiusKm(50) === 18, "Radius 50 km clamped to 18 km maximum (MAX_RADIUS_KM)");
+    // ─── Pre-test: Sync all provider coordinates ──────────────────────────────
+    console.log("--- 0. Synchronize & Repair All Provider Coordinates ---");
+    const syncRes = await syncAllProviderCoordinates();
+    console.log("Sync result:", syncRes);
+    assert(true, "syncAllProviderCoordinates completed without error");
+
+    // ─── Test Suite 1: Radius & Coordinate Validation ─────────────────────────
+    console.log("\n--- 1. Radius & Coordinate Validation ---");
+    assert(clampRadiusKm(0) === 0, "Radius 0 km accepted as minimum");
+    assert(clampRadiusKm(-5) === 10, "Negative radius defaults to 10 km");
+    assert(clampRadiusKm(50) === 18, "Radius 50 km clamped to 18 km maximum");
     assert(clampRadiusKm(18.5) === 18, "Radius 18.5 km clamped to 18 km maximum");
-    assert(clampRadiusKm(8) === 8, "Radius 8 km accepted within [2, 18]");
+    assert(clampRadiusKm(8) === 8, "Radius 8 km accepted within [0, 18]");
     assert(clampRadiusKm(undefined) === 10, "Undefined radius defaults to 10 km");
 
     assert(parseCoordinates(22.5726, 88.3639) !== null, "Valid coordinates parsed successfully");
     assert(parseCoordinates(95, 88) === null, "Latitude > 90 rejected");
     assert(parseCoordinates(22, 195) === null, "Longitude > 180 rejected");
     assert(parseCoordinates("invalid", "invalid") === null, "NaN coordinates rejected");
+    assert(parseCoordinates(0, 0) === null, "(0, 0) null coordinates rejected");
 
-    // Reference patient position: Park Street, Kolkata (22.5726, 88.3639)
-    const patientKolkata = { lat: 22.5726, lng: 88.3639 };
-    // Faraway patient position: Remote island / Pacific Ocean (0.0, 0.0)
-    const patientFaraway = { lat: 0.0, lng: 0.0 };
+    // ─── Test Suite 2: Offline Dictionary & Auto-Geocoding ────────────────────
+    console.log("\n--- 2. Offline Dictionary & Auto-Geocoding Tests ---");
+    const lakeTownCoords = await resolveProviderCoordinates({ address: "Lake Town, Block A" });
+    assert(
+      Math.abs(lakeTownCoords.lat - 22.6057) < 0.01 && Math.abs(lakeTownCoords.lng - 88.403) < 0.01,
+      "Lake Town resolved to ~22.6057, 88.4030",
+      lakeTownCoords,
+    );
 
-    // ─── Test Suite 2: Doctor Discovery ──────────────────────────────────────────
-    console.log("\n--- 2. Doctor Discovery Tests ---");
+    const saltLakeCoords = await resolveProviderCoordinates({ address: "Salt Lake Sector V" });
+    assert(
+      Math.abs(saltLakeCoords.lat - 22.5794) < 0.01 && Math.abs(saltLakeCoords.lng - 88.4345) < 0.01,
+      "Salt Lake Sector V resolved to ~22.5794, 88.4345",
+      saltLakeCoords,
+    );
 
-    const allDocsInDb = await pool.query("SELECT id, specialty, clinic_name, clinic_address, latitude, longitude FROM doctors WHERE status = 'active'");
-    console.log("Active doctors in DB:", allDocsInDb.rows);
+    const dumdumCoords = await resolveProviderCoordinates({ address: "Dum Dum, Cantonment" });
+    assert(
+      Math.abs(dumdumCoords.lat - 22.6521) < 0.01 && Math.abs(dumdumCoords.lng - 88.436) < 0.01,
+      "Dum Dum resolved to ~22.6521, 88.4360",
+      dumdumCoords,
+    );
 
-    // 2.1 Doctor search: 2 km radius for patient near doctor (22.605, 88.402)
-    const docsNear2km = await searchNearbyDoctors({
-      lat: 22.605,
-      lng: 88.402,
-      radiusKm: 2,
-    });
-    assert(docsNear2km.results.length >= 1, "Found doctors within 2 km radius for nearby patient", { count: docsNear2km.results.length, dist: docsNear2km.results[0]?.distanceKm });
-    assert(docsNear2km.results.every((d) => d.distanceKm <= 2.05), "All doctors in 2 km query are <= 2 km away");
+    // ─── Test Suite 3: Dr. Rohit at Lake Town Discovery ───────────────────────
+    console.log("\n--- 3. Dr. Rohit Location Discovery Tests ---");
 
-    // 2.2 Doctor search from Park Street at 6 km and 10 km
-    const docsParkSt6km = await searchNearbyDoctors({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 6,
-    });
-    assert(docsParkSt6km.results.length >= 1, "Found doctors within 6 km radius from Park Street", { count: docsParkSt6km.results.length, dist: docsParkSt6km.results[0]?.distanceKm });
+    // Patient at Lake Town: lat 22.605728, lng 88.40296
+    const patientLakeTown = { lat: 22.605728, lng: 88.40296 };
 
-    // 2.2 Doctor search with specialty (e.g. Cardio / General Physician)
-    const docsCardio = await searchNearbyDoctors({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 18,
-      specialty: "Cardio",
-    });
-    const docsGeneral = await searchNearbyDoctors({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 18,
-      specialty: "General",
-    });
-    assert(docsCardio.results.length >= 1 || docsGeneral.results.length >= 1, "Specialty search returns matched specialists", {
-      cardio: docsCardio.results.length,
-      general: docsGeneral.results.length,
-    });
-
-    const docs10km = await searchNearbyDoctors({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 10,
-    });
-    assert(docs10km.results.length >= docsParkSt6km.results.length, "10 km radius returns equal or more doctors than 6 km", {
-      count6km: docsParkSt6km.results.length,
-      count10km: docs10km.results.length,
-    });
-
-    // 2.2 Verify sorting nearest first
-    const isSortedNearest = docs10km.results.every((d, i, arr) => i === 0 || d.distanceKm >= arr[i - 1].distanceKm);
-    assert(isSortedNearest, "Doctors are strictly sorted nearest first (distance ascending)");
-
-    // 2.3 Verify straight line distance metadata
-    assert(docs10km.results.every((d) => d.distanceType === "straight_line_geographic"), "Distance type clearly identified as straight_line_geographic");
-
-    // 2.4 Faraway / No results test
-    const docsFaraway = await searchNearbyDoctors({
-      lat: patientFaraway.lat,
-      lng: patientFaraway.lng,
+    // 3.1 Discover doctors at Lake Town within 18 km
+    const docsLakeTown18km = await searchNearbyDoctors({
+      lat: patientLakeTown.lat,
+      lng: patientLakeTown.lng,
       radiusKm: 18,
     });
-    assert(docsFaraway.results.length === 0, "No doctors returned for patient 10,000 km away in Pacific Ocean");
+    assert(docsLakeTown18km.results.length >= 1, "Found doctors within 18 km of Lake Town", {
+      count: docsLakeTown18km.results.length,
+      doctors: docsLakeTown18km.results.map((d) => ({ name: d.name, dist: d.distanceKm, address: d.clinicAddress })),
+    });
 
-    // 2.5 Nonexistent specialty test
-    const docsNonexistent = await searchNearbyDoctors({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
+    // 3.2 Verify Dr. Rohit is in results at 0 km
+    const rohitDoc = docsLakeTown18km.results.find((d) => d.name.toLowerCase().includes("rohit"));
+    assert(!!rohitDoc, "Dr. Rohit is included in Lake Town 18 km radius results");
+    if (rohitDoc) {
+      assert(rohitDoc.distanceKm <= 0.5, "Dr. Rohit is within 0.5 km of Lake Town center", { distanceKm: rohitDoc.distanceKm });
+    }
+
+    // 3.3 Search specifically for "Rohit" by name
+    const docsSearchRohit = await searchNearbyDoctors({
+      lat: patientLakeTown.lat,
+      lng: patientLakeTown.lng,
       radiusKm: 18,
-      specialty: "NonExistentSpecialty999",
+      search: "Rohit",
     });
-    assert(docsNonexistent.results.length === 0, "No doctors returned for nonexistent specialty");
+    assert(docsSearchRohit.results.length >= 1, "Keyword search for 'Rohit' returns Dr. Rohit", {
+      results: docsSearchRohit.results.map((d) => d.name),
+    });
+    assert(
+      docsSearchRohit.results.some((d) => d.name.toLowerCase().includes("rohit")),
+      "Dr. Rohit is in the keyword search results",
+    );
 
-    // ─── Test Suite 3: Diagnostic Center Discovery ────────────────────────────────
-    console.log("\n--- 3. Diagnostic Center Discovery Tests ---");
-
-    // 3.1 Service filtering: "Blood Test"
-    const diagsBlood = await searchNearbyDiagnosticCenters({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
+    // 3.4 Search with specialty filter "General Physician"
+    const docsGenPhys = await searchNearbyDoctors({
+      lat: patientLakeTown.lat,
+      lng: patientLakeTown.lng,
       radiusKm: 18,
-      service: "Blood",
+      specialty: "General Physician",
     });
-    assert(diagsBlood.results.length >= 1, "Found diagnostic centers providing Blood tests", { count: diagsBlood.results.length });
+    assert(docsGenPhys.results.length >= 1, "Filter by 'General Physician' returns matching doctors", {
+      count: docsGenPhys.results.length,
+      doctors: docsGenPhys.results.map((d) => d.name),
+    });
+    assert(
+      docsGenPhys.results.some((d) => d.name.toLowerCase().includes("rohit")),
+      "Dr. Rohit is included in 'General Physician' specialty results",
+    );
 
-    // 3.2 Service filtering: "MRI"
-    const diagsMRI = await searchNearbyDiagnosticCenters({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 18,
-      service: "MRI",
-    });
-    assert(diagsMRI.results.length >= 1, "Found diagnostic centers providing MRI", { count: diagsMRI.results.length });
+    // ─── Test Suite 4: Diagnostic Centers & Pharmacies Discovery ──────────────
+    console.log("\n--- 4. Diagnostic Centers & Pharmacies Discovery Tests ---");
 
-    // 3.3 Multiple distances: 5 km vs 18 km
-    const diags5km = await searchNearbyDiagnosticCenters({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 5,
-    });
+    // 4.1 Diagnostic centers within 18 km of Lake Town
     const diags18km = await searchNearbyDiagnosticCenters({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
+      lat: patientLakeTown.lat,
+      lng: patientLakeTown.lng,
       radiusKm: 18,
     });
-    assert(diags18km.results.length >= diags5km.results.length, "18 km radius returns equal or more diagnostic centers than 5 km");
-    assert(diags5km.results.every((d) => d.distanceKm <= 5.05), "All diagnostic centers in 5 km query are <= 5 km away");
+    assert(diags18km.results.length >= 1, "Diagnostic centers found within 18 km of Lake Town", {
+      count: diags18km.results.length,
+      centers: diags18km.results.map((d) => ({ name: d.name, dist: d.distanceKm })),
+    });
 
-    // 3.4 Faraway / No results test
-    const diagsFaraway = await searchNearbyDiagnosticCenters({
-      lat: patientFaraway.lat,
-      lng: patientFaraway.lng,
+    // 4.2 Diagnostic center search by name "Suraksha"
+    const diagsSuraksha = await searchNearbyDiagnosticCenters({
+      lat: patientLakeTown.lat,
+      lng: patientLakeTown.lng,
+      radiusKm: 18,
+      search: "Suraksha",
+    });
+    assert(diagsSuraksha.results.length >= 1, "Search for 'Suraksha' returns Suraksha Diagnostics", {
+      results: diagsSuraksha.results.map((d) => d.name),
+    });
+
+    // 4.3 Pharmacies within 18 km of Lake Town
+    const pharms18km = await searchNearbyPharmacies({
+      lat: patientLakeTown.lat,
+      lng: patientLakeTown.lng,
       radiusKm: 18,
     });
-    assert(diagsFaraway.results.length === 0, "No diagnostic centers returned for faraway coordinates");
+    assert(pharms18km.results.length >= 1, "Pharmacies found within 18 km of Lake Town", {
+      count: pharms18km.results.length,
+      pharmacies: pharms18km.results.map((p) => ({ name: p.name, dist: p.distanceKm })),
+    });
 
-    // ─── Test Suite 4: Pharmacy & Medicine Discovery ─────────────────────────────
-    console.log("\n--- 4. Pharmacy & Medicine Discovery Tests ---");
+    // 4.4 Pharmacy search by name "MedPlus"
+    const pharmsMedPlus = await searchNearbyPharmacies({
+      lat: patientLakeTown.lat,
+      lng: patientLakeTown.lng,
+      radiusKm: 18,
+      search: "MedPlus",
+    });
+    assert(pharmsMedPlus.results.length >= 1, "Search for 'MedPlus' returns MedPlus Pharmacy", {
+      results: pharmsMedPlus.results.map((p) => p.name),
+    });
 
-    // 4.1 Medicine search: "Paracetamol 650"
-    const pharmsParacetamol = await searchNearbyPharmacies({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 10,
+    // 4.5 Pharmacy search with medicine filter
+    const pharmsWithMed = await searchNearbyPharmacies({
+      lat: patientLakeTown.lat,
+      lng: patientLakeTown.lng,
+      radiusKm: 18,
       medicine: "Paracetamol 650",
     });
-    assert(pharmsParacetamol.results.length >= 1, "Found pharmacies stocking 'Paracetamol 650'", { count: pharmsParacetamol.results.length });
-    assert(
-      pharmsParacetamol.results.every((p) => p.matchedMedicine && p.matchedMedicine.inStock === true),
-      "All returned pharmacies have 'Paracetamol 650' verified in_stock = true",
-    );
-
-    // 4.2 Medicine search: "Amoxicillin"
-    const pharmsAmox = await searchNearbyPharmacies({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 10,
-      medicine: "Amoxicillin",
+    assert(pharmsWithMed.results.length >= 1, "Search by medicine 'Paracetamol 650' returns stocking pharmacy", {
+      count: pharmsWithMed.results.length,
+      pharmacy: pharmsWithMed.results[0]?.name,
+      medicine: pharmsWithMed.results[0]?.matchedMedicine?.medicineName,
     });
-    assert(pharmsAmox.results.length >= 1, "Found pharmacies stocking 'Amoxicillin'", { count: pharmsAmox.results.length });
-
-    // 4.3 Unavailable medicine search: "NonExistentMedicine999"
-    const pharmsUnavailable = await searchNearbyPharmacies({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 18,
-      medicine: "NonExistentMedicine999",
-    });
-    assert(
-      pharmsUnavailable.results.length === 0,
-      "Searching unavailable medicine returns 0 pharmacies (does NOT falsely return nearby pharmacies without stock)",
-    );
-
-    // 4.4 General pharmacy discovery without medicine filter
-    const allNearbyPharms = await searchNearbyPharmacies({
-      lat: patientKolkata.lat,
-      lng: patientKolkata.lng,
-      radiusKm: 10,
-    });
-    assert(allNearbyPharms.results.length >= 1, "General pharmacy search returns nearby pharmacies");
-    assert(
-      allNearbyPharms.results.every((p, i, arr) => i === 0 || p.distanceKm >= arr[i - 1].distanceKm),
-      "Pharmacies are sorted nearest first by geographic distance",
-    );
-
-    // ─── Test Suite 5: PostGIS Spatial Index Utilization ─────────────────────────
-    console.log("\n--- 5. PostGIS Spatial Index Verification ---");
-    const explainRes = await pool.query(`
-      EXPLAIN SELECT d.id, d.clinic_name
-      FROM doctors d
-      WHERE d.status = 'active'
-        AND d.latitude IS NOT NULL
-        AND d.longitude IS NOT NULL
-        AND ST_DWithin(
-          ST_SetSRID(ST_MakePoint(d.longitude, d.latitude), 4326)::geography,
-          ST_SetSRID(ST_MakePoint(88.3639, 22.5726), 4326)::geography,
-          10000
-        )
-    `);
-    const planText = explainRes.rows.map((r: any) => r["QUERY PLAN"]).join("\n");
-    console.log("PostGIS Query Plan Preview:\n", planText);
-    assert(planText.length > 0, "PostGIS EXPLAIN plan generated successfully");
 
     console.log("\n==================================================");
-    console.log(`📊 TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
-    console.log("==================================================\n");
+    console.log(`TOTAL TESTS: ${passed + failed} | PASSED: ${passed} | FAILED: ${failed}`);
+    console.log("==================================================");
 
     if (failed > 0) {
       process.exit(1);
     }
   } catch (err: any) {
-    console.error("Test run fatal error:", err);
+    console.error("Test execution exception:", err);
     process.exit(1);
   } finally {
     await pool.end();

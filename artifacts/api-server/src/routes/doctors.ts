@@ -24,7 +24,7 @@ function matchDoctorSpecialty(docSpec: string | null | undefined, filterSpec: st
 import { inArray } from "drizzle-orm";
 import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
-import { parseCoordinates, clampRadiusKm, searchNearbyDoctors } from "../lib/locationService";
+import { parseCoordinates, clampRadiusKm, searchNearbyDoctors, resolveProviderCoordinates } from "../lib/locationService";
 
 // GET /doctors - list approved doctors (with optional location-based radius filtering)
 router.get("/doctors", async (req, res): Promise<void> => {
@@ -47,7 +47,7 @@ router.get("/doctors", async (req, res): Promise<void> => {
       lng: coords.lng,
       radiusKm,
       specialty: specialty !== "all" ? specialty : undefined,
-      search,
+      search: search && search.trim() ? search.trim() : undefined,
       limit: pagination.limit,
       offset: pagination.offset,
     });
@@ -69,6 +69,8 @@ router.get("/doctors", async (req, res): Promise<void> => {
         avatarUrl: usersTable.avatarUrl,
         status: usersTable.status,
         role: usersTable.role,
+        address: usersTable.address,
+        city: usersTable.city,
       },
     })
     .from(doctorsTable)
@@ -91,7 +93,8 @@ router.get("/doctors", async (req, res): Promise<void> => {
     qualification: r.d.qualification || "MBBS, MD",
     licenseNumber: r.d.licenseNumber,
     clinicName: r.d.clinicName || "ArogyaGenie Medical Center",
-    clinicAddress: r.d.clinicAddress || "Health Tech City",
+    clinicAddress: r.d.clinicAddress || r.u.address || "Health Tech City",
+    address: r.d.clinicAddress || r.u.address || "Health Tech City",
     state: r.d.state,
     pincode: r.d.pincode,
     consultationFee: r.d.consultationFee || 500,
@@ -129,14 +132,14 @@ router.get("/doctors", async (req, res): Promise<void> => {
 
 // GET /doctors/:id
 router.get("/doctors/:id", async (req, res): Promise<void> => {
-  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
-  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const doctorId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  if (isNaN(doctorId)) { res.status(400).json({ error: "Invalid doctor id" }); return; }
 
   const row = await db
     .select({ d: doctorsTable, u: usersTable })
     .from(doctorsTable)
     .innerJoin(usersTable, eq(doctorsTable.userId, usersTable.id))
-    .where(eq(doctorsTable.id, id))
+    .where(eq(doctorsTable.id, doctorId))
     .limit(1);
 
   if (!row[0]) { res.status(404).json({ error: "Doctor not found" }); return; }
@@ -148,7 +151,8 @@ router.get("/doctors/:id", async (req, res): Promise<void> => {
     email: u.email, avatarUrl: u.avatarUrl,
     specialty: d.specialty, qualification: d.qualification,
     licenseNumber: d.licenseNumber, clinicName: d.clinicName,
-    clinicAddress: d.clinicAddress, consultationFee: d.consultationFee,
+    clinicAddress: d.clinicAddress || u.address || "Medical Center",
+    consultationFee: d.consultationFee,
     experience: d.experience, bio: d.bio, rating: d.rating,
     reviewCount: d.reviewCount, status: d.status,
     availableDays: d.availableDays, availableHours: d.availableHours,
@@ -172,7 +176,8 @@ router.get("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (r
     email: u.email, avatarUrl: u.avatarUrl,
     specialty: d.specialty, qualification: d.qualification,
     licenseNumber: d.licenseNumber, clinicName: d.clinicName,
-    clinicAddress: d.clinicAddress, consultationFee: d.consultationFee,
+    clinicAddress: d.clinicAddress || u.address,
+    consultationFee: d.consultationFee,
     experience: d.experience, bio: d.bio, rating: d.rating,
     reviewCount: d.reviewCount, status: d.status,
     availableDays: d.availableDays, availableHours: d.availableHours,
@@ -183,13 +188,36 @@ router.get("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (r
 router.put("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { specialty, qualification, licenseNumber, clinicName, clinicAddress, consultationFee, experience, bio, availableDays, availableHours } = req.body;
 
+  const existingDoc = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
+  const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
+
+  // Resolve coordinates
+  const resolvedCoords = await resolveProviderCoordinates({
+    lat: existingDoc?.latitude,
+    lng: existingDoc?.longitude,
+    address: clinicAddress || existingDoc?.clinicAddress || u?.address || "Lake Town, Kolkata",
+    city: u?.city || "Kolkata",
+  });
+
   const [d] = await db
     .update(doctorsTable)
-    .set({ specialty, qualification, licenseNumber, clinicName, clinicAddress, consultationFee, experience, bio, availableDays, availableHours })
+    .set({
+      specialty,
+      qualification,
+      licenseNumber,
+      clinicName,
+      clinicAddress,
+      consultationFee,
+      experience,
+      bio,
+      availableDays,
+      availableHours,
+      latitude: resolvedCoords.lat,
+      longitude: resolvedCoords.lng,
+    })
     .where(eq(doctorsTable.userId, req.userId!))
     .returning();
 
-  const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
   res.json({
     id: d.id, userId: d.userId,
     firstName: u?.firstName ?? "", lastName: u?.lastName ?? "",
