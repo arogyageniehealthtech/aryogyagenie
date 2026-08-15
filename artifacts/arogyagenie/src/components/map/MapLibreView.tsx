@@ -1,8 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { Loader2, Navigation, Layers, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// Explicitly set Vite-resolved worker URL to avoid strict MIME type error with SPA fallback
+if (maplibregl.config) {
+  maplibregl.config.WORKER_URL = maplibreWorkerUrl;
+}
 
 export interface MapProviderItem {
   id: number;
