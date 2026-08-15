@@ -232,12 +232,14 @@ export function GoogleMapView({
 
     // Add or update provider markers
     providers.forEach((p) => {
-      if (!p.latitude || !p.longitude) return;
+      const lat = typeof p.latitude === "number" ? p.latitude : parseFloat(String(p.latitude));
+      const lng = typeof p.longitude === "number" ? p.longitude : parseFloat(String(p.longitude));
+      if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
 
       const markerKey = `${p.type || "doctor"}_${p.id}`;
       const isSelected = p.id === selectedId;
       const typeCfg = TYPE_CONFIG[p.type] || TYPE_CONFIG.doctor;
-      const pos = { lat: p.latitude, lng: p.longitude };
+      const pos = { lat, lng };
 
       let marker = providerMarkersRef.current.get(markerKey);
 

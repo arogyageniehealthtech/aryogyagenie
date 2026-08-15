@@ -93,13 +93,16 @@ router.get("/pharmacies/me/profile", requireAuth, requireRole(["pharmacy"]), asy
 
 // PUT /pharmacies/me/profile
 router.put("/pharmacies/me/profile", requireAuth, requireRole(["pharmacy"]), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { name, phone, address, city, licenseNumber, openingHours } = req.body;
+  const { name, phone, address, city, licenseNumber, openingHours, latitude, longitude } = req.body;
   const existingPharm = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
 
+  const effectiveAddress = address || existingPharm?.address || name;
+  const addressChanged = Boolean(address && address !== existingPharm?.address);
+
   const resolvedCoords = await resolveProviderCoordinates({
-    lat: existingPharm?.latitude,
-    lng: existingPharm?.longitude,
-    address: address || existingPharm?.address || name,
+    lat: addressChanged ? (latitude ?? undefined) : (latitude ?? existingPharm?.latitude),
+    lng: addressChanged ? (longitude ?? undefined) : (longitude ?? existingPharm?.longitude),
+    address: effectiveAddress,
     city: city || existingPharm?.city || "Kolkata",
   });
 

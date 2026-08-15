@@ -93,13 +93,16 @@ router.get("/diagnostic-centers/me/profile", requireAuth, requireRole(["diagnost
 
 // PUT /diagnostic-centers/me/profile
 router.put("/diagnostic-centers/me/profile", requireAuth, requireRole(["diagnostic_center"]), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { name, phone, address, city, accreditation, services, openingHours } = req.body;
+  const { name, phone, address, city, accreditation, services, openingHours, latitude, longitude } = req.body;
   const existingDc = await db.query.diagnosticCentersTable.findFirst({ where: eq(diagnosticCentersTable.userId, req.userId!) });
 
+  const effectiveAddress = address || existingDc?.address || name;
+  const addressChanged = Boolean(address && address !== existingDc?.address);
+
   const resolvedCoords = await resolveProviderCoordinates({
-    lat: existingDc?.latitude,
-    lng: existingDc?.longitude,
-    address: address || existingDc?.address || name,
+    lat: addressChanged ? (latitude ?? undefined) : (latitude ?? existingDc?.latitude),
+    lng: addressChanged ? (longitude ?? undefined) : (longitude ?? existingDc?.longitude),
+    address: effectiveAddress,
     city: city || existingDc?.city || "Kolkata",
   });
 

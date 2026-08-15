@@ -96,16 +96,33 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use(
-  clerkMiddleware((req) => ({
-    publishableKey:
-      process.env.CLERK_PUBLISHABLE_KEY ||
-      process.env.VITE_CLERK_PUBLISHABLE_KEY ||
-      publishableKeyFromHost(
-        getClerkProxyHost(req) ?? "",
-      ),
-  })),
+const rawPublishableKey =
+  process.env.CLERK_PUBLISHABLE_KEY ||
+  process.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+const isKeyValid = Boolean(
+  rawPublishableKey &&
+  !rawPublishableKey.includes("your_publishable_key_here") &&
+  (rawPublishableKey.startsWith("pk_test_") || rawPublishableKey.startsWith("pk_live_"))
 );
+
+if (isKeyValid) {
+  app.use(
+    clerkMiddleware((req) => ({
+      publishableKey:
+        rawPublishableKey ||
+        publishableKeyFromHost(
+          getClerkProxyHost(req) ?? "",
+        ),
+    })),
+  );
+} else {
+  logger.warn("Clerk publishable key is not configured or is a placeholder; auth middleware running in fallback mode.");
+  app.use((req, _res, next) => {
+    (req as any).auth = (req as any).auth || { userId: null };
+    next();
+  });
+}
 
 // Root Health Check Probes (/health, /healthz, /health/ready)
 app.use(healthRouter);

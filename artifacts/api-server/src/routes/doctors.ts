@@ -186,16 +186,19 @@ router.get("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (r
 
 // PUT /doctors/me/profile
 router.put("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { specialty, qualification, licenseNumber, clinicName, clinicAddress, consultationFee, experience, bio, availableDays, availableHours } = req.body;
+  const { specialty, qualification, licenseNumber, clinicName, clinicAddress, consultationFee, experience, bio, availableDays, availableHours, latitude, longitude } = req.body;
 
   const existingDoc = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
   const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
 
+  const effectiveAddress = clinicAddress || existingDoc?.clinicAddress || u?.address || "Lake Town, Kolkata";
+  const addressChanged = Boolean(clinicAddress && clinicAddress !== existingDoc?.clinicAddress);
+
   // Resolve coordinates
   const resolvedCoords = await resolveProviderCoordinates({
-    lat: existingDoc?.latitude,
-    lng: existingDoc?.longitude,
-    address: clinicAddress || existingDoc?.clinicAddress || u?.address || "Lake Town, Kolkata",
+    lat: addressChanged ? (latitude ?? undefined) : (latitude ?? existingDoc?.latitude),
+    lng: addressChanged ? (longitude ?? undefined) : (longitude ?? existingDoc?.longitude),
+    address: effectiveAddress,
     city: u?.city || "Kolkata",
   });
 
