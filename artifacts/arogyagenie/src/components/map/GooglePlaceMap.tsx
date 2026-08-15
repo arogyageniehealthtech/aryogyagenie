@@ -46,7 +46,7 @@ export function GooglePlaceMap({
         const map = new maps.Map(containerRef.current, {
           center: pos,
           zoom: 15,
-          mapTypeId: maps.MapTypeId.ROADMAP,
+          mapTypeId: "roadmap",
           streetViewControl: false,
           mapTypeControl: true,
           fullscreenControl: true,

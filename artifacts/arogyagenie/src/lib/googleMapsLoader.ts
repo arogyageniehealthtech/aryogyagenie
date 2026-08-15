@@ -10,10 +10,10 @@ export function getGoogleMapsApiKey(): string {
 
 /**
  * Singleton loader for Google Maps JavaScript API.
- * Ensures the Google Maps script is injected only once into the document.
+ * Uses standard callback initialization to guarantee full SDK readiness.
  */
 export function loadGoogleMaps(): Promise<typeof google.maps> {
-  if (typeof window !== "undefined" && (window as any).google?.maps) {
+  if (typeof window !== "undefined" && (window as any).google?.maps?.Map) {
     return Promise.resolve((window as any).google.maps);
   }
 
@@ -29,25 +29,29 @@ export function loadGoogleMaps(): Promise<typeof google.maps> {
       return;
     }
 
+    if ((window as any).google?.maps?.Map) {
+      resolve((window as any).google.maps);
+      return;
+    }
+
+    const callbackName = `__googleMapsInitCallback_${Math.random().toString(36).substring(2, 9)}`;
+
+    (window as any)[callbackName] = () => {
+      delete (window as any)[callbackName];
+      if ((window as any).google?.maps?.Map) {
+        resolve((window as any).google.maps);
+      } else {
+        reject(new Error("Google Maps loaded but google.maps.Map is not available."));
+      }
+    };
+
     // Check if script tag already exists
     const existingScript = document.getElementById("google-maps-js-sdk") as HTMLScriptElement | null;
     if (existingScript) {
-      if ((window as any).google?.maps) {
+      if ((window as any).google?.maps?.Map) {
         resolve((window as any).google.maps);
         return;
       }
-      existingScript.addEventListener("load", () => {
-        if ((window as any).google?.maps) {
-          resolve((window as any).google.maps);
-        } else {
-          reject(new Error("Google Maps SDK loaded but google.maps is undefined."));
-        }
-      });
-      existingScript.addEventListener("error", (e) => {
-        loadPromise = null;
-        reject(new Error("Failed to load Google Maps script."));
-      });
-      return;
     }
 
     const script = document.createElement("script");
@@ -57,19 +61,16 @@ export function loadGoogleMaps(): Promise<typeof google.maps> {
     script.defer = true;
 
     const keyParam = apiKey ? `&key=${encodeURIComponent(apiKey)}` : "";
-    script.src = `https://maps.googleapis.com/maps/api/js?v=weekly${keyParam}&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?v=weekly${keyParam}&callback=${callbackName}`;
 
-    script.onload = () => {
-      if ((window as any).google?.maps) {
-        resolve((window as any).google.maps);
-      } else {
-        reject(new Error("Google Maps API script loaded but google.maps is not defined."));
-      }
-    };
-
-    script.onerror = (err) => {
+    script.onerror = () => {
+      delete (window as any)[callbackName];
       loadPromise = null;
-      reject(new Error("Failed to load Google Maps JavaScript API. Please verify network connectivity and API key."));
+      reject(
+        new Error(
+          "Failed to load Google Maps JavaScript API. Please verify your VITE_GOOGLE_MAPS_API_KEY and network connection.",
+        ),
+      );
     };
 
     document.head.appendChild(script);

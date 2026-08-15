@@ -120,10 +120,10 @@ export function GoogleMapView({
         const map = new maps.Map(mapContainerRef.current, {
           center: { lat: userLoc.lat, lng: userLoc.lng },
           zoom: 13,
-          mapTypeId: maps.MapTypeId.ROADMAP,
+          mapTypeId: "roadmap",
           mapTypeControl: true,
           mapTypeControlOptions: {
-            position: maps.ControlPosition.TOP_RIGHT,
+            position: maps.ControlPosition?.TOP_RIGHT ?? 3,
           },
           fullscreenControl: true,
           streetViewControl: false,
