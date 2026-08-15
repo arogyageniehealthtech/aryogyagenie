@@ -121,6 +121,17 @@ router.put("/pharmacies/me/profile", requireAuth, requireRole(["pharmacy"]), asy
     .where(eq(pharmaciesTable.userId, req.userId!))
     .returning();
 
+  // Also sync coordinates and address to linked user record
+  await db
+    .update(usersTable)
+    .set({
+      address: address || effectiveAddress,
+      city: city || undefined,
+      latitude: resolvedCoords.lat,
+      longitude: resolvedCoords.lng,
+    })
+    .where(eq(usersTable.id, req.userId!));
+
   const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
   res.json({ id: p.id, userId: p.userId, name: p.name, email: u?.email ?? "", phone: p.phone, address: p.address, city: p.city, licenseNumber: p.licenseNumber, openingHours: p.openingHours, status: p.status });
 });

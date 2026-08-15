@@ -97,6 +97,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           phone: cleanPhone,
           address: address || null,
           city: city || null,
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
           role: targetRole,
           status: "pending",
         })
@@ -114,6 +116,8 @@ router.post("/provider-applications", async (req: Request, res: Response): Promi
           phone: cleanPhone || currentUser.phone,
           address: address || currentUser.address,
           city: city || currentUser.city,
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
         })
         .where(eq(usersTable.id, currentUser.id))
         .returning();
@@ -379,14 +383,24 @@ router.post(
       if (application.userId) {
         const [u] = await db
           .update(usersTable)
-          .set({ status: "active", role: targetRole })
+          .set({
+            status: "active",
+            role: targetRole,
+            latitude: resolvedCoords.lat,
+            longitude: resolvedCoords.lng,
+          })
           .where(eq(usersTable.id, application.userId))
           .returning();
         linkedUser = u;
       } else {
         const [u] = await db
           .update(usersTable)
-          .set({ status: "active", role: targetRole })
+          .set({
+            status: "active",
+            role: targetRole,
+            latitude: resolvedCoords.lat,
+            longitude: resolvedCoords.lng,
+          })
           .where(eq(usersTable.email, application.email))
           .returning();
         linkedUser = u;

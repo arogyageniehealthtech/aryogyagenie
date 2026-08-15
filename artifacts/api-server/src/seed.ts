@@ -13,6 +13,11 @@ export async function seedCoordinates() {
   try {
     await pool.query("CREATE EXTENSION IF NOT EXISTS postgis");
     await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_geo ON users USING gist (
+        (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography)
+      ) WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
+    `);
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_doctors_geo ON doctors USING gist (
         (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography)
       ) WHERE latitude IS NOT NULL AND longitude IS NOT NULL;

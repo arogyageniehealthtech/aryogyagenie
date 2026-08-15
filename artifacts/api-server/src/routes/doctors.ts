@@ -221,6 +221,16 @@ router.put("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (r
     .where(eq(doctorsTable.userId, req.userId!))
     .returning();
 
+  // Also sync coordinates and address to linked user record
+  await db
+    .update(usersTable)
+    .set({
+      address: clinicAddress || effectiveAddress,
+      latitude: resolvedCoords.lat,
+      longitude: resolvedCoords.lng,
+    })
+    .where(eq(usersTable.id, req.userId!));
+
   res.json({
     id: d.id, userId: d.userId,
     firstName: u?.firstName ?? "", lastName: u?.lastName ?? "",

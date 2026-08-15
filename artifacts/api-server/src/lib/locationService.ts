@@ -243,21 +243,59 @@ export async function resolveProviderCoordinates(options: {
 }
 
 /**
- * Synchronizes and repairs coordinates for all doctors, diagnostic centers,
+ * Synchronizes and repairs coordinates for all users, doctors, diagnostic centers,
  * pharmacies, and provider applications that have missing (NULL or 0) coordinates.
  */
 export async function syncAllProviderCoordinates(): Promise<{
+  usersUpdated: number;
   doctorsUpdated: number;
   diagsUpdated: number;
   pharmsUpdated: number;
   appsUpdated: number;
 }> {
+  let usersUpdated = 0;
   let doctorsUpdated = 0;
   let diagsUpdated = 0;
   let pharmsUpdated = 0;
   let appsUpdated = 0;
 
   try {
+    // 0. Repair Users (Patients, Doctors, Diagnostic Centers, Pharmacies, Admins)
+    const userRows = await pool.query(`
+      SELECT u.id, u.role, u.first_name, u.last_name, u.address, u.city, u.state, u.latitude, u.longitude,
+             d.clinic_address,
+             dc.address as diag_address, dc.name as diag_name,
+             p.address as pharm_address, p.name as pharm_name
+      FROM users u
+      LEFT JOIN doctors d ON d.user_id = u.id
+      LEFT JOIN diagnostic_centers dc ON dc.user_id = u.id
+      LEFT JOIN pharmacies p ON p.user_id = u.id
+      WHERE u.latitude IS NULL OR u.longitude IS NULL OR u.latitude = 0 OR u.longitude = 0
+    `);
+
+    for (const u of userRows.rows) {
+      const candidateAddress =
+        u.address ||
+        u.clinic_address ||
+        u.diag_address ||
+        u.pharm_address ||
+        (u.city ? `${u.city}` : "Lake Town, Kolkata");
+
+      const coords = await resolveProviderCoordinates({
+        lat: u.latitude,
+        lng: u.longitude,
+        address: candidateAddress,
+        city: u.city || "Kolkata",
+        state: u.state || "West Bengal",
+      });
+
+      await pool.query(
+        `UPDATE users SET latitude = $1, longitude = $2 WHERE id = $3`,
+        [coords.lat, coords.lng, u.id],
+      );
+      usersUpdated++;
+    }
+
     // 1. Repair Doctors
     const docRows = await pool.query(`
       SELECT d.id, d.clinic_address, d.state, d.pincode, d.latitude, d.longitude, u.address as user_address, u.city as user_city
@@ -356,7 +394,7 @@ export async function syncAllProviderCoordinates(): Promise<{
     console.warn("syncAllProviderCoordinates warning:", err?.message);
   }
 
-  return { doctorsUpdated, diagsUpdated, pharmsUpdated, appsUpdated };
+  return { usersUpdated, doctorsUpdated, diagsUpdated, pharmsUpdated, appsUpdated };
 }
 
 // ─── Specialty Root Word Matching ─────────────────────────────────────────────

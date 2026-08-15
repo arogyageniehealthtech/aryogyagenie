@@ -51,6 +51,8 @@ router.get("/users/me", requireAuth, async (req: AuthenticatedRequest, res): Pro
     address: user.address,
     city: user.city,
     state: user.state,
+    latitude: user.latitude,
+    longitude: user.longitude,
     bloodGroup: user.bloodGroup,
     allergies: user.allergies,
     existingConditions: user.existingConditions,
@@ -70,22 +72,89 @@ router.put("/users/me", requireAuth, async (req: AuthenticatedRequest, res): Pro
     address, city, state, bloodGroup, allergies, existingConditions, currentMedications, previousIllnesses, emergencyContact, avatarUrl,
   } = req.body;
 
+  const existingUser = await db.query.usersTable.findFirst({
+    where: eq(usersTable.id, req.userId!),
+  });
+
+  const effectiveAddress = address !== undefined ? address : existingUser?.address;
+  const effectiveCity = city !== undefined ? city : existingUser?.city;
+  const effectiveState = state !== undefined ? state : existingUser?.state;
+
+  // Automatically resolve high precision coordinates whenever address, city, or state is updated or if missing
+  let resolvedCoords: { lat: number; lng: number } | null = null;
+  if (
+    effectiveAddress ||
+    effectiveCity ||
+    effectiveState ||
+    existingUser?.latitude === null ||
+    existingUser?.longitude === null
+  ) {
+    try {
+      resolvedCoords = await resolveProviderCoordinates({
+        lat: address === undefined && city === undefined && state === undefined ? existingUser?.latitude : undefined,
+        lng: address === undefined && city === undefined && state === undefined ? existingUser?.longitude : undefined,
+        address: effectiveAddress,
+        city: effectiveCity,
+        state: effectiveState,
+      });
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  const updatePayload: Record<string, any> = {
+    firstName,
+    lastName,
+    phone,
+    dateOfBirth,
+    age,
+    gender,
+    address,
+    city,
+    state,
+    bloodGroup,
+    allergies,
+    existingConditions,
+    currentMedications,
+    previousIllnesses,
+    emergencyContact,
+    avatarUrl,
+  };
+
+  if (resolvedCoords) {
+    updatePayload.latitude = resolvedCoords.lat;
+    updatePayload.longitude = resolvedCoords.lng;
+  }
+
   const [user] = await db
     .update(usersTable)
-    .set({ firstName, lastName, phone, dateOfBirth, age, gender, address, city, state, bloodGroup, allergies, existingConditions, currentMedications, previousIllnesses, emergencyContact, avatarUrl })
+    .set(updatePayload)
     .where(eq(usersTable.id, req.userId!))
     .returning();
 
-  // If user is a provider and address/city was updated, sync coordinates to provider tables
-  if (address || city) {
+  // If user is a provider, automatically sync coordinates to provider tables
+  if (resolvedCoords) {
     try {
-      const coords = await resolveProviderCoordinates({ address, city, state });
       if (user.role === "doctor") {
-        await db.update(doctorsTable).set({ clinicAddress: address, latitude: coords.lat, longitude: coords.lng }).where(eq(doctorsTable.userId, user.id));
+        await db.update(doctorsTable).set({
+          clinicAddress: effectiveAddress || "Lake Town, Kolkata",
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
+        }).where(eq(doctorsTable.userId, user.id));
       } else if (user.role === "diagnostic_center") {
-        await db.update(diagnosticCentersTable).set({ address, city, latitude: coords.lat, longitude: coords.lng }).where(eq(diagnosticCentersTable.userId, user.id));
+        await db.update(diagnosticCentersTable).set({
+          address: effectiveAddress || "Main Address",
+          city: effectiveCity || "Kolkata",
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
+        }).where(eq(diagnosticCentersTable.userId, user.id));
       } else if (user.role === "pharmacy") {
-        await db.update(pharmaciesTable).set({ address, city, latitude: coords.lat, longitude: coords.lng }).where(eq(pharmaciesTable.userId, user.id));
+        await db.update(pharmaciesTable).set({
+          address: effectiveAddress || "Main Address",
+          city: effectiveCity || "Kolkata",
+          latitude: resolvedCoords.lat,
+          longitude: resolvedCoords.lng,
+        }).where(eq(pharmaciesTable.userId, user.id));
       }
     } catch {
       // Non-fatal
@@ -128,6 +197,18 @@ router.post("/users/me/onboard", requireAuth, async (req: AuthenticatedRequest, 
 
   const resolvedFirstName = firstName || centerName || pharmacyName || existingUser?.firstName || "Patient";
 
+  // Auto-resolve coordinates for the user on onboarding
+  let userCoords: { lat: number; lng: number } | null = null;
+  try {
+    userCoords = await resolveProviderCoordinates({
+      address: address || existingUser?.address || "Lake Town, Kolkata",
+      city: existingUser?.city || "Kolkata",
+      state: existingUser?.state || "West Bengal",
+    });
+  } catch {
+    // Non-fatal
+  }
+
   const [user] = await db
     .update(usersTable)
     .set({
@@ -139,6 +220,7 @@ router.post("/users/me/onboard", requireAuth, async (req: AuthenticatedRequest, 
       gender: gender || existingUser?.gender || undefined,
       address: address || existingUser?.address || undefined,
       status: initialStatus,
+      ...(userCoords ? { latitude: userCoords.lat, longitude: userCoords.lng } : {}),
     })
     .where(eq(usersTable.id, req.userId!))
     .returning();

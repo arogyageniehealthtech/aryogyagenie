@@ -122,6 +122,17 @@ router.put("/diagnostic-centers/me/profile", requireAuth, requireRole(["diagnost
     .where(eq(diagnosticCentersTable.userId, req.userId!))
     .returning();
 
+  // Also sync coordinates and address to linked user record
+  await db
+    .update(usersTable)
+    .set({
+      address: address || effectiveAddress,
+      city: city || undefined,
+      latitude: resolvedCoords.lat,
+      longitude: resolvedCoords.lng,
+    })
+    .where(eq(usersTable.id, req.userId!));
+
   const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
   res.json({ id: dc.id, userId: dc.userId, name: dc.name, email: u?.email ?? "", phone: dc.phone, address: dc.address, city: dc.city, accreditation: dc.accreditation, services: dc.services, openingHours: dc.openingHours, rating: dc.rating, status: dc.status });
 });
