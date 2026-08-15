@@ -162,33 +162,65 @@ export function PatientMedicineReminders() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="medicineName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Medicine Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. Paracetamol, Metformin" className="rounded-xl" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="dosage"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Dosage</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. 500mg, 1 tablet" className="rounded-xl" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="medicineName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Medicine Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g. Paracetamol 650, Metformin" className="rounded-xl" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="dosage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dosage</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g. 1 tablet, 500mg" className="rounded-xl" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Quick Medicine Suggestions */}
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        Suggested Options:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { name: "Paracetamol 650", dose: "1 tablet", freq: "twice_daily", times: "08:00 AM, 08:00 PM" },
+                          { name: "Dolo 650", dose: "1 tablet", freq: "as_needed", times: "08:00 AM" },
+                          { name: "Amoxicillin 500mg", dose: "1 capsule", freq: "thrice_daily", times: "08:00 AM, 02:00 PM, 08:00 PM" },
+                          { name: "Pantoprazole 40mg", dose: "1 tablet before meal", freq: "once_daily", times: "07:30 AM" },
+                          { name: "Cetirizine 10mg", dose: "1 tablet at night", freq: "once_daily", times: "09:30 PM" },
+                        ].map((sug) => (
+                          <button
+                            key={sug.name}
+                            type="button"
+                            onClick={() => {
+                              form.setValue("medicineName", sug.name);
+                              form.setValue("dosage", sug.dose);
+                              form.setValue("frequency", sug.freq as any);
+                              form.setValue("times", sug.times);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200/60 text-xs font-medium transition-colors"
+                          >
+                            + {sug.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

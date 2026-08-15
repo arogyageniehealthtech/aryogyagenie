@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useListDoctors } from "@workspace/api-client-react";
 import { DOCTOR_SPECIALTIES } from "@/lib/specialties";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
@@ -71,6 +71,39 @@ export function PatientDoctors() {
   const [nearbyDocs, setNearbyDocs] = useState<MapProviderItem[]>([]);
   const [loadingNearby, setLoadingNearby] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Doctor search quick suggestions
+  const DOCTOR_SUGGESTIONS = useMemo(() => [
+    { title: "General Physician", category: "Specialty", subtitle: "Fever, cold, routine care & general health", icon: "🩺" },
+    { title: "Cardiologist", category: "Specialty", subtitle: "Heart checkup, chest pain & blood pressure", icon: "🫀" },
+    { title: "Dermatologist", category: "Specialty", subtitle: "Skin rash, acne, hair & allergy issues", icon: "🧴" },
+    { title: "Pediatrician", category: "Specialty", subtitle: "Child healthcare, vaccinations & growth", icon: "👶" },
+    { title: "Orthopedic", category: "Specialty", subtitle: "Bone fractures, joint pain & arthritis", icon: "🦴" },
+    { title: "Neurologist", category: "Specialty", subtitle: "Migraines, headaches & nerve disorders", icon: "🧠" },
+    { title: "Gynecologist", category: "Specialty", subtitle: "Women's wellness, pregnancy & PCOS", icon: "🤰" },
+    { title: "ENT Specialist", category: "Specialty", subtitle: "Ear infections, throat pain & sinus", icon: "👂" },
+  ], []);
+
+  const filteredSuggestions = useMemo(() => {
+    if (!search.trim()) return DOCTOR_SUGGESTIONS.slice(0, 4);
+    const q = search.toLowerCase().trim();
+    return DOCTOR_SUGGESTIONS.filter(
+      (s) => s.title.toLowerCase().includes(q) || s.subtitle.toLowerCase().includes(q) || s.category.toLowerCase().includes(q)
+    ).slice(0, 5);
+  }, [search, DOCTOR_SUGGESTIONS]);
+
+  // Close search suggestions on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   // List view data query
   const { data: doctors, isLoading } = useListDoctors({
@@ -176,15 +209,68 @@ export function PatientDoctors() {
         {/* Search & Specialty Filters */}
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
+            <div className="relative flex-1" ref={searchContainerRef}>
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search by doctor name, specialty, clinic..."
-                className="pl-10 h-11 rounded-xl bg-white border-slate-200/80 shadow-xs focus-visible:ring-violet-500"
+                className="pl-10 pr-8 h-11 rounded-xl bg-white border-slate-200/80 shadow-xs focus-visible:ring-violet-500"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+
+              {/* Suggestions Dropdown Popup */}
+              {isSearchFocused && filteredSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">
+                      Suggested Options ({filteredSuggestions.length})
+                    </span>
+                    <span className="text-[10px] text-violet-600 font-medium">Click to select</span>
+                  </div>
+                  <div className="p-1.5 space-y-1">
+                    {filteredSuggestions.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setSearch(item.title);
+                          setIsSearchFocused(false);
+                        }}
+                        className="w-full flex items-start gap-3 p-2.5 rounded-xl text-left hover:bg-violet-50/80 transition-colors group cursor-pointer"
+                      >
+                        <span className="text-xl shrink-0 p-1 bg-slate-100 rounded-lg group-hover:bg-violet-100 transition-colors">
+                          {item.icon}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-900 group-hover:text-violet-700">
+                              {item.title}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                              {item.category}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {item.subtitle}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
             <Select value={specialty} onValueChange={setSpecialty}>
               <SelectTrigger className="w-full sm:w-[240px] h-11 rounded-xl bg-white border-slate-200/80 shadow-xs">
                 <SelectValue placeholder="All Specialties" />
@@ -198,6 +284,27 @@ export function PatientDoctors() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Quick Option Pill Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+              Quick Options:
+            </span>
+            {["General Physician", "Cardiologist", "Dermatologist", "Pediatrician", "Orthopedic"].map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setSearch(search === opt ? "" : opt)}
+                className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-all border ${
+                  search === opt
+                    ? "bg-violet-600 text-white border-violet-600 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:bg-violet-50/50"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
           </div>
         </div>
 

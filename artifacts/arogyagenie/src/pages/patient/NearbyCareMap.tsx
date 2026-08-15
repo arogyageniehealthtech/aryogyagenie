@@ -61,14 +61,71 @@ export function NearbyCareMap() {
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [medicineQuery, setMedicineQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Results State
   const [providers, setProviders] = useState<MapProviderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mobileViewMode, setMobileViewMode] = useState<"split" | "map" | "list">("split");
-
   const cardListRef = useRef<HTMLDivElement | null>(null);
+
+  // Discovery quick options catalog
+  const NEARBY_SUGGESTIONS = useMemo(() => ({
+    doctor: [
+      { title: "General Physician", category: "Specialty", subtitle: "Fever, cold, routine checkup & general health", icon: "🩺", type: "doctor" },
+      { title: "Cardiologist", category: "Specialty", subtitle: "Heart care, blood pressure & ECG", icon: "🫀", type: "doctor" },
+      { title: "Dermatologist", category: "Specialty", subtitle: "Skin rash, acne & allergies", icon: "🧴", type: "doctor" },
+      { title: "Pediatrician", category: "Specialty", subtitle: "Child healthcare & wellness", icon: "👶", type: "doctor" },
+      { title: "Orthopedic", category: "Specialty", subtitle: "Bone fractures & joint pain", icon: "🦴", type: "doctor" },
+    ],
+    diagnostic_center: [
+      { title: "Complete Blood Count (CBC)", category: "Lab Test", subtitle: "Hemoglobin, platelets & infections", icon: "🩸", type: "diagnostic_center" },
+      { title: "Lipid Profile", category: "Lab Test", subtitle: "Cholesterol & triglyceride panel", icon: "🫀", type: "diagnostic_center" },
+      { title: "Thyroid Profile (T3, T4, TSH)", category: "Lab Test", subtitle: "Hormone level checkup", icon: "🧬", type: "diagnostic_center" },
+      { title: "MRI Scan", category: "Radiology", subtitle: "Brain, spine & joint imaging", icon: "🧠", type: "diagnostic_center" },
+      { title: "Digital Chest X-Ray", category: "Radiology", subtitle: "Lungs & chest examination", icon: "🩻", type: "diagnostic_center" },
+    ],
+    pharmacy: [
+      { title: "Paracetamol 650", category: "Medicine", subtitle: "Pain relief & antipyretic for fever", icon: "💊", type: "pharmacy" },
+      { title: "Dolo 650", category: "Medicine", subtitle: "Fast fever and body ache relief", icon: "💊", type: "pharmacy" },
+      { title: "Amoxicillin 500mg", category: "Antibiotic", subtitle: "Broad-spectrum bacterial infection capsule", icon: "💊", type: "pharmacy" },
+      { title: "Pantoprazole 40mg", category: "Antacid", subtitle: "Acidity, GERD & gastric relief", icon: "💊", type: "pharmacy" },
+      { title: "Cetirizine 10mg", category: "Antihistamine", subtitle: "Allergy, sneezing & runny nose", icon: "💊", type: "pharmacy" },
+      { title: "Azithromycin 500mg", category: "Antibiotic", subtitle: "Throat & chest infection tablet", icon: "💊", type: "pharmacy" },
+    ],
+  }), []);
+
+  const currentSuggestions = useMemo(() => {
+    const activeText = filterType === "pharmacy" ? medicineQuery : searchQuery;
+    const q = activeText.toLowerCase().trim();
+
+    let pool: Array<{ title: string; category: string; subtitle: string; icon: string; type: string }> = [];
+    if (filterType === "doctor") pool = NEARBY_SUGGESTIONS.doctor;
+    else if (filterType === "diagnostic_center") pool = NEARBY_SUGGESTIONS.diagnostic_center;
+    else if (filterType === "pharmacy") pool = NEARBY_SUGGESTIONS.pharmacy;
+    else {
+      pool = [
+        ...NEARBY_SUGGESTIONS.doctor.slice(0, 2),
+        ...NEARBY_SUGGESTIONS.diagnostic_center.slice(0, 2),
+        ...NEARBY_SUGGESTIONS.pharmacy.slice(0, 2),
+      ];
+    }
+
+    if (!q) return pool.slice(0, 4);
+    return pool.filter((s) => s.title.toLowerCase().includes(q) || s.subtitle.toLowerCase().includes(q) || s.category.toLowerCase().includes(q)).slice(0, 5);
+  }, [filterType, searchQuery, medicineQuery, NEARBY_SUGGESTIONS]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   // Fetch from backend location discovery API
   const fetchNearby = useCallback(
@@ -280,7 +337,7 @@ export function NearbyCareMap() {
             </div>
 
             {/* Keyword / Specialty / Medicine Search */}
-            <div className="flex items-center gap-2 flex-1 max-w-md">
+            <div className="flex items-center gap-2 flex-1 max-w-md" ref={searchContainerRef}>
               <div className="relative flex-1">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -301,7 +358,8 @@ export function NearbyCareMap() {
                       setSearchQuery(e.target.value);
                     }
                   }}
-                  className="pl-8 text-xs h-9 bg-slate-50 border-slate-200"
+                  onFocus={() => setIsSearchFocused(true)}
+                  className="pl-8 pr-8 text-xs h-9 bg-slate-50 border-slate-200"
                 />
                 {(searchQuery || medicineQuery) && (
                   <button
@@ -315,8 +373,91 @@ export function NearbyCareMap() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
+
+                {/* Suggestions Dropdown */}
+                {isSearchFocused && currentSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">
+                        Suggested Options ({currentSuggestions.length})
+                      </span>
+                      <span className="text-[10px] text-violet-600 font-medium">Click to select</span>
+                    </div>
+                    <div className="p-1.5 space-y-1">
+                      {currentSuggestions.map((item, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            if (item.type === "pharmacy" || filterType === "pharmacy") {
+                              setMedicineQuery(item.title);
+                            } else {
+                              setSearchQuery(item.title);
+                            }
+                            setIsSearchFocused(false);
+                          }}
+                          className="w-full flex items-start gap-3 p-2 rounded-xl text-left hover:bg-violet-50/80 transition-colors group cursor-pointer"
+                        >
+                          <span className="text-lg shrink-0 p-1 bg-slate-100 rounded-lg group-hover:bg-violet-100 transition-colors">
+                            {item.icon}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-900 group-hover:text-violet-700">
+                                {item.title}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                                {item.category}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                              {item.subtitle}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+
+          {/* Quick Option Pills by Tab */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+              Popular Options:
+            </span>
+            {(filterType === "pharmacy"
+              ? ["Paracetamol 650", "Dolo 650", "Amoxicillin 500mg", "Pantoprazole 40mg", "Cetirizine 10mg"]
+              : filterType === "diagnostic_center"
+              ? ["Complete Blood Count (CBC)", "Lipid Profile", "Thyroid Profile", "MRI Scan", "X-Ray"]
+              : filterType === "doctor"
+              ? ["General Physician", "Cardiologist", "Dermatologist", "Pediatrician", "Orthopedic"]
+              : ["General Physician", "Complete Blood Count", "Paracetamol 650", "Cardiologist", "Dolo 650"]
+            ).map((opt) => {
+              const isActive = (filterType === "pharmacy" ? medicineQuery : searchQuery) === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    if (filterType === "pharmacy") {
+                      setMedicineQuery(medicineQuery === opt ? "" : opt);
+                    } else {
+                      setSearchQuery(searchQuery === opt ? "" : opt);
+                    }
+                  }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-all border ${
+                    isActive
+                      ? "bg-violet-600 text-white border-violet-600 shadow-xs"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:bg-violet-50/50"
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
           </div>
 
           {/* ── Radius Slider: 0 km to 18 km ────────────────────────────────────── */}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useListDiagnosticBookings, useCreateDiagnosticBooking, useListDiagnosticCenters, getListDiagnosticBookingsQueryKey } from "@workspace/api-client-react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { GooglePlaceMap } from "../../components/map/GooglePlaceMap";
@@ -14,7 +14,7 @@ import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   TestTube, MapPin, Plus, Clock, CheckCircle2, AlertCircle, XCircle, Building2,
-  Search, Sparkles, FileText, ArrowRight, ShieldCheck, Map as MapIcon
+  Search, Sparkles, FileText, ArrowRight, ShieldCheck, Map as MapIcon, X
 } from "lucide-react";
 
 const bookingSchema = z.object({
@@ -83,7 +83,42 @@ export function PatientDiagnosticBookings() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"all" | "confirmed" | "pending" | "completed">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isModalTestFocused, setIsModalTestFocused] = useState(false);
   const [selectedCenterId, setSelectedCenterId] = useState<number | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Diagnostic Test quick suggestions catalog
+  const DIAGNOSTIC_SUGGESTIONS = useMemo(() => [
+    { title: "Complete Blood Count (CBC)", category: "Blood Test", subtitle: "Hemoglobin, WBC, RBC, Platelets & Infections", icon: "🩸" },
+    { title: "Lipid Profile (Cholesterol)", category: "Cardio Health", subtitle: "Total Cholesterol, HDL, LDL & Triglycerides", icon: "🫀" },
+    { title: "Thyroid Profile (T3, T4, TSH)", category: "Endocrine", subtitle: "Thyroid gland hormonal activity & metabolism", icon: "🧬" },
+    { title: "Fasting Blood Sugar & HbA1c", category: "Diabetes", subtitle: "Blood glucose and 3-month average sugar level", icon: "🍬" },
+    { title: "Liver Function Test (LFT)", category: "Organ Panel", subtitle: "Bilirubin, SGOT, SGPT, Protein & Liver enzymes", icon: "🧪" },
+    { title: "Kidney Function Test (KFT)", category: "Organ Panel", subtitle: "Creatinine, Urea, Uric Acid & Electrolytes", icon: "🧫" },
+    { title: "MRI Scan (Brain / Spine)", category: "Radiology", subtitle: "High-resolution magnetic resonance imaging", icon: "🧠" },
+    { title: "Digital Chest X-Ray", category: "Radiology", subtitle: "Lungs, chest cavity & respiratory examination", icon: "🩻" },
+    { title: "Ultrasound Abdomen", category: "Sonography", subtitle: "Liver, Gallbladder, Kidneys & Abdominal scan", icon: "🔊" },
+    { title: "Vitamin D & B12 Test", category: "Nutritional", subtitle: "Bone density, nerve health & deficiency check", icon: "☀️" },
+  ], []);
+
+  const filteredTestSuggestions = useMemo(() => {
+    if (!searchQuery.trim()) return DIAGNOSTIC_SUGGESTIONS.slice(0, 4);
+    const q = searchQuery.toLowerCase().trim();
+    return DIAGNOSTIC_SUGGESTIONS.filter(
+      (s) => s.title.toLowerCase().includes(q) || s.subtitle.toLowerCase().includes(q) || s.category.toLowerCase().includes(q)
+    ).slice(0, 5);
+  }, [searchQuery, DIAGNOSTIC_SUGGESTIONS]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   const { data: bookings, isLoading: isLoadingBookings } = useListDiagnosticBookings();
   const { data: centers } = useListDiagnosticCenters();
@@ -351,36 +386,111 @@ export function PatientDiagnosticBookings() {
         </div>
 
         {/* ── Search & Filter Tabs ───────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs">
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-            {[
-              { id: "all", label: "All Tests" },
-              { id: "confirmed", label: "Confirmed" },
-              { id: "pending", label: "Pending" },
-              { id: "completed", label: "Completed" },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveFilter(tab.id as any)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                  activeFilter === tab.id
-                    ? "bg-violet-600 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs">
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              {[
+                { id: "all", label: "All Tests" },
+                { id: "confirmed", label: "Confirmed" },
+                { id: "pending", label: "Pending" },
+                { id: "completed", label: "Completed" },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveFilter(tab.id as any)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                    activeFilter === tab.id
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-full sm:w-80" ref={searchContainerRef}>
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search test or lab center..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                className="pl-9 pr-8 h-10 rounded-xl bg-slate-50 border-slate-200/80 text-xs focus-visible:ring-violet-500"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {/* Diagnostic Suggestions Dropdown */}
+              {isSearchFocused && filteredTestSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">
+                      Popular Diagnostic Tests ({filteredTestSuggestions.length})
+                    </span>
+                    <span className="text-[10px] text-violet-600 font-medium">Click to select</span>
+                  </div>
+                  <div className="p-1.5 space-y-1">
+                    {filteredTestSuggestions.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery(item.title);
+                          setIsSearchFocused(false);
+                        }}
+                        className="w-full flex items-start gap-3 p-2 rounded-xl text-left hover:bg-violet-50/80 transition-colors group cursor-pointer"
+                      >
+                        <span className="text-lg shrink-0 p-1 bg-slate-100 rounded-lg group-hover:bg-violet-100 transition-colors">
+                          {item.icon}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-900 group-hover:text-violet-700">
+                              {item.title}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                              {item.category}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {item.subtitle}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search test or lab center..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 rounded-xl bg-slate-50 border-slate-200/80 text-xs focus-visible:ring-violet-500"
-            />
+          {/* Quick Option Test Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+              Quick Options:
+            </span>
+            {["Complete Blood Count (CBC)", "Lipid Profile", "Thyroid Profile", "MRI Scan", "Fasting Blood Sugar"].map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setSearchQuery(searchQuery === opt ? "" : opt)}
+                className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-all border ${
+                  searchQuery === opt
+                    ? "bg-violet-600 text-white border-violet-600 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:bg-violet-50/50"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
           </div>
         </div>
 
