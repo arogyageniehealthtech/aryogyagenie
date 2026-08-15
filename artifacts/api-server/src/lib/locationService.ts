@@ -1,7 +1,7 @@
 import { pool } from "@workspace/db";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-export const MIN_RADIUS_KM = 2;
+export const MIN_RADIUS_KM = 0;
 export const MAX_RADIUS_KM = 18;
 export const DEFAULT_RADIUS_KM = 10;
 
@@ -29,13 +29,13 @@ export function parseCoordinates(rawLat: any, rawLng: any): Coordinates | null {
 }
 
 /**
- * Enforces search radius constraints: 2 km min to 18 km max.
+ * Enforces search radius constraints: 0 km min to 18 km max.
  * Clamps out-of-range values or defaults to 10 km.
  */
 export function clampRadiusKm(rawRadius: any, defaultRadius = DEFAULT_RADIUS_KM): number {
   if (rawRadius === undefined || rawRadius === null) return defaultRadius;
   const parsed = typeof rawRadius === "number" ? rawRadius : parseFloat(String(rawRadius));
-  if (isNaN(parsed) || parsed <= 0) return defaultRadius;
+  if (isNaN(parsed) || parsed < 0) return defaultRadius;
 
   if (parsed < MIN_RADIUS_KM) return MIN_RADIUS_KM;
   if (parsed > MAX_RADIUS_KM) return MAX_RADIUS_KM;

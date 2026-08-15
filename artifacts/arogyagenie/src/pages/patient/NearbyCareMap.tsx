@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useLocation } from "wouter";
 import { useUserLocation, QUICK_CITIES, fmtDist } from "@/hooks/useUserLocation";
-import { GoogleMapView, type MapProviderItem } from "@/components/map/GoogleMapView";
+import { MapLibreView, type MapProviderItem } from "@/components/map/MapLibreView";
 
 type FilterType = "all" | "doctor" | "pharmacy" | "diagnostic_center";
 
@@ -319,7 +319,7 @@ export function NearbyCareMap() {
             </div>
           </div>
 
-          {/* ── Radius Slider: 2 km to 18 km ────────────────────────────────────── */}
+          {/* ── Radius Slider: 0 km to 18 km ────────────────────────────────────── */}
           <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <Sliders className="w-4 h-4 text-primary" />
@@ -327,16 +327,16 @@ export function NearbyCareMap() {
               <span className="font-bold text-slate-900 px-2 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">
                 {radiusKm} km
               </span>
-              <span className="text-[11px] text-slate-400">(Min: 2 km • Max: 18 km)</span>
+              <span className="text-[11px] text-slate-400">(Min: 0 km • Max: 18 km)</span>
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-72">
-              <span className="text-[11px] font-semibold text-slate-400 shrink-0">2 km</span>
+              <span className="text-[11px] font-semibold text-slate-400 shrink-0">0 km</span>
               <Slider
                 value={[radiusKm]}
-                min={2}
+                min={0}
                 max={18}
-                step={2}
+                step={1}
                 onValueChange={(vals) => setRadiusKm(vals[0])}
                 className="flex-1"
               />
@@ -511,9 +511,9 @@ export function NearbyCareMap() {
             )}
           </div>
 
-          {/* Interactive Google Map Column */}
+          {/* Interactive MapLibre GL JS Map Column */}
           <div className="lg:col-span-7 h-full">
-            <GoogleMapView
+            <MapLibreView
               userLoc={userLoc}
               radiusKm={radiusKm}
               providers={providers}

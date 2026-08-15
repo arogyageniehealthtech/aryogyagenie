@@ -52,14 +52,17 @@ async function runEndToEndIntegrationTests() {
     assert(parseCoordinates(22, 195) === null, "Out of bounds longitude (>180) rejected safely");
     assert(parseCoordinates("bad_data", "bad_data") === null, "Invalid NaN string rejected safely");
 
-    // ─── 2. RADIUS ENFORCEMENT [2 km to 18 km] ────────────────────────────────────
-    console.log("\n▶ 2. Radius Slider Constraint Enforcement [2 km to 18 km]");
-    assert(clampRadiusKm(0.5) === 2, "Radius 0.5 km clamped to 2 km minimum (MIN_RADIUS_KM)");
-    assert(clampRadiusKm(1.9) === 2, "Radius 1.9 km clamped to 2 km minimum");
+    // ─── 2. RADIUS ENFORCEMENT [0 km to 18 km] ────────────────────────────────────
+    console.log("\n▶ 2. Radius Slider Constraint Enforcement [0 km to 18 km]");
+    assert(clampRadiusKm(0) === 0, "Radius 0 km accepted (MIN_RADIUS_KM = 0)");
+    assert(clampRadiusKm(0.5) === 0.5, "Radius 0.5 km accepted");
+    assert(clampRadiusKm(1) === 1, "Radius 1 km accepted");
     assert(clampRadiusKm(2) === 2, "Radius 2 km accepted");
     assert(clampRadiusKm(5) === 5, "Radius 5 km accepted");
+    assert(clampRadiusKm(8) === 8, "Radius 8 km accepted");
     assert(clampRadiusKm(10) === 10, "Radius 10 km accepted");
-    assert(clampRadiusKm(18) === 18, "Radius 18 km accepted");
+    assert(clampRadiusKm(15) === 15, "Radius 15 km accepted");
+    assert(clampRadiusKm(18) === 18, "Radius 18 km accepted (MAX_RADIUS_KM = 18)");
     assert(clampRadiusKm(25) === 18, "Radius 25 km clamped to 18 km maximum (MAX_RADIUS_KM)");
     assert(clampRadiusKm(999) === 18, "Radius 999 km clamped to 18 km maximum");
     assert(clampRadiusKm(undefined) === 10, "Undefined radius defaults safely to 10 km");

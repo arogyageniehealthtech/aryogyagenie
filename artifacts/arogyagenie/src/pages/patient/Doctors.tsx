@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useUserLocation, QUICK_CITIES, fmtDist } from "@/hooks/useUserLocation";
-import { GoogleMapView, type MapProviderItem } from "@/components/map/GoogleMapView";
+import { MapLibreView, type MapProviderItem } from "@/components/map/MapLibreView";
 
 function DoctorCardSkeleton() {
   return (
@@ -217,9 +217,9 @@ export function PatientDoctors() {
                   </div>
                   <Slider
                     value={[radiusKm]}
-                    min={2}
+                    min={0}
                     max={18}
-                    step={2}
+                    step={1}
                     onValueChange={(v) => setRadiusKm(v[0])}
                     className="flex-1"
                   />
@@ -399,9 +399,9 @@ export function PatientDoctors() {
                 )}
               </div>
 
-              {/* Google Map Column */}
+              {/* MapLibre GL JS Map Column */}
               <div className="lg:col-span-7 h-full">
-                <GoogleMapView
+                <MapLibreView
                   userLoc={userLoc}
                   radiusKm={radiusKm}
                   providers={nearbyDocs}
