@@ -176,6 +176,7 @@ export function GoogleMapView({
     if (!map || !mapLoaded || typeof google === "undefined") return;
 
     const patientPos = { lat: userLoc.lat, lng: userLoc.lng };
+    map.panTo(patientPos);
 
     // 1. Patient Marker
     if (!userMarkerRef.current) {
@@ -213,7 +214,7 @@ export function GoogleMapView({
       circleRef.current.setCenter(patientPos);
       circleRef.current.setRadius(radiusMeters);
     }
-  }, [mapLoaded, userLoc, radiusKm]);
+  }, [mapLoaded, userLoc.lat, userLoc.lng, radiusKm]);
 
   // Sync Provider Markers on Google Map
   useEffect(() => {

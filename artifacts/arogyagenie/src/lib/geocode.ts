@@ -8,16 +8,29 @@
  */
 
 export const LOCALITY_COORDINATES: Record<string, { lat: number; lng: number; displayName: string }> = {
-  // Lake Town & Dum Dum & Baguiati
+  // Lake Town & Dum Dum & Baguiati & Bangur
+  "477, swamiji sarani": { lat: 22.6100, lng: 88.4050, displayName: "Swamiji Sarani, South Dum Dum, Kolkata" },
+  "swamiji sarani": { lat: 22.6100, lng: 88.4050, displayName: "Swamiji Sarani, South Dum Dum, Kolkata" },
+  "700048": { lat: 22.6100, lng: 88.4050, displayName: "South Dum Dum / Lake Town (700048), Kolkata" },
+  "bangur avenue": { lat: 22.6050, lng: 88.4080, displayName: "Bangur Avenue, Kolkata" },
+  "bangur": { lat: 22.6050, lng: 88.4080, displayName: "Bangur, Kolkata" },
+  "700055": { lat: 22.6050, lng: 88.4080, displayName: "Bangur Avenue (700055), Kolkata" },
+  "dum dum park": { lat: 22.6120, lng: 88.4110, displayName: "Dum Dum Park, Kolkata" },
+  "700074": { lat: 22.6120, lng: 88.4110, displayName: "Dum Dum Park (700074), Kolkata" },
+  "nagerbazar": { lat: 22.6300, lng: 88.4180, displayName: "Nagerbazar, Kolkata" },
+  "700028": { lat: 22.6521, lng: 88.4360, displayName: "Dum Dum Cantonment (700028), Kolkata" },
+  "700079": { lat: 22.6450, lng: 88.4250, displayName: "Motijheel / Dum Dum (700079), Kolkata" },
+  "700052": { lat: 22.6500, lng: 88.4450, displayName: "Kolkata Airport / Dum Dum (700052)" },
+  "airport": { lat: 22.6500, lng: 88.4450, displayName: "Netaji Subhash Chandra Bose Airport, Kolkata" },
+  "patipukur": { lat: 22.6000, lng: 88.3900, displayName: "Patipukur, Kolkata" },
+  "dakshindari": { lat: 22.6020, lng: 88.3980, displayName: "Dakshindari, Lake Town, Kolkata" },
   "lake town": { lat: 22.6057, lng: 88.4030, displayName: "Lake Town, Kolkata" },
   "laketown": { lat: 22.6057, lng: 88.4030, displayName: "Lake Town, Kolkata" },
   "700089": { lat: 22.6057, lng: 88.4030, displayName: "Lake Town (700089), Kolkata" },
   "south dumdum": { lat: 22.6100, lng: 88.4050, displayName: "South Dumdum, Kolkata" },
   "south dum dum": { lat: 22.6100, lng: 88.4050, displayName: "South Dumdum, Kolkata" },
-  "700074": { lat: 22.6100, lng: 88.4050, displayName: "Dum Dum Park (700074), Kolkata" },
   "dum dum": { lat: 22.6521, lng: 88.4360, displayName: "Dum Dum, Kolkata" },
   "dumdum": { lat: 22.6521, lng: 88.4360, displayName: "Dum Dum, Kolkata" },
-  "700028": { lat: 22.6521, lng: 88.4360, displayName: "Dum Dum Cantonment (700028), Kolkata" },
   "baguiati": { lat: 22.6185, lng: 88.4285, displayName: "Baguiati, Kolkata" },
   "baguihati": { lat: 22.6185, lng: 88.4285, displayName: "Baguiati, Kolkata" },
   "700059": { lat: 22.6185, lng: 88.4285, displayName: "Baguiati (700059), Kolkata" },
