@@ -35,26 +35,7 @@ const onboardingSchema = z.object({
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-// ─── Nominatim Geocoding Helper ───────────────────────────────────────────────
-interface GeocodeResult {
-  lat: number;
-  lng: number;
-  displayName: string;
-}
-
-async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&addressdetails=1`;
-  const res = await fetch(url, {
-    headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
-  });
-  const data = await res.json();
-  if (!data || data.length === 0) return null;
-  return {
-    lat: parseFloat(data[0].lat),
-    lng: parseFloat(data[0].lon),
-    displayName: data[0].display_name,
-  };
-}
+import { detectAddressCoordinates } from "@/lib/geocode";
 
 // ─── AddressWithGeocode Component ────────────────────────────────────────────
 interface AddressWithGeocodeProps {
@@ -85,17 +66,17 @@ function AddressWithGeocode({
     setGeocoding(true);
     setGeocodeStatus(null);
     try {
-      const result = await geocodeAddress(value.trim());
+      const result = await detectAddressCoordinates(value.trim());
       if (!result) {
         setGeocodeStatus({
           type: "error",
-          text: "Address not found. Try adding more detail (e.g. city, state).",
+          text: "Address not found. Try adding more detail (e.g. locality, city).",
         });
       } else {
         onCoordsDetected(result.lat, result.lng);
         setGeocodeStatus({
           type: "success",
-          text: `Located: ${result.displayName.split(",").slice(0, 3).join(",")}`,
+          text: `📍 Located: ${result.displayName} (${result.lat.toFixed(4)}, ${result.lng.toFixed(4)})`,
         });
       }
     } catch {

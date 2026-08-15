@@ -5,12 +5,36 @@ import {
   searchNearbyDoctors,
   searchNearbyDiagnosticCenters,
   searchNearbyPharmacies,
+  resolveProviderCoordinates,
   MIN_RADIUS_KM,
   MAX_RADIUS_KM,
   DEFAULT_RADIUS_KM,
 } from "../lib/locationService";
 
 const router = Router();
+
+/**
+ * GET /geocode
+ * Resolves any address, locality, or pincode into geographic coordinates.
+ */
+router.get("/geocode", async (req, res): Promise<void> => {
+  try {
+    const rawAddress = (req.query.address || req.query.q) as string | undefined;
+    if (!rawAddress || !rawAddress.trim()) {
+      res.status(400).json({ error: "Address parameter 'address' or 'q' is required." });
+      return;
+    }
+
+    const resolved = await resolveProviderCoordinates({ address: rawAddress.trim() });
+    res.json({
+      lat: resolved.lat,
+      lng: resolved.lng,
+      displayName: rawAddress.trim(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to geocode address." });
+  }
+});
 
 /**
  * GET /nearby

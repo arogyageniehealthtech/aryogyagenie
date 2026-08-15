@@ -45,27 +45,12 @@ export async function fetchReverseGeocode(lat: number, lng: number): Promise<str
   return `Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
 }
 
+import { detectAddressCoordinates } from "@/lib/geocode";
+
 export async function forwardGeocode(
   query: string,
 ): Promise<{ lat: number; lng: number; displayName: string } | null> {
-  if (!query.trim()) return null;
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
-    const res = await fetch(url, {
-      headers: { "Accept-Language": "en", "User-Agent": "ArogyaGenie/1.0" },
-    });
-    const data = await res.json();
-    if (data && data.length > 0) {
-      return {
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-        displayName: data[0].display_name.split(",").slice(0, 3).join(","),
-      };
-    }
-  } catch {
-    // fallback
-  }
-  return null;
+  return detectAddressCoordinates(query);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

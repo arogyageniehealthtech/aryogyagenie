@@ -162,16 +162,9 @@ export function PatientDiagnosticBookings() {
     return matchesFilter && matchesSearch;
   });
 
-  const activeCenter: any = centers?.find(c => c.id === selectedCenterId) || centers?.[0] || {
-    id: 1,
-    name: "Suraksha Diagnostics - Laketown",
-    address: "Premises No. 99, Satnam Apartment, Lake Town Road, Kolkata",
-    city: "Kolkata",
-    phone: "+91 033 6619 1000",
-    latitude: 22.6015,
-    longitude: 88.4023,
-    rating: 4.4,
-  };
+  const activeCenter = centers && centers.length > 0
+    ? (centers.find(c => c.id === selectedCenterId) || centers[0])
+    : null;
 
   return (
     <DashboardLayout>
@@ -223,20 +216,26 @@ export function PatientDiagnosticBookings() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="font-semibold">Diagnostic Center</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger className="rounded-xl h-11">
-                                <SelectValue placeholder="Select a center" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="rounded-xl">
-                              {centers?.map(center => (
-                                <SelectItem key={center.id} value={center.id.toString()}>
-                                  {center.name} ({center.city})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {centers && centers.length > 0 ? (
+                            <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger className="rounded-xl h-11">
+                                  <SelectValue placeholder="Select a center" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="rounded-xl">
+                                {centers.map(center => (
+                                  <SelectItem key={center.id} value={center.id.toString()}>
+                                    {center.name} ({center.city || "Kolkata"})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800">
+                              ℹ️ No diagnostic centers are onboarded yet. Test booking will be activated once a center onboards.
+                            </div>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
@@ -340,22 +339,22 @@ export function PatientDiagnosticBookings() {
           </div>
         </div>
 
-        {/* ── Partner Diagnostic Center Map Section ──────────────────────────── */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold">
-                <MapIcon className="h-5 w-5" />
+        {/* ── Partner Diagnostic Center Map Section (Only displayed when real centers exist) ──────────────── */}
+        {centers && centers.length > 0 && activeCenter && (
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold">
+                  <MapIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-900 text-base">Diagnostic Lab Location & Directions</h2>
+                  <p className="text-xs text-slate-500">Google Place card view synchronized with real-time lab locations.</p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-bold text-slate-900 text-base">Diagnostic Lab Location & Directions</h2>
-                <p className="text-xs text-slate-500">Google Place card view synchronized with real-time lab locations.</p>
-              </div>
-            </div>
 
-            {centers && centers.length > 0 && (
               <Select
-                value={activeCenter?.id?.toString() || "1"}
+                value={activeCenter.id.toString()}
                 onValueChange={(val) => setSelectedCenterId(Number(val))}
               >
                 <SelectTrigger className="w-full sm:w-[260px] h-10 rounded-xl text-xs font-bold border-slate-200">
@@ -369,21 +368,21 @@ export function PatientDiagnosticBookings() {
                   ))}
                 </SelectContent>
               </Select>
-            )}
-          </div>
+            </div>
 
-          {/* Interactive Google Place Map Component */}
-          <GooglePlaceMap
-            title={activeCenter.name || "Suraksha Diagnostics - Laketown"}
-            address={activeCenter.address || "Premises No. 99, Satnam Apartment, Lake Town Road, Kolkata"}
-            latitude={activeCenter.latitude ?? 22.6015}
-            longitude={activeCenter.longitude ?? 88.4023}
-            rating={activeCenter.rating || "4.4"}
-            reviewCount={445}
-            phone={activeCenter.phone ?? undefined}
-            height="400px"
-          />
-        </div>
+            {/* Interactive Google Place Map Component */}
+            <GooglePlaceMap
+              title={activeCenter.name}
+              address={activeCenter.address || "Main Diagnostic Center Address"}
+              latitude={(activeCenter as any).latitude ?? 22.6015}
+              longitude={(activeCenter as any).longitude ?? 88.4023}
+              rating={activeCenter.rating || "4.5"}
+              reviewCount={120}
+              phone={activeCenter.phone ?? undefined}
+              height="400px"
+            />
+          </div>
+        )}
 
         {/* ── Search & Filter Tabs ───────────────────────────────────────────── */}
         <div className="space-y-3">
