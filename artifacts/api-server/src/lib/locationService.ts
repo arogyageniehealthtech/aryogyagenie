@@ -398,7 +398,7 @@ export async function syncAllProviderCoordinates(): Promise<{
 }
 
 // ─── Specialty Root Word Matching ─────────────────────────────────────────────
-function buildSpecialtySqlClause(specialty: string, paramIndex: number): string {
+function buildSpecialtyConditions(specialty: string, params: any[]): string {
   const specLower = specialty.toLowerCase().trim();
   const roots: Record<string, string[]> = {
     general: ["general", "physician", "medicine", "practice", "family"],
@@ -437,8 +437,12 @@ function buildSpecialtySqlClause(specialty: string, paramIndex: number): string 
   };
 
   const matchedKeywords = roots[specLower] || [specLower];
-  const conditions = matchedKeywords.map(() => `d.specialty ILIKE $${paramIndex}`).join(" OR ");
-  return `(${conditions})`;
+  const conditions: string[] = [];
+  for (const kw of matchedKeywords) {
+    params.push(`%${kw}%`);
+    conditions.push(`d.specialty ILIKE $${params.length}`);
+  }
+  return `(${conditions.join(" OR ")})`;
 }
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
@@ -524,6 +528,8 @@ export interface NearbyPharmacyResult {
 
 /**
  * Searches active doctors within radiusKm using PostGIS ST_DWithin and ST_Distance.
+ * If no doctors are found within the strict radius circle, automatically falls back
+ * to all active matching doctors sorted by distance so the patient is never left with an empty view.
  */
 export async function searchNearbyDoctors(options: {
   lat: number;
@@ -538,7 +544,6 @@ export async function searchNearbyDoctors(options: {
   const radiusMeters = radiusKm * 1000.0;
 
   const params: any[] = [lng, lat, radiusMeters];
-  let paramIdx = 4;
 
   let whereClauses = `
     LOWER(COALESCE(d.status, 'active')) IN ('active', 'approved')
@@ -552,25 +557,23 @@ export async function searchNearbyDoctors(options: {
   `;
 
   if (specialty && specialty !== "all") {
-    const specSql = buildSpecialtySqlClause(specialty, paramIdx);
-    params.push(`%${specialty.toLowerCase().trim()}%`);
+    const specSql = buildSpecialtyConditions(specialty, params);
     whereClauses += ` AND ${specSql}`;
-    paramIdx++;
   }
 
   if (search && search.trim()) {
     params.push(`%${search.trim()}%`);
+    const searchIdx = params.length;
     whereClauses += ` AND (
-      u.first_name ILIKE $${paramIdx}
-      OR u.last_name ILIKE $${paramIdx}
-      OR d.specialty ILIKE $${paramIdx}
-      OR d.clinic_name ILIKE $${paramIdx}
-      OR d.clinic_address ILIKE $${paramIdx}
-      OR u.city ILIKE $${paramIdx}
-      OR d.state ILIKE $${paramIdx}
-      OR d.pincode ILIKE $${paramIdx}
+      u.first_name ILIKE $${searchIdx}
+      OR u.last_name ILIKE $${searchIdx}
+      OR d.specialty ILIKE $${searchIdx}
+      OR d.clinic_name ILIKE $${searchIdx}
+      OR d.clinic_address ILIKE $${searchIdx}
+      OR u.city ILIKE $${searchIdx}
+      OR d.state ILIKE $${searchIdx}
+      OR d.pincode ILIKE $${searchIdx}
     )`;
-    paramIdx++;
   }
 
   const countQuery = `
@@ -615,18 +618,90 @@ export async function searchNearbyDoctors(options: {
     LEFT JOIN users u ON d.user_id = u.id
     WHERE ${whereClauses}
     ORDER BY "distanceKm" ASC
-    LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
+    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `;
 
-  params.push(limit, offset);
+  const queryParams = [...params, limit, offset];
 
   const [countRes, dataRes] = await Promise.all([
-    pool.query(countQuery, params.slice(0, paramIdx - 1)),
-    pool.query(dataQuery, params),
+    pool.query(countQuery, params),
+    pool.query(dataQuery, queryParams),
   ]);
 
-  const total = countRes.rows[0]?.total ?? 0;
-  const results: NearbyDoctorResult[] = dataRes.rows.map((r: any) => ({
+  let total = countRes.rows[0]?.total ?? 0;
+  let rows = dataRes.rows;
+
+  // Fallback: If 0 doctors found within strict radius, fetch active doctors sorted by distance
+  if (rows.length === 0) {
+    const fbParams: any[] = [lng, lat];
+    let fbWhere = `
+      LOWER(COALESCE(d.status, 'active')) IN ('active', 'approved')
+      AND d.latitude IS NOT NULL
+      AND d.longitude IS NOT NULL
+    `;
+    if (specialty && specialty !== "all") {
+      const fbSpecSql = buildSpecialtyConditions(specialty, fbParams);
+      fbWhere += ` AND ${fbSpecSql}`;
+    }
+    if (search && search.trim()) {
+      fbParams.push(`%${search.trim()}%`);
+      const fbSearchIdx = fbParams.length;
+      fbWhere += ` AND (
+        u.first_name ILIKE $${fbSearchIdx}
+        OR u.last_name ILIKE $${fbSearchIdx}
+        OR d.specialty ILIKE $${fbSearchIdx}
+        OR d.clinic_name ILIKE $${fbSearchIdx}
+        OR d.clinic_address ILIKE $${fbSearchIdx}
+        OR u.city ILIKE $${fbSearchIdx}
+        OR d.state ILIKE $${fbSearchIdx}
+        OR d.pincode ILIKE $${fbSearchIdx}
+      )`;
+    }
+
+    const fbDataQuery = `
+      SELECT
+        d.id,
+        d.user_id as "userId",
+        u.first_name as "firstName",
+        u.last_name as "lastName",
+        u.email,
+        u.avatar_url as "avatarUrl",
+        d.specialty,
+        d.qualification,
+        d.license_number as "licenseNumber",
+        d.clinic_name as "clinicName",
+        COALESCE(d.clinic_address, u.address, 'Medical Center') as "clinicAddress",
+        d.state,
+        d.pincode,
+        d.consultation_fee as "consultationFee",
+        d.experience,
+        d.bio,
+        d.rating,
+        d.review_count as "reviewCount",
+        d.available_days as "availableDays",
+        d.available_hours as "availableHours",
+        d.latitude,
+        d.longitude,
+        ROUND(
+          (ST_Distance(
+            ST_SetSRID(ST_MakePoint(d.longitude, d.latitude), 4326)::geography,
+            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+          ) / 1000.0)::numeric,
+          2
+        )::float as "distanceKm"
+      FROM doctors d
+      LEFT JOIN users u ON d.user_id = u.id
+      WHERE ${fbWhere}
+      ORDER BY "distanceKm" ASC
+      LIMIT $${fbParams.length + 1} OFFSET $${fbParams.length + 2}
+    `;
+
+    const fbRes = await pool.query(fbDataQuery, [...fbParams, limit, offset]);
+    rows = fbRes.rows;
+    total = rows.length;
+  }
+
+  const results: NearbyDoctorResult[] = rows.map((r: any) => ({
     id: r.id,
     userId: r.userId,
     type: "doctor",

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useGetMe } from "@workspace/api-client-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface UserLocation {
@@ -14,14 +15,16 @@ export interface SavedLocation extends UserLocation {
 const STORAGE_KEY = "arogyagenie_user_location";
 
 const DEFAULT_LOCATION: SavedLocation = {
-  lat: 22.5726,
-  lng: 88.3639,
-  name: "Park Street, Kolkata",
+  lat: 22.6057,
+  lng: 88.4030,
+  name: "Lake Town / South Dum Dum, Kolkata",
 };
 
 export const QUICK_CITIES = [
-  { name: "Kolkata (Park St)", lat: 22.5532, lng: 88.3512 },
+  { name: "Lake Town, Kolkata", lat: 22.6057, lng: 88.4030 },
+  { name: "Swamiji Sarani / Dum Dum", lat: 22.6100, lng: 88.4050 },
   { name: "Salt Lake, Kolkata", lat: 22.5834, lng: 88.4123 },
+  { name: "Park Street, Kolkata", lat: 22.5532, lng: 88.3512 },
   { name: "Howrah, Kolkata", lat: 22.5958, lng: 88.2636 },
   { name: "Durgapur", lat: 23.5204, lng: 87.3119 },
   { name: "New Delhi", lat: 28.6139, lng: 77.209 },
@@ -110,6 +113,7 @@ export interface UseUserLocationReturn {
 }
 
 export function useUserLocation(): UseUserLocationReturn {
+  const { data: user } = useGetMe();
   const initialLoc = useMemo(() => getSavedLocation(), []);
 
   const [userLoc, setUserLoc] = useState<UserLocation>({
@@ -121,6 +125,20 @@ export function useUserLocation(): UseUserLocationReturn {
   const [isLiveGps, setIsLiveGps] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+
+  // Synchronize with logged-in user profile coordinates from DB if present
+  useEffect(() => {
+    const rawUser = user as any;
+    if (rawUser?.latitude && rawUser?.longitude) {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) {
+        const profileName = rawUser.address || (rawUser.city ? `${rawUser.city}` : "My Location");
+        setUserLoc({ lat: rawUser.latitude, lng: rawUser.longitude });
+        setLocationName(profileName);
+        saveLocation({ lat: rawUser.latitude, lng: rawUser.longitude, name: profileName });
+      }
+    }
+  }, [user]);
 
   const watchIdRef = useRef<number | null>(null);
 
