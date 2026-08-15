@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useLocation } from "wouter";
 import { useUserLocation, QUICK_CITIES, fmtDist } from "@/hooks/useUserLocation";
-import { MapLibreView, type MapProviderItem } from "@/components/map/MapLibreView";
+import { GoogleMapView, type MapProviderItem } from "@/components/map/GoogleMapView";
 
 type FilterType = "all" | "doctor" | "pharmacy" | "diagnostic_center";
 
@@ -511,9 +511,9 @@ export function NearbyCareMap() {
             )}
           </div>
 
-          {/* Interactive MapLibre GL JS Map Column */}
+          {/* Interactive Google Map Column */}
           <div className="lg:col-span-7 h-full">
-            <MapLibreView
+            <GoogleMapView
               userLoc={userLoc}
               radiusKm={radiusKm}
               providers={providers}
