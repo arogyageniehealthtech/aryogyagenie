@@ -42,6 +42,35 @@ export function clampRadiusKm(rawRadius: any, defaultRadius = DEFAULT_RADIUS_KM)
   return Math.round(parsed * 10) / 10;
 }
 
+/**
+ * Attempts to forward geocode an address string using Nominatim if coordinates are missing.
+ */
+export async function geocodeAddress(
+  address: string,
+): Promise<{ lat: number; lng: number } | null> {
+  if (!address || !address.trim()) return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address.trim())}&format=json&limit=1`;
+    const res = await fetch(url, {
+      headers: {
+        "Accept-Language": "en",
+        "User-Agent": "ArogyaGenie/1.0",
+      },
+    });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+  } catch (err) {
+    // Non-fatal geocoding error
+  }
+  return null;
+}
+
 // ─── Type Definitions ─────────────────────────────────────────────────────────
 export interface NearbyDoctorResult {
   id: number;
@@ -165,6 +194,9 @@ export async function searchNearbyDoctors(options: {
       OR d.specialty ILIKE $${paramIdx}
       OR d.clinic_name ILIKE $${paramIdx}
       OR d.clinic_address ILIKE $${paramIdx}
+      OR d.city ILIKE $${paramIdx}
+      OR d.state ILIKE $${paramIdx}
+      OR d.pincode ILIKE $${paramIdx}
     )`;
     paramIdx++;
   }
@@ -296,6 +328,8 @@ export async function searchNearbyDiagnosticCenters(options: {
       OR dc.services ILIKE $${paramIdx}
       OR dc.address ILIKE $${paramIdx}
       OR dc.city ILIKE $${paramIdx}
+      OR dc.state ILIKE $${paramIdx}
+      OR dc.pincode ILIKE $${paramIdx}
     )`;
     paramIdx++;
   }
@@ -423,6 +457,8 @@ export async function searchNearbyPharmacies(options: {
       p.name ILIKE $${paramIdx}
       OR p.city ILIKE $${paramIdx}
       OR p.address ILIKE $${paramIdx}
+      OR p.state ILIKE $${paramIdx}
+      OR p.pincode ILIKE $${paramIdx}
     )`;
     paramIdx++;
   }
