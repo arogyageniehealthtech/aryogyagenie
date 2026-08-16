@@ -1,3 +1,7 @@
+-- Ensure PostGIS spatial and pgvector extensions exist before table creation
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS vector;
+--> statement-breakpoint
 CREATE TABLE "users" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"clerk_id" text NOT NULL,

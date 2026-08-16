@@ -35,6 +35,10 @@ export async function runMigrations(closePool = true) {
   console.log(`Applying SQL migrations from: ${migrationsFolder}`);
 
   try {
+    // Ensure required extensions are active prior to migration execution
+    await pool.query("CREATE EXTENSION IF NOT EXISTS postgis;");
+    await pool.query("CREATE EXTENSION IF NOT EXISTS vector;");
+
     await migrate(db, { migrationsFolder });
     console.log("✓ All pending migrations applied successfully.");
     console.log("=================================================");

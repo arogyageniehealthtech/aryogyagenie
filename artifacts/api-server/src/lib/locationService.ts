@@ -550,9 +550,9 @@ export async function searchNearbyDoctors(options: {
     AND d.latitude IS NOT NULL
     AND d.longitude IS NOT NULL
     AND ST_DWithin(
-      ST_SetSRID(ST_MakePoint(d.longitude, d.latitude), 4326)::geography,
-      ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-      $3
+      ST_SetSRID(ST_MakePoint(d.longitude::float8, d.latitude::float8), 4326)::geography,
+      ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography,
+      $3::float8
     )
   `;
 
@@ -609,8 +609,8 @@ export async function searchNearbyDoctors(options: {
       d.longitude,
       ROUND(
         (ST_Distance(
-          ST_SetSRID(ST_MakePoint(d.longitude, d.latitude), 4326)::geography,
-          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+          ST_SetSRID(ST_MakePoint(d.longitude::float8, d.latitude::float8), 4326)::geography,
+          ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography
         ) / 1000.0)::numeric,
         2
       )::float as "distanceKm"
@@ -684,8 +684,8 @@ export async function searchNearbyDoctors(options: {
         d.longitude,
         ROUND(
           (ST_Distance(
-            ST_SetSRID(ST_MakePoint(d.longitude, d.latitude), 4326)::geography,
-            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+            ST_SetSRID(ST_MakePoint(d.longitude::float8, d.latitude::float8), 4326)::geography,
+            ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography
           ) / 1000.0)::numeric,
           2
         )::float as "distanceKm"
@@ -757,9 +757,9 @@ export async function searchNearbyDiagnosticCenters(options: {
     AND dc.latitude IS NOT NULL
     AND dc.longitude IS NOT NULL
     AND ST_DWithin(
-      ST_SetSRID(ST_MakePoint(dc.longitude, dc.latitude), 4326)::geography,
-      ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-      $3
+      ST_SetSRID(ST_MakePoint(dc.longitude::float8, dc.latitude::float8), 4326)::geography,
+      ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography,
+      $3::float8
     )
   `;
 
@@ -808,8 +808,8 @@ export async function searchNearbyDiagnosticCenters(options: {
       dc.longitude,
       ROUND(
         (ST_Distance(
-          ST_SetSRID(ST_MakePoint(dc.longitude, dc.latitude), 4326)::geography,
-          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+          ST_SetSRID(ST_MakePoint(dc.longitude::float8, dc.latitude::float8), 4326)::geography,
+          ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography
         ) / 1000.0)::numeric,
         2
       )::float as "distanceKm"
@@ -880,9 +880,9 @@ export async function searchNearbyPharmacies(options: {
     AND p.latitude IS NOT NULL
     AND p.longitude IS NOT NULL
     AND ST_DWithin(
-      ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)::geography,
-      ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-      $3
+      ST_SetSRID(ST_MakePoint(p.longitude::float8, p.latitude::float8), 4326)::geography,
+      ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography,
+      $3::float8
     )
   `;
 
@@ -940,8 +940,8 @@ export async function searchNearbyPharmacies(options: {
         p.longitude,
         ROUND(
           (ST_Distance(
-            ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)::geography,
-            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+            ST_SetSRID(ST_MakePoint(p.longitude::float8, p.latitude::float8), 4326)::geography,
+            ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography
           ) / 1000.0)::numeric,
           2
         )::float as "distanceKm",
@@ -984,8 +984,8 @@ export async function searchNearbyPharmacies(options: {
         p.longitude,
         ROUND(
           (ST_Distance(
-            ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)::geography,
-            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+            ST_SetSRID(ST_MakePoint(p.longitude::float8, p.latitude::float8), 4326)::geography,
+            ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography
           ) / 1000.0)::numeric,
           2
         )::float as "distanceKm",

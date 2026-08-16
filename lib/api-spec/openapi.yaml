@@ -116,6 +116,18 @@ paths:
           in: query
           schema:
             type: string
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lng
+          in: query
+          schema:
+            type: number
+        - name: radius
+          in: query
+          schema:
+            type: number
       responses:
         "200":
           description: List of doctors

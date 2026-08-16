@@ -9,4 +9,7 @@
 export type ListDoctorsParams = {
 specialty?: string;
 search?: string;
+lat?: number;
+lng?: number;
+radius?: number;
 };
