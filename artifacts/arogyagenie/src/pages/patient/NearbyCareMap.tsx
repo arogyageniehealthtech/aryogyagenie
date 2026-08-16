@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { customFetch } from "@workspace/api-client-react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import {
   MapPin, Stethoscope, Pill, TestTube, Locate, AlertCircle,
@@ -141,10 +142,8 @@ export function NearbyCareMap() {
           ...(med.trim() ? { medicine: med.trim() } : {}),
         });
 
-        const res = await fetch(`/api/nearby?${params}`);
-        if (!res.ok) throw new Error("Failed to fetch nearby providers");
-        const data = await res.json();
-        setProviders(data.results || []);
+        const data = await customFetch<{ results: MapProviderItem[] }>(`/api/nearby?${params}`);
+        setProviders(data?.results || []);
       } catch {
         setProviders([]);
       } finally {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useListDoctors } from "@workspace/api-client-react";
+import { useListDoctors, customFetch } from "@workspace/api-client-react";
 import { DOCTOR_SPECIALTIES } from "@/lib/specialties";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Input } from "@/components/ui/input";
@@ -142,15 +142,11 @@ export function PatientDoctors() {
         ...(specialty !== "all" ? { specialty } : {}),
         ...(search ? { search } : {}),
       });
-      const res = await fetch(`/api/nearby?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setNearbyDocs(data.results || []);
-      } else {
-        setNearbyFetchError("Failed to fetch nearby medical providers");
-      }
-    } catch {
-      setNearbyFetchError("Network connection error while fetching map locations");
+      const data = await customFetch<{ results: MapProviderItem[] }>(`/api/nearby?${params}`);
+      setNearbyDocs(data?.results || []);
+    } catch (err: any) {
+      setNearbyDocs([]);
+      setNearbyFetchError(err?.message || "Failed to fetch nearby medical providers. Please ensure the backend server is running.");
     } finally {
       setLoadingNearby(false);
     }
