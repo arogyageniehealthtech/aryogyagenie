@@ -460,7 +460,7 @@ export function NearbyCareMap() {
             })}
           </div>
 
-          {/* ── Radius Slider: 0 km to 18 km ────────────────────────────────────── */}
+          {/* ── Radius Slider: 2 km to 18 km ────────────────────────────────────── */}
           <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <Sliders className="w-4 h-4 text-primary" />
@@ -471,17 +471,41 @@ export function NearbyCareMap() {
               <span className="text-[11px] text-slate-400">(Min: 0 km • Max: 18 km)</span>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-72">
-              <span className="text-[11px] font-semibold text-slate-400 shrink-0">0 km</span>
-              <Slider
-                value={[radiusKm]}
-                min={0}
-                max={18}
-                step={1}
-                onValueChange={(vals) => setRadiusKm(vals[0])}
-                className="flex-1"
-              />
-              <span className="text-[11px] font-semibold text-slate-400 shrink-0">18 km</span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 w-56">
+                <span className="text-[11px] font-semibold text-slate-400 shrink-0">0 km</span>
+                <Slider
+                  value={[radiusKm]}
+                  min={0}
+                  max={18}
+                  step={1}
+                  onValueChange={(vals) => setRadiusKm(vals[0])}
+                  className="flex-1"
+                />
+                <span className="text-[11px] font-semibold text-slate-400 shrink-0">18 km</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                {[
+                  { label: "2 km", val: 2 },
+                  { label: "5 km", val: 5 },
+                  { label: "10 km", val: 10 },
+                  { label: "18 km", val: 18 },
+                ].map((m) => (
+                  <button
+                    key={m.val}
+                    type="button"
+                    onClick={() => setRadiusKm(m.val)}
+                    className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition-all border ${
+                      radiusKm === m.val
+                        ? "bg-violet-600 text-white border-violet-600 shadow-2xs"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-violet-50 hover:text-violet-700"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

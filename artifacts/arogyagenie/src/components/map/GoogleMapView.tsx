@@ -273,6 +273,51 @@ export function GoogleMapView({
     });
   }, [mapLoaded, providers, selectedId, onSelectProvider]);
 
+  // Auto-Fit Bounds to frame user and all providers within radius
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !mapLoaded || typeof google === "undefined") return;
+
+    // Only auto-fit when not explicitly inspecting a single selected provider
+    if (selectedId !== null) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(new google.maps.LatLng(userLoc.lat, userLoc.lng));
+
+    let validCount = 0;
+    providers.forEach((p) => {
+      const lat = typeof p.latitude === "number" ? p.latitude : parseFloat(String(p.latitude));
+      const lng = typeof p.longitude === "number" ? p.longitude : parseFloat(String(p.longitude));
+      if (!isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0)) {
+        bounds.extend(new google.maps.LatLng(lat, lng));
+        validCount++;
+      }
+    });
+
+    if (validCount > 0) {
+      map.fitBounds(bounds, {
+        top: 50,
+        right: 50,
+        bottom: 50,
+        left: 50,
+      });
+
+      // Prevent over-zooming when patient and doctor are at identical or very close coordinates
+      const listener = google.maps.event.addListenerOnce(map, "idle", () => {
+        const currentZoom = map.getZoom();
+        if (currentZoom !== undefined && currentZoom > 15) {
+          map.setZoom(15);
+        }
+      });
+      return () => {
+        google.maps.event.removeListener(listener);
+      };
+    } else {
+      map.panTo({ lat: userLoc.lat, lng: userLoc.lng });
+      map.setZoom(13);
+    }
+  }, [mapLoaded, userLoc.lat, userLoc.lng, providers, selectedId, radiusKm]);
+
   // Handle Selected Provider (Pan to location & open InfoWindow)
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -288,17 +333,36 @@ export function GoogleMapView({
     const typeCfg = TYPE_CONFIG[selectedProvider.type] || TYPE_CONFIG.doctor;
     const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLoc.lat},${userLoc.lng}&destination=${selectedProvider.latitude},${selectedProvider.longitude}`;
 
+    const bookHref =
+      selectedProvider.type === "doctor"
+        ? `/patient/appointments?doctorId=${selectedProvider.id}`
+        : selectedProvider.type === "diagnostic_center"
+        ? `/patient/diagnostic-bookings?centerId=${selectedProvider.id}`
+        : `/patient/prescriptions`;
+
+    const bookLabel =
+      selectedProvider.type === "doctor"
+        ? "Book Appointment"
+        : selectedProvider.type === "diagnostic_center"
+        ? "Book Lab Test"
+        : "Order Medicine";
+
     const contentString = `
-      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 4px; max-width: 260px;">
-        <div style="font-size: 11px; font-weight: 700; color: ${typeCfg.pinColor}; text-transform: uppercase; margin-bottom: 2px;">
-          ${typeCfg.emoji} ${typeCfg.label}
+      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; max-width: 280px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+          <span style="font-size: 11px; font-weight: 700; color: ${typeCfg.pinColor}; text-transform: uppercase; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">
+            ${typeCfg.emoji} ${typeCfg.label}
+          </span>
+          <span style="font-size: 11px; font-weight: 700; color: #475569; background: #f8fafc; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+            ${selectedProvider.distanceKm < 1 ? Math.round(selectedProvider.distanceKm * 1000) + " m" : selectedProvider.distanceKm.toFixed(1) + " km"}
+          </span>
         </div>
         <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 3px;">
           ${selectedProvider.name}
         </div>
         ${
           selectedProvider.specialty
-            ? `<div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">${selectedProvider.specialty}</div>`
+            ? `<div style="font-size: 12px; font-weight: 600; color: #6d28d9; margin-bottom: 4px;">${selectedProvider.specialty}</div>`
             : ""
         }
         ${
@@ -310,13 +374,19 @@ export function GoogleMapView({
               </div>`
             : ""
         }
-        <div style="font-size: 11px; color: #475569; margin-bottom: 8px;">
-          📍 ${selectedProvider.distanceKm} km away • ${selectedProvider.address || "Verified Location"}
+        <div style="font-size: 11px; color: #64748b; margin-bottom: 8px; line-height: 1.3;">
+          📍 ${selectedProvider.address || "Verified Healthcare Provider"}
         </div>
-        <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer"
-           style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #2563eb; text-decoration: none; padding: 4px 8px; background: #eff6ff; border-radius: 6px; border: 1px solid #bfdbfe;">
-          Get Directions ↗
-        </a>
+        <div style="display: flex; align-items: center; gap: 6px; pt-1;">
+          <a href="${bookHref}"
+             style="display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #ffffff; background: ${typeCfg.pinColor}; text-decoration: none; padding: 6px 10px; border-radius: 6px; flex: 1; text-align: center;">
+            ${bookLabel}
+          </a>
+          <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer"
+             style="display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: #2563eb; text-decoration: none; padding: 5px 8px; background: #eff6ff; border-radius: 6px; border: 1px solid #bfdbfe;">
+            🧭 Route ↗
+          </a>
+        </div>
       </div>
     `;
 
@@ -329,7 +399,7 @@ export function GoogleMapView({
   const handleCenterOnUser = useCallback(() => {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.panTo({ lat: userLoc.lat, lng: userLoc.lng });
-      mapInstanceRef.current.setZoom(13);
+      mapInstanceRef.current.setZoom(14);
     }
   }, [userLoc]);
 
@@ -368,7 +438,7 @@ export function GoogleMapView({
           size="sm"
           variant="secondary"
           onClick={handleCenterOnUser}
-          className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white text-xs font-semibold gap-1.5 border border-slate-200 h-8 text-slate-700"
+          className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white text-xs font-semibold gap-1.5 border border-slate-200 h-8 text-slate-700 cursor-pointer"
         >
           <Navigation className="w-3.5 h-3.5 text-primary" />
           Center on Me
