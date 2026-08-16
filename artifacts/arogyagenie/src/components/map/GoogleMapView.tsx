@@ -35,7 +35,7 @@ interface GoogleMapViewProps {
 
 const TYPE_CONFIG = {
   doctor: {
-    pinColor: "#7C3AED", // Violet
+    pinColor: "#EF4444", // Vibrant Red for Doctors
     emoji: "🩺",
     label: "Doctor",
   },
@@ -50,6 +50,48 @@ const TYPE_CONFIG = {
     label: "Pharmacy",
   },
 };
+
+/**
+ * Computes display coordinates with micro-offset (spiderfying) when multiple providers
+ * share identical or near-identical coordinates (< 0.00015 deg ~ 15m), ensuring every
+ * provider has a distinct, fully visible, and interactive pin on Google Maps.
+ */
+function computeDisambiguatedPositions(providers: MapProviderItem[]): Map<string, { lat: number; lng: number }> {
+  const result = new Map<string, { lat: number; lng: number }>();
+  const groups = new Map<string, Array<{ key: string; origLat: number; origLng: number }>>();
+
+  providers.forEach((p) => {
+    const lat = typeof p.latitude === "number" ? p.latitude : parseFloat(String(p.latitude));
+    const lng = typeof p.longitude === "number" ? p.longitude : parseFloat(String(p.longitude));
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
+
+    const markerKey = `${p.type || "doctor"}_${p.id}`;
+    // Key at ~15m resolution (4 decimal places)
+    const gridKey = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
+
+    if (!groups.has(gridKey)) {
+      groups.set(gridKey, []);
+    }
+    groups.get(gridKey)!.push({ key: markerKey, origLat: lat, origLng: lng });
+  });
+
+  groups.forEach((items) => {
+    if (items.length === 1) {
+      result.set(items[0].key, { lat: items[0].origLat, lng: items[0].origLng });
+    } else {
+      // Fan out overlapping pins radially so each pin is clearly visible
+      const radiusOffset = 0.00020; // ~20 meters
+      items.forEach((item, index) => {
+        const angle = (2 * Math.PI * index) / items.length;
+        const offsetLat = item.origLat + radiusOffset * Math.sin(angle);
+        const offsetLng = item.origLng + (radiusOffset / Math.cos((item.origLat * Math.PI) / 180)) * Math.cos(angle);
+        result.set(item.key, { lat: offsetLat, lng: offsetLng });
+      });
+    }
+  });
+
+  return result;
+}
 
 /**
  * Creates custom SVG data URL icon for Google Maps markers.
@@ -216,10 +258,13 @@ export function GoogleMapView({
     }
   }, [mapLoaded, userLoc.lat, userLoc.lng, radiusKm]);
 
-  // Sync Provider Markers on Google Map
+  // Sync Provider Markers on Google Map with spiderfying for co-located coordinates
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !mapLoaded || typeof google === "undefined") return;
+
+    // Disambiguate positions for overlapping / identical coordinates
+    const disambiguatedPositions = computeDisambiguatedPositions(providers);
 
     // Composite keys (type_id) to avoid collision between doctor, pharmacy, and diagnostic center
     const currentKeys = new Set(providers.map((p) => `${p.type || "doctor"}_${p.id}`));
@@ -232,14 +277,12 @@ export function GoogleMapView({
 
     // Add or update provider markers
     providers.forEach((p) => {
-      const lat = typeof p.latitude === "number" ? p.latitude : parseFloat(String(p.latitude));
-      const lng = typeof p.longitude === "number" ? p.longitude : parseFloat(String(p.longitude));
-      if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
-
       const markerKey = `${p.type || "doctor"}_${p.id}`;
+      const pos = disambiguatedPositions.get(markerKey);
+      if (!pos) return;
+
       const isSelected = p.id === selectedId;
       const typeCfg = TYPE_CONFIG[p.type] || TYPE_CONFIG.doctor;
-      const pos = { lat, lng };
 
       let marker = providerMarkersRef.current.get(markerKey);
 
@@ -253,7 +296,7 @@ export function GoogleMapView({
             scaledSize: isSelected ? new google.maps.Size(42, 52) : new google.maps.Size(34, 42),
             anchor: isSelected ? new google.maps.Point(21, 52) : new google.maps.Point(17, 42),
           },
-          zIndex: isSelected ? 1000 : 10,
+          zIndex: isSelected ? 1000 : (p.type === "doctor" ? 50 : 10),
         });
 
         marker.addListener("click", () => {
@@ -268,7 +311,7 @@ export function GoogleMapView({
           scaledSize: isSelected ? new google.maps.Size(42, 52) : new google.maps.Size(34, 42),
           anchor: isSelected ? new google.maps.Point(21, 52) : new google.maps.Point(17, 42),
         });
-        marker.setZIndex(isSelected ? 1000 : 10);
+        marker.setZIndex(isSelected ? 1000 : (p.type === "doctor" ? 50 : 10));
       }
     });
   }, [mapLoaded, providers, selectedId, onSelectProvider]);
@@ -319,7 +362,6 @@ export function GoogleMapView({
     }
   }, [mapLoaded, userLoc.lat, userLoc.lng, providers, selectedId, radiusKm]);
 
-
   // Handle Selected Provider (Pan to location & open InfoWindow)
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -329,7 +371,10 @@ export function GoogleMapView({
     const selectedProvider = providers.find((p) => p.id === selectedId);
     if (!selectedProvider) return;
 
-    const pos = { lat: selectedProvider.latitude, lng: selectedProvider.longitude };
+    const disambiguatedPositions = computeDisambiguatedPositions(providers);
+    const markerKey = `${selectedProvider.type || "doctor"}_${selectedProvider.id}`;
+    const pos = disambiguatedPositions.get(markerKey) || { lat: selectedProvider.latitude, lng: selectedProvider.longitude };
+
     map.panTo(pos);
 
     const typeCfg = TYPE_CONFIG[selectedProvider.type] || TYPE_CONFIG.doctor;
@@ -352,7 +397,7 @@ export function GoogleMapView({
     const contentString = `
       <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; max-width: 280px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-          <span style="font-size: 11px; font-weight: 700; color: ${typeCfg.pinColor}; text-transform: uppercase; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">
+          <span style="font-size: 11px; font-weight: 700; color: ${typeCfg.pinColor}; text-transform: uppercase; background: ${selectedProvider.type === "doctor" ? "#fee2e2" : "#f1f5f9"}; padding: 2px 6px; border-radius: 4px;">
             ${typeCfg.emoji} ${typeCfg.label}
           </span>
           <span style="font-size: 11px; font-weight: 700; color: #475569; background: #f8fafc; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
@@ -364,7 +409,7 @@ export function GoogleMapView({
         </div>
         ${
           selectedProvider.specialty
-            ? `<div style="font-size: 12px; font-weight: 600; color: #6d28d9; margin-bottom: 4px;">${selectedProvider.specialty}</div>`
+            ? `<div style="font-size: 12px; font-weight: 600; color: #dc2626; margin-bottom: 4px;">${selectedProvider.specialty}</div>`
             : ""
         }
         ${

@@ -24,8 +24,8 @@ const TYPE_CONFIG = {
   doctor: {
     label: "Doctor",
     emoji: "🩺",
-    color: "bg-violet-50 text-violet-700 border-violet-200",
-    badgeColor: "bg-violet-600 text-white",
+    color: "bg-red-50 text-red-700 border-red-200",
+    badgeColor: "bg-red-600 text-white",
   },
   diagnostic_center: {
     label: "Diagnostic Lab",
@@ -168,7 +168,7 @@ export function NearbyCareMap() {
   const handleSelectProvider = useCallback((provider: MapProviderItem | null) => {
     setSelectedId(provider ? provider.id : null);
     if (provider) {
-      const el = document.getElementById(`provider-card-${provider.id}`);
+      const el = document.getElementById(`provider-card-${provider.type}-${provider.id}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
@@ -281,7 +281,7 @@ export function NearbyCareMap() {
                     key={city.name}
                     type="button"
                     onClick={() => handleQuickCitySelect(city)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-violet-700 border border-slate-200 hover:border-violet-200 transition-colors"
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-50 hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-200 hover:border-red-200 transition-colors"
                   >
                     📍 {city.name}
                   </button>
@@ -316,7 +316,7 @@ export function NearbyCareMap() {
                 type="button"
                 onClick={() => setFilterType("doctor")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  filterType === "doctor" ? "bg-violet-600 text-white shadow-xs" : "text-slate-600 hover:text-violet-700"
+                  filterType === "doctor" ? "bg-red-600 text-white shadow-xs" : "text-slate-600 hover:text-red-700"
                 }`}
               >
                 🩺 Doctors
@@ -386,7 +386,7 @@ export function NearbyCareMap() {
                       <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">
                         Suggested Options ({currentSuggestions.length})
                       </span>
-                      <span className="text-[10px] text-violet-600 font-medium">Click to select</span>
+                      <span className="text-[10px] text-red-600 font-medium">Click to select</span>
                     </div>
                     <div className="p-1.5 space-y-1">
                       {currentSuggestions.map((item, idx) => (
@@ -401,14 +401,14 @@ export function NearbyCareMap() {
                             }
                             setIsSearchFocused(false);
                           }}
-                          className="w-full flex items-start gap-3 p-2 rounded-xl text-left hover:bg-violet-50/80 transition-colors group cursor-pointer"
+                          className="w-full flex items-start gap-3 p-2 rounded-xl text-left hover:bg-red-50/80 transition-colors group cursor-pointer"
                         >
-                          <span className="text-lg shrink-0 p-1 bg-slate-100 rounded-lg group-hover:bg-violet-100 transition-colors">
+                          <span className="text-lg shrink-0 p-1 bg-slate-100 rounded-lg group-hover:bg-red-100 transition-colors">
                             {item.icon}
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-slate-900 group-hover:text-violet-700">
+                              <span className="text-xs font-bold text-slate-900 group-hover:text-red-700">
                                 {item.title}
                               </span>
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
@@ -455,8 +455,10 @@ export function NearbyCareMap() {
                   }}
                   className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-all border ${
                     isActive
-                      ? "bg-violet-600 text-white border-violet-600 shadow-xs"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:bg-violet-50/50"
+                      ? filterType === "doctor"
+                        ? "bg-red-600 text-white border-red-600 shadow-xs"
+                        : "bg-primary text-white border-primary shadow-xs"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-red-300 hover:bg-red-50/50"
                   }`}
                 >
                   {opt}
@@ -465,12 +467,12 @@ export function NearbyCareMap() {
             })}
           </div>
 
-          {/* ── Radius Slider: 2 km to 18 km ────────────────────────────────────── */}
+          {/* ── Radius Slider: 0 km to 18 km ────────────────────────────────────── */}
           <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <Sliders className="w-4 h-4 text-primary" />
               <span>Search Radius:</span>
-              <span className="font-bold text-slate-900 px-2 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">
+              <span className="font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">
                 {radiusKm} km
               </span>
               <span className="text-[11px] text-slate-400">(Min: 0 km • Max: 18 km)</span>
@@ -503,8 +505,8 @@ export function NearbyCareMap() {
                     onClick={() => setRadiusKm(m.val)}
                     className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition-all border ${
                       radiusKm === m.val
-                        ? "bg-violet-600 text-white border-violet-600 shadow-2xs"
-                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-violet-50 hover:text-violet-700"
+                        ? "bg-primary text-white border-primary shadow-2xs"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
                     }`}
                   >
                     {m.label}
@@ -550,7 +552,7 @@ export function NearbyCareMap() {
                     size="sm"
                     variant="outline"
                     onClick={() => setRadiusKm(18)}
-                    className="text-xs gap-1.5 border-violet-200 text-violet-700 hover:bg-violet-50"
+                    className="text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50"
                   >
                     Expand to 18 km
                   </Button>
@@ -564,12 +566,16 @@ export function NearbyCareMap() {
 
                 return (
                   <div
-                    id={`provider-card-${p.id}`}
+                    id={`provider-card-${p.type}-${p.id}`}
                     key={`${p.type}-${p.id}`}
                     onClick={() => handleSelectProvider(p)}
                     className={`p-4 rounded-2xl bg-white border transition-all cursor-pointer ${
                       isSelected
-                        ? "border-violet-500 shadow-md ring-2 ring-violet-500/20 bg-violet-50/20"
+                        ? p.type === "doctor"
+                          ? "border-red-500 shadow-md ring-2 ring-red-500/20 bg-red-50/20"
+                          : p.type === "diagnostic_center"
+                          ? "border-sky-500 shadow-md ring-2 ring-sky-500/20 bg-sky-50/20"
+                          : "border-emerald-500 shadow-md ring-2 ring-emerald-500/20 bg-emerald-50/20"
                         : "border-slate-200/90 hover:border-slate-300 shadow-2xs hover:shadow-xs"
                     }`}
                   >
@@ -595,7 +601,7 @@ export function NearbyCareMap() {
                     <h3 className="font-bold text-slate-900 text-sm mb-1">{p.name}</h3>
 
                     {p.specialty && (
-                      <p className="text-xs text-violet-700 font-semibold mb-1">{p.specialty}</p>
+                      <p className="text-xs text-red-700 font-semibold mb-1">{p.specialty}</p>
                     )}
 
                     {p.address && (
@@ -628,7 +634,7 @@ export function NearbyCareMap() {
                             e.stopPropagation();
                             setLocation(`/patient/appointments?doctorId=${p.id}`);
                           }}
-                          className="h-8 text-xs font-semibold bg-primary text-white hover:bg-primary/90 flex-1"
+                          className="h-8 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 flex-1"
                         >
                           Book Appointment
                         </Button>

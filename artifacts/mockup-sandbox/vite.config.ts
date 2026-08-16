@@ -20,7 +20,7 @@ try {
   // .env is optional
 }
 
-const rawPort = process.env.PORT || "5001";
+const rawPort = process.env.MOCKUP_PORT || "5001";
 
 const port = Number(rawPort);
 

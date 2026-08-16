@@ -3,7 +3,7 @@ import { syncAllProviderCoordinates } from "../../artifacts/api-server/src/lib/l
 
 async function main() {
   console.log("Starting full database coordinate auto-resolution & backfill...");
-  const result = await syncAllProviderCoordinates();
+  const result = await syncAllProviderCoordinates({ forceAll: true });
   console.log("Synchronization result:", result);
 
   console.log("\n--- Current Users in Database ---");
@@ -21,6 +21,22 @@ async function main() {
     ORDER BY id ASC
   `);
   console.table(docs.rows);
+
+  console.log("\n--- Current Diagnostic Centers in Database ---");
+  const diags = await pool.query(`
+    SELECT id, user_id, name, address, latitude, longitude, status
+    FROM diagnostic_centers
+    ORDER BY id ASC
+  `);
+  console.table(diags.rows);
+
+  console.log("\n--- Current Pharmacies in Database ---");
+  const pharms = await pool.query(`
+    SELECT id, user_id, name, address, latitude, longitude, status
+    FROM pharmacies
+    ORDER BY id ASC
+  `);
+  console.table(pharms.rows);
 
   await pool.end();
 }

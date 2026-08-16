@@ -181,10 +181,78 @@ export async function geocodeAddress(
   return null;
 }
 
+// Specific sub-localities that should be matched before generic municipality/city names
+const SPECIFIC_LOCALITY_PRIORITY = [
+  "477, swamiji sarani",
+  "swamiji sarani",
+  "nagerbazar",
+  "dum dum park",
+  "bangur avenue",
+  "bangur",
+  "lake town",
+  "laketown",
+  "salt lake sector v",
+  "salt lake sector 5",
+  "salt lake sector 1",
+  "salt lake sector 2",
+  "salt lake sector 3",
+  "salt lake sector i",
+  "salt lake sector ii",
+  "salt lake sector iii",
+  "salt lake",
+  "saltlake",
+  "bidhannagar",
+  "new town",
+  "newtown",
+  "rajarhat",
+  "kestopur",
+  "krishnapur",
+  "baguiati",
+  "baguihati",
+  "patipukur",
+  "dakshindari",
+  "park street",
+  "park circus",
+  "gariahat",
+  "jadavpur",
+  "ballygunge",
+  "alipore",
+  "behala",
+  "baranagar",
+  "belgharia",
+  "ruby",
+  "mukundapur",
+  "tollygunge",
+  "sealdah",
+  "esplanade",
+  "shyambazar",
+  "bhowanipore",
+  "bhawanipur",
+  "barasat",
+  "madhyamgram",
+  "barrackpore",
+  "howrah",
+  "airport",
+  "700048",
+  "700055",
+  "700074",
+  "700028",
+  "700079",
+  "700052",
+  "700089",
+  "700059",
+  "700091",
+  "700064",
+  "700106",
+  "700156",
+  "700016",
+];
+
 /**
  * Comprehensive coordinate resolver:
  * 1. Checks if existing coords are valid non-zero numbers.
- * 2. Matches address / city keywords against LOCALITY_COORDINATES dictionary.
+ * 2. Matches address / city keywords against high-priority specific sub-localities first,
+ *    then the remaining LOCALITY_COORDINATES dictionary.
  * 3. Tries OpenStreetMap / Nominatim geocoding.
  * 4. Falls back to default city/regional anchor (guarantees non-null coordinates).
  */
@@ -210,8 +278,16 @@ export async function resolveProviderCoordinates(options: {
     .toLowerCase()
     .trim();
 
-  // 2. High-precision offline dictionary matching (sorted by length desc to match specific sub-localities first)
+  // 2. High-precision offline dictionary matching:
+  // First check specific sub-localities
   if (combinedText) {
+    for (const key of SPECIFIC_LOCALITY_PRIORITY) {
+      if (combinedText.includes(key) && LOCALITY_COORDINATES[key]) {
+        return LOCALITY_COORDINATES[key];
+      }
+    }
+
+    // Then check all other keys sorted by length desc
     const sortedKeys = Object.keys(LOCALITY_COORDINATES).sort((a, b) => b.length - a.length);
     for (const key of sortedKeys) {
       if (combinedText.includes(key)) {
@@ -244,15 +320,16 @@ export async function resolveProviderCoordinates(options: {
 
 /**
  * Synchronizes and repairs coordinates for all users, doctors, diagnostic centers,
- * pharmacies, and provider applications that have missing (NULL or 0) coordinates.
+ * pharmacies, and provider applications.
  */
-export async function syncAllProviderCoordinates(): Promise<{
+export async function syncAllProviderCoordinates(options?: { forceAll?: boolean }): Promise<{
   usersUpdated: number;
   doctorsUpdated: number;
   diagsUpdated: number;
   pharmsUpdated: number;
   appsUpdated: number;
 }> {
+  const forceAll = options?.forceAll ?? false;
   let usersUpdated = 0;
   let doctorsUpdated = 0;
   let diagsUpdated = 0;
@@ -261,6 +338,7 @@ export async function syncAllProviderCoordinates(): Promise<{
 
   try {
     // 0. Repair Users (Patients, Doctors, Diagnostic Centers, Pharmacies, Admins)
+    const userWhere = forceAll ? "" : "WHERE u.latitude IS NULL OR u.longitude IS NULL OR u.latitude = 0 OR u.longitude = 0";
     const userRows = await pool.query(`
       SELECT u.id, u.role, u.first_name, u.last_name, u.address, u.city, u.state, u.latitude, u.longitude,
              d.clinic_address,
@@ -270,7 +348,7 @@ export async function syncAllProviderCoordinates(): Promise<{
       LEFT JOIN doctors d ON d.user_id = u.id
       LEFT JOIN diagnostic_centers dc ON dc.user_id = u.id
       LEFT JOIN pharmacies p ON p.user_id = u.id
-      WHERE u.latitude IS NULL OR u.longitude IS NULL OR u.latitude = 0 OR u.longitude = 0
+      ${userWhere}
     `);
 
     for (const u of userRows.rows) {
@@ -282,8 +360,8 @@ export async function syncAllProviderCoordinates(): Promise<{
         (u.city ? `${u.city}` : "Lake Town, Kolkata");
 
       const coords = await resolveProviderCoordinates({
-        lat: u.latitude,
-        lng: u.longitude,
+        lat: forceAll ? undefined : u.latitude,
+        lng: forceAll ? undefined : u.longitude,
         address: candidateAddress,
         city: u.city || "Kolkata",
         state: u.state || "West Bengal",
@@ -297,17 +375,18 @@ export async function syncAllProviderCoordinates(): Promise<{
     }
 
     // 1. Repair Doctors
+    const docWhere = forceAll ? "" : "WHERE d.latitude IS NULL OR d.longitude IS NULL OR d.latitude = 0 OR d.longitude = 0";
     const docRows = await pool.query(`
       SELECT d.id, d.clinic_address, d.state, d.pincode, d.latitude, d.longitude, u.address as user_address, u.city as user_city
       FROM doctors d
       LEFT JOIN users u ON d.user_id = u.id
-      WHERE d.latitude IS NULL OR d.longitude IS NULL OR d.latitude = 0 OR d.longitude = 0
+      ${docWhere}
     `);
 
     for (const doc of docRows.rows) {
       const coords = await resolveProviderCoordinates({
-        lat: doc.latitude,
-        lng: doc.longitude,
+        lat: forceAll ? undefined : doc.latitude,
+        lng: forceAll ? undefined : doc.longitude,
         address: doc.clinic_address || doc.user_address || "Lake Town, Kolkata",
         city: doc.user_city || "Kolkata",
         state: doc.state || "West Bengal",
@@ -322,16 +401,17 @@ export async function syncAllProviderCoordinates(): Promise<{
     }
 
     // 2. Repair Diagnostic Centers
+    const diagWhere = forceAll ? "" : "WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0";
     const diagRows = await pool.query(`
       SELECT id, name, address, city, state, pincode, latitude, longitude
       FROM diagnostic_centers
-      WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0
+      ${diagWhere}
     `);
 
     for (const diag of diagRows.rows) {
       const coords = await resolveProviderCoordinates({
-        lat: diag.latitude,
-        lng: diag.longitude,
+        lat: forceAll ? undefined : diag.latitude,
+        lng: forceAll ? undefined : diag.longitude,
         address: diag.address || diag.name,
         city: diag.city || "Kolkata",
         state: diag.state || "West Bengal",
@@ -339,23 +419,24 @@ export async function syncAllProviderCoordinates(): Promise<{
       });
 
       await pool.query(
-        `UPDATE diagnostic_centers SET latitude = $1, longitude = $2, status = 'active' WHERE id = $3`,
+        `UPDATE diagnostic_centers SET latitude = $1, longitude = $2, status = 'active', services = COALESCE(services, 'Blood Test, Pathology, MRI, Digital X-Ray, Ultrasound, CT Scan') WHERE id = $3`,
         [coords.lat, coords.lng, diag.id],
       );
       diagsUpdated++;
     }
 
     // 3. Repair Pharmacies
+    const pharmWhere = forceAll ? "" : "WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0";
     const pharmRows = await pool.query(`
       SELECT id, name, address, city, state, pincode, latitude, longitude
       FROM pharmacies
-      WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0
+      ${pharmWhere}
     `);
 
     for (const pharm of pharmRows.rows) {
       const coords = await resolveProviderCoordinates({
-        lat: pharm.latitude,
-        lng: pharm.longitude,
+        lat: forceAll ? undefined : pharm.latitude,
+        lng: forceAll ? undefined : pharm.longitude,
         address: pharm.address || pharm.name,
         city: pharm.city || "Kolkata",
         state: pharm.state || "West Bengal",
@@ -370,16 +451,17 @@ export async function syncAllProviderCoordinates(): Promise<{
     }
 
     // 4. Repair Provider Applications
+    const appWhere = forceAll ? "" : "WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0";
     const appRows = await pool.query(`
       SELECT id, type, name, first_name, last_name, address, city, latitude, longitude
       FROM provider_applications
-      WHERE latitude IS NULL OR longitude IS NULL OR latitude = 0 OR longitude = 0
+      ${appWhere}
     `);
 
     for (const app of appRows.rows) {
       const coords = await resolveProviderCoordinates({
-        lat: app.latitude,
-        lng: app.longitude,
+        lat: forceAll ? undefined : app.latitude,
+        lng: forceAll ? undefined : app.longitude,
         address: app.address || `${app.first_name || ""} ${app.last_name || ""}`.trim(),
         city: app.city || "Kolkata",
       });
@@ -546,7 +628,7 @@ export async function searchNearbyDoctors(options: {
   const params: any[] = [lng, lat, radiusMeters];
 
   let whereClauses = `
-    LOWER(COALESCE(d.status, 'active')) IN ('active', 'approved')
+    (LOWER(COALESCE(d.status, 'active')) IN ('active', 'approved') OR (u.role = 'doctor' AND LOWER(COALESCE(u.status, 'active')) = 'active'))
     AND d.latitude IS NOT NULL
     AND d.longitude IS NOT NULL
     AND ST_DWithin(
@@ -635,7 +717,7 @@ export async function searchNearbyDoctors(options: {
   if (rows.length === 0) {
     const fbParams: any[] = [lng, lat];
     let fbWhere = `
-      LOWER(COALESCE(d.status, 'active')) IN ('active', 'approved')
+      (LOWER(COALESCE(d.status, 'active')) IN ('active', 'approved') OR (u.role = 'doctor' AND LOWER(COALESCE(u.status, 'active')) = 'active'))
       AND d.latitude IS NOT NULL
       AND d.longitude IS NOT NULL
     `;

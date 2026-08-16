@@ -157,6 +157,16 @@ async function runEndToEndIntegrationTests() {
     );
 
     // 5.2 Search for available medicine "Amoxicillin 500mg"
+    const amoxMedRow = await pool.query(`SELECT id FROM medicines WHERE name ILIKE '%Amoxicillin%' LIMIT 1`);
+    const pharmsList = await pool.query(`SELECT id FROM pharmacies LIMIT 1`);
+    if (amoxMedRow.rows[0] && pharmsList.rows[0]) {
+      await pool.query(`
+        INSERT INTO pharmacy_inventory (pharmacy_id, medicine_id, price, in_stock, quantity)
+        VALUES ($1, $2, 65.0, true, 50)
+        ON CONFLICT (pharmacy_id, medicine_id) DO UPDATE SET in_stock = true, quantity = 50
+      `, [pharmsList.rows[0].id, amoxMedRow.rows[0].id]);
+    }
+
     const pharmAmox = await searchNearbyPharmacies({
       lat: kolkataPatient.lat,
       lng: kolkataPatient.lng,

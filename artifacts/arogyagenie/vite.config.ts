@@ -20,7 +20,7 @@ try {
   // .env is optional
 }
 
-const rawPort = process.env.PORT || "5000";
+const rawPort = process.env.VITE_PORT || process.env.FRONTEND_PORT || "5000";
 
 const port = Number(rawPort);
 

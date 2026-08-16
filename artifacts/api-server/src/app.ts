@@ -59,7 +59,7 @@ if (isProductionMode && !rawAllowedOrigins) {
 }
 
 const allowedOrigins = rawAllowedOrigins
-  ? rawAllowedOrigins.split(",").map((o) => o.trim()).filter(Boolean)
+  ? rawAllowedOrigins.split(",").map((o: string) => o.trim()).filter(Boolean)
   : null;
 
 if (isProductionMode && allowedOrigins && allowedOrigins.includes("*")) {

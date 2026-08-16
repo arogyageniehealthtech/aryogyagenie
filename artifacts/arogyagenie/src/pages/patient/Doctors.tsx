@@ -161,7 +161,7 @@ export function PatientDoctors() {
   const handleSelectDoctor = useCallback((doc: MapProviderItem | null) => {
     setSelectedDocId(doc ? doc.id : null);
     if (doc) {
-      const el = document.getElementById(`doc-list-item-${doc.id}`);
+      const el = document.getElementById(`doc-list-item-${doc.type}-${doc.id}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
@@ -528,13 +528,13 @@ export function PatientDoctors() {
 
                     return (
                       <div
-                        id={`doc-list-item-${doc.id}`}
+                        id={`doc-list-item-${doc.type}-${doc.id}`}
                         key={`${doc.type}-${doc.id}`}
                         onClick={() => handleSelectDoctor(doc)}
                         className={`p-3.5 rounded-xl cursor-pointer transition-all border ${
                           isSelected
                             ? isDoctor
-                              ? "bg-violet-50/80 border-violet-500 shadow-xs ring-2 ring-violet-500/20"
+                              ? "bg-red-50/80 border-red-500 shadow-xs ring-2 ring-red-500/20"
                               : "bg-sky-50/80 border-sky-500 shadow-xs ring-2 ring-sky-500/20"
                             : "bg-white border-slate-200/80 hover:border-slate-300 shadow-2xs"
                         }`}
@@ -545,7 +545,7 @@ export function PatientDoctors() {
                               <span
                                 className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                   isDoctor
-                                    ? "bg-violet-100 text-violet-700"
+                                    ? "bg-red-100 text-red-700"
                                     : "bg-sky-100 text-sky-700"
                                 }`}
                               >
@@ -554,7 +554,7 @@ export function PatientDoctors() {
                             </div>
                             <h4 className="font-bold text-sm text-slate-900">{doc.name}</h4>
                             {doc.specialty && (
-                              <p className="text-xs text-violet-600 font-semibold mt-0.5">{doc.specialty}</p>
+                              <p className="text-xs text-red-600 font-semibold mt-0.5">{doc.specialty}</p>
                             )}
                           </div>
                           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 shrink-0">
@@ -599,7 +599,7 @@ export function PatientDoctors() {
                                 }
                               }}
                               className={`h-7 text-xs font-semibold rounded-lg px-3 text-white ${
-                                isDoctor ? "bg-violet-600 hover:bg-violet-700" : "bg-sky-600 hover:bg-sky-700"
+                                isDoctor ? "bg-red-600 hover:bg-red-700" : "bg-sky-600 hover:bg-sky-700"
                               }`}
                             >
                               {isDoctor ? "Book Visit" : "Book Test"}
