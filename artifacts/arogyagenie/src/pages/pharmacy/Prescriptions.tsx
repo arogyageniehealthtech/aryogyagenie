@@ -55,6 +55,10 @@ interface MedicineOrder {
   deliveryOtp: string | null;
   notes: string | null;
   createdAt: string;
+  isSearchInquiry?: boolean;
+  inStock?: boolean;
+  matchedMedicinePrice?: number | null;
+  matchedMedicineName?: string | null;
 }
 
 export function PharmacyPrescriptionsPage() {
@@ -314,13 +318,15 @@ export function PharmacyPrescriptionsPage() {
                                 }
                                 className={`text-[10px] uppercase font-bold ${
                                   isRequested
-                                    ? "bg-amber-500 text-slate-950"
+                                    ? order.isSearchInquiry
+                                      ? "bg-amber-500 text-slate-950 font-black"
+                                      : "bg-amber-500 text-slate-950"
                                     : isOutForDelivery
                                     ? "bg-purple-600 text-white"
                                     : "bg-emerald-600 text-white"
                                 }`}
                               >
-                                {order.status.replace("_", " ")}
+                                {isRequested && order.isSearchInquiry ? "⚡ Live Demand" : order.status.replace("_", " ")}
                               </Badge>
                             </div>
                             <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
@@ -331,7 +337,14 @@ export function PharmacyPrescriptionsPage() {
                               </span>
                             </p>
                           </div>
-                          <span className="text-xs font-mono text-slate-400">Order #{order.id}</span>
+                          <div className="flex items-center gap-1.5">
+                            {order.inStock !== undefined && isRequested && (
+                              <Badge className={`text-[10px] ${order.inStock ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}>
+                                {order.inStock ? `✓ In Stock (₹${order.matchedMedicinePrice || 35})` : "⚠️ Not in Stock"}
+                              </Badge>
+                            )}
+                            <span className="text-xs font-mono text-slate-400">Order #{order.id}</span>
+                          </div>
                         </div>
 
                         <div>
@@ -364,11 +377,11 @@ export function PharmacyPrescriptionsPage() {
                               className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-bold text-xs"
                               onClick={() => {
                                 setSelectedOrderForAccept(order);
-                                setPriceInput(order.totalPrice ? String(order.totalPrice) : "320");
+                                setPriceInput(order.matchedMedicinePrice ? String(order.matchedMedicinePrice) : (order.totalPrice ? String(order.totalPrice) : "320"));
                                 setEtaInput("18");
                               }}
                             >
-                              <CheckCircle className="h-4 w-4" /> Accept Request & Confirm Stock
+                              <CheckCircle className="h-4 w-4" /> Accept Request & Offer 1-Click Delivery
                             </Button>
                           )}
 

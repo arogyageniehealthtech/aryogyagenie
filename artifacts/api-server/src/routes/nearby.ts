@@ -140,6 +140,43 @@ router.get("/nearby", async (req, res): Promise<void> => {
 
     combinedResults.sort((a, b) => a.distanceKm - b.distanceKm);
 
+    // If patient is searching for a specific medicine, log the live search demand for nearby pharmacies in background
+    if (medicine && medicine.trim()) {
+      const trimmedMed = medicine.trim();
+      (async () => {
+        try {
+          const { pool } = await import("@workspace/db");
+          const recentCheck = await pool.query(
+            `SELECT id FROM medicine_orders
+             WHERE LOWER(medicines) = LOWER($1)
+               AND status = 'requested'
+               AND notes LIKE 'Search Inquiry:%'
+               AND created_at >= NOW() - INTERVAL '3 minutes'
+             LIMIT 1`,
+            [trimmedMed]
+          );
+          if (recentCheck.rows.length === 0) {
+            await pool.query(
+              `INSERT INTO medicine_orders (patient_id, medicines, patient_name, patient_phone, patient_address, patient_lat, patient_lng, status, delivery_distance_km, estimated_delivery_mins, notes)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, 'requested', 2.5, 18, $8)`,
+              [
+                1,
+                trimmedMed,
+                "Patient",
+                "+91 98300 11223",
+                "Nearby Location (Lake Town / Dum Dum)",
+                coords.lat,
+                coords.lng,
+                `Search Inquiry: Patient searched for "${trimmedMed}" nearby`,
+              ]
+            );
+          }
+        } catch {
+          // Non-blocking background log
+        }
+      })();
+    }
+
     res.json({
       count: combinedResults.length,
       total: grandTotal,

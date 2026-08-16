@@ -164,6 +164,27 @@ export function NearbyCareMap() {
     fetchNearby(userLoc.lat, userLoc.lng, radiusKm, filterType, searchQuery, medicineQuery);
   }, [userLoc.lat, userLoc.lng, radiusKm, filterType, searchQuery, medicineQuery, fetchNearby]);
 
+  // Log live medicine search demand to nearby pharmacies (debounced)
+  useEffect(() => {
+    const med = medicineQuery.trim() || (filterType === "pharmacy" ? searchQuery.trim() : "");
+    if (!med || med.length < 3) return;
+
+    const timer = setTimeout(() => {
+      fetch("/api/medicine-orders/search-inquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          medicineName: med,
+          lat: userLoc.lat,
+          lng: userLoc.lng,
+          address: locationName,
+        }),
+      }).catch(() => {});
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [medicineQuery, searchQuery, filterType, userLoc.lat, userLoc.lng, locationName]);
+
   // Scroll to selected card when selected on map
   const handleSelectProvider = useCallback((provider: MapProviderItem | null) => {
     setSelectedId(provider ? provider.id : null);

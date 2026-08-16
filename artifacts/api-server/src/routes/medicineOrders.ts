@@ -108,22 +108,23 @@ router.get("/medicine-orders", requireAuth, async (req: AuthenticatedRequest, re
     const pagination = parsePaginationParams(req);
 
     let whereClause: any;
+    let pharmacyRecord: any = null;
 
     if (user.role === "pharmacy") {
-      const pharmacy = await db.query.pharmaciesTable.findFirst({
+      pharmacyRecord = await db.query.pharmaciesTable.findFirst({
         where: eq(pharmaciesTable.userId, req.userId!),
       });
 
-      if (!pharmacy) {
+      if (!pharmacyRecord) {
         res.json([]);
         return;
       }
 
       // Pharmacies see:
       // 1. Orders assigned to / accepted by them
-      // 2. Open unassigned patient requests waiting for acceptance (status = 'requested')
+      // 2. Open unassigned patient requests / search inquiries waiting for acceptance (status = 'requested')
       const pharmacyFilter = or(
-        eq(medicineOrdersTable.pharmacyId, pharmacy.id),
+        eq(medicineOrdersTable.pharmacyId, pharmacyRecord.id),
         and(eq(medicineOrdersTable.status, "requested"), isNull(medicineOrdersTable.pharmacyId)),
         eq(medicineOrdersTable.status, "requested")
       );
@@ -149,10 +150,152 @@ router.get("/medicine-orders", requireAuth, async (req: AuthenticatedRequest, re
       .limit(pagination.limit)
       .offset(pagination.offset);
 
+    // If pharmacy role, enrich orders with real-time stock matching
+    if (pharmacyRecord) {
+      const inventoryItems = await pool.query(
+        `SELECT pi.medicine_id, pi.price, pi.in_stock, pi.quantity, m.name, m.generic_name
+         FROM pharmacy_inventory pi
+         JOIN medicines m ON pi.medicine_id = m.id
+         WHERE pi.pharmacy_id = $1`,
+        [pharmacyRecord.id]
+      );
+
+      const enriched = orders.map((o) => {
+        const orderMeds = o.medicines.toLowerCase();
+        const matched = inventoryItems.rows.find((inv) =>
+          orderMeds.includes(inv.name.toLowerCase()) ||
+          (inv.generic_name && orderMeds.includes(inv.generic_name.toLowerCase()))
+        );
+
+        const isSearchInquiry = Boolean(
+          o.notes && (o.notes.includes("Search Inquiry") || o.notes.includes("Searched for"))
+        );
+
+        return {
+          ...o,
+          isSearchInquiry,
+          inStock: matched ? matched.in_stock : false,
+          matchedMedicinePrice: matched ? matched.price : null,
+          matchedMedicineName: matched ? matched.name : null,
+        };
+      });
+
+      res.json(enriched);
+      return;
+    }
+
     res.json(orders);
   } catch (error: any) {
     console.error("Failed to fetch medicine orders:", error);
     res.status(500).json({ error: error.message || "Failed to fetch medicine orders" });
+  }
+});
+
+// ─── POST /medicine-orders/search-inquiry ──────────────────────────────────
+// Automatically logs patient live medicine search inquiries to nearby pharmacies
+router.post("/medicine-orders/search-inquiry", async (req: any, res): Promise<void> => {
+  await ensureMedicineOrdersTable();
+  try {
+    const { medicineName, lat, lng, address, pharmacyId } = req.body;
+
+    if (!medicineName || !String(medicineName).trim()) {
+      res.status(400).json({ error: "medicineName is required" });
+      return;
+    }
+
+    const trimmedMed = String(medicineName).trim();
+
+    // Deduplicate rapid re-searches within last 2 minutes for the same medicine
+    const recentCheck = await pool.query(
+      `SELECT id FROM medicine_orders
+       WHERE LOWER(medicines) = LOWER($1)
+         AND status = 'requested'
+         AND notes LIKE 'Search Inquiry:%'
+         AND created_at >= NOW() - INTERVAL '2 minutes'
+       LIMIT 1`,
+      [trimmedMed]
+    );
+
+    if (recentCheck.rows.length > 0) {
+      res.json({ success: true, message: "Search inquiry already active", id: recentCheck.rows[0].id });
+      return;
+    }
+
+    // Determine patient details (if auth header present or fallback guest)
+    let patientId = 1;
+    let patientName = "Patient";
+    let patientPhone = "+91 98300 11223";
+
+    if (req.headers.authorization) {
+      try {
+        const { getAuth } = await import("@clerk/express");
+        const auth = getAuth(req);
+        if (auth?.userId) {
+          const user = await db.query.usersTable.findFirst({ where: eq(usersTable.clerkId, auth.userId) });
+          if (user) {
+            patientId = user.id;
+            patientName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email || "Patient";
+            patientPhone = user.phone || "";
+          }
+        }
+      } catch {
+        // Fallback to default patient ID
+      }
+    }
+
+    const patientLat = typeof lat === "number" ? lat : parseFloat(String(lat)) || 22.6057;
+    const patientLng = typeof lng === "number" ? lng : parseFloat(String(lng)) || 88.4030;
+    const patientAddress = address || "Lake Town / South Dum Dum, Kolkata";
+
+    let targetPharmacyId: number | null = null;
+    let pharmacyName: string | null = null;
+    let pharmacyAddress: string | null = null;
+    let pharmacyLat: number | null = null;
+    let pharmacyLng: number | null = null;
+    let distanceKm: number | null = null;
+
+    if (pharmacyId) {
+      targetPharmacyId = parseInt(String(pharmacyId), 10);
+      const ph = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.id, targetPharmacyId) });
+      if (ph) {
+        pharmacyName = ph.name;
+        pharmacyAddress = ph.address;
+        pharmacyLat = ph.latitude;
+        pharmacyLng = ph.longitude;
+        if (pharmacyLat && pharmacyLng) {
+          distanceKm = calculateDistanceKm(patientLat, patientLng, pharmacyLat, pharmacyLng);
+        }
+      }
+    }
+
+    const [order] = await db
+      .insert(medicineOrdersTable)
+      .values({
+        patientId,
+        pharmacyId: targetPharmacyId,
+        prescriptionId: null,
+        medicines: trimmedMed,
+        patientName,
+        patientPhone,
+        patientAddress,
+        patientLat,
+        patientLng,
+        pharmacyName,
+        pharmacyAddress,
+        pharmacyLat,
+        pharmacyLng,
+        status: "requested",
+        deliveryDistanceKm: distanceKm ?? 2.5,
+        estimatedDeliveryMins: 18,
+        totalPrice: null,
+        notes: `Search Inquiry: Patient searched for "${trimmedMed}" nearby`,
+      })
+      .returning();
+
+    res.status(201).json({ success: true, inquiry: order });
+  } catch (error: any) {
+    console.error("Failed to log search inquiry:", error);
+    res.status(500).json({ error: error.message || "Failed to log search inquiry" });
   }
 });
 
