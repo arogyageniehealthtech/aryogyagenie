@@ -1,11 +1,13 @@
+import { useState, useEffect } from "react";
 import { useGetPatientDashboard } from "@workspace/api-client-react";
-import { Calendar, FileText, Pill, Clipboard, ArrowRight, Activity, Clock, Stethoscope, TestTube } from "lucide-react";
+import { Calendar, FileText, Pill, Clipboard, ArrowRight, Activity, Clock, Stethoscope, TestTube, Truck } from "lucide-react";
 import { Link } from "wouter";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { HealthSummaryCard } from "../../components/health/HealthSummaryCard";
 import { HealthAssistantChat } from "../../components/health/HealthAssistantChat";
 import { HealthEpisodeTracker } from "../../components/health/HealthEpisodeTracker";
 import { LabTrendVisualizer } from "../../components/health/LabTrendVisualizer";
+import { OneClickDeliveryCard, type MedicineOrderItem } from "@/components/delivery/OneClickDeliveryCard";
 
 // ─── Skeleton loading shimmer ────────────────────────────────────────────────
 function SkeletonBlock({ className = "" }: { className?: string }) {
@@ -129,6 +131,25 @@ function QuickAction({ label, icon: Icon, href, color }: { label: string; icon: 
 // ─── Main Dashboard Component ─────────────────────────────────────────────────
 export function PatientDashboard() {
   const { data: dashboard, isLoading } = useGetPatientDashboard();
+  const [orders, setOrders] = useState<MedicineOrderItem[]>([]);
+
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch("/api/medicine-orders");
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch medicine orders:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (isLoading) return <DashboardSkeleton />;
   if (!dashboard) return null;
@@ -137,6 +158,10 @@ export function PatientDashboard() {
 
   const today = new Date();
   const dateStr = today.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  const activeOrAcceptedOrders = orders.filter((o) =>
+    ["accepted", "delivery_confirmed", "packing", "out_for_delivery"].includes(o.status)
+  );
 
   const statCards: StatCardProps[] = [
     {
@@ -302,10 +327,20 @@ export function PatientDashboard() {
           </div>
         </div>
 
+        {/* ── Active 1-Click Medicine Deliveries & Pharmacy Acceptance Prompts ── */}
+        {activeOrAcceptedOrders.length > 0 && (
+          <div className="space-y-4">
+            {activeOrAcceptedOrders.map((order) => (
+              <OneClickDeliveryCard key={order.id} order={order} onOrderUpdated={fetchOrders} />
+            ))}
+          </div>
+        )}
+
         {/* ── Stat Cards ───────────────────────────────────────────────────── */}
         <div>
           <SectionHeading title="Health Overview" subtitle="Your key health metrics at a glance" />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
             {statCards.map((card) => (
               <StatCard key={card.label} {...card} />
             ))}

@@ -315,8 +315,10 @@ export function GoogleMapView({
     } else {
       map.panTo({ lat: userLoc.lat, lng: userLoc.lng });
       map.setZoom(13);
+      return undefined;
     }
   }, [mapLoaded, userLoc.lat, userLoc.lng, providers, selectedId, radiusKm]);
+
 
   // Handle Selected Provider (Pan to location & open InfoWindow)
   useEffect(() => {

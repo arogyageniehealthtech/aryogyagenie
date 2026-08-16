@@ -11,8 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useLocation } from "wouter";
+
 import { useUserLocation, QUICK_CITIES, fmtDist } from "@/hooks/useUserLocation";
 import { GoogleMapView, type MapProviderItem } from "@/components/map/GoogleMapView";
+import { RequestMedicineModal } from "@/components/delivery/RequestMedicineModal";
+
+
 
 type FilterType = "all" | "doctor" | "pharmacy" | "diagnostic_center";
 
@@ -70,7 +74,9 @@ export function NearbyCareMap() {
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mobileViewMode, setMobileViewMode] = useState<"split" | "map" | "list">("split");
+  const [orderPharmacy, setOrderPharmacy] = useState<{ id: number; name: string; medicine?: string } | null>(null);
   const cardListRef = useRef<HTMLDivElement | null>(null);
+
 
   // Discovery quick options catalog
   const NEARBY_SUGGESTIONS = useMemo(() => ({
@@ -648,7 +654,11 @@ export function NearbyCareMap() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLocation(`/patient/prescriptions`);
+                            setOrderPharmacy({
+                              id: p.id,
+                              name: p.name,
+                              medicine: p.matchedMedicine?.medicineName || "",
+                            });
                           }}
                           className="h-8 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 flex-1"
                         >
@@ -689,6 +699,18 @@ export function NearbyCareMap() {
           </div>
         </div>
       </div>
+
+      {/* Request Medicine Modal */}
+      {orderPharmacy && (
+        <RequestMedicineModal
+          isOpen={Boolean(orderPharmacy)}
+          onClose={() => setOrderPharmacy(null)}
+          pharmacyId={orderPharmacy.id}
+          pharmacyName={orderPharmacy.name}
+          defaultMedicines={orderPharmacy.medicine || ""}
+        />
+      )}
     </DashboardLayout>
   );
 }
+
