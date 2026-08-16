@@ -126,7 +126,7 @@ export function useUserLocation(): UseUserLocationReturn {
   const [locError, setLocError] = useState<string | null>(null);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
 
-  // Synchronize with logged-in user profile coordinates from DB if present
+  // Synchronize with logged-in user profile coordinates from DB if present and not already customized
   useEffect(() => {
     const rawUser = user as any;
     if (rawUser?.latitude && rawUser?.longitude) {
@@ -136,6 +136,17 @@ export function useUserLocation(): UseUserLocationReturn {
         setUserLoc({ lat: rawUser.latitude, lng: rawUser.longitude });
         setLocationName(profileName);
         saveLocation({ lat: rawUser.latitude, lng: rawUser.longitude, name: profileName });
+      } else {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.lat === DEFAULT_LOCATION.lat && parsed.lng === DEFAULT_LOCATION.lng) {
+            // Upgrade default to user's saved DB profile location
+            const profileName = rawUser.address || (rawUser.city ? `${rawUser.city}` : "My Location");
+            setUserLoc({ lat: rawUser.latitude, lng: rawUser.longitude });
+            setLocationName(profileName);
+            saveLocation({ lat: rawUser.latitude, lng: rawUser.longitude, name: profileName });
+          }
+        } catch {}
       }
     }
   }, [user]);
@@ -155,6 +166,15 @@ export function useUserLocation(): UseUserLocationReturn {
       setUserLoc({ lat, lng });
       setLocationName(name);
       saveLocation({ lat, lng, name });
+
+      // If user is authenticated, sync coordinates to user profile in background
+      try {
+        fetch("/api/patients/me/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: name, latitude: lat, longitude: lng }),
+        }).catch(() => {});
+      } catch {}
     },
     [],
   );

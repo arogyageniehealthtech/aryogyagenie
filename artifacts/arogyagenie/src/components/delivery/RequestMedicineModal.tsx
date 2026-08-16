@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,12 @@ export function RequestMedicineModal({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (defaultMedicines) {
+      setMedicines(defaultMedicines);
+    }
+  }, [defaultMedicines, isOpen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!medicines.trim()) {
@@ -51,21 +57,23 @@ export function RequestMedicineModal({
 
     setLoading(true);
     try {
-      let endpoint = "/api/medicine-orders";
-      let body: any = {
+      let savedLoc: any = null;
+      try {
+        const raw = localStorage.getItem("arogyagenie_user_location");
+        if (raw) savedLoc = JSON.parse(raw);
+      } catch {}
+
+      const body: any = {
         medicines: medicines.trim(),
         prescriptionId: prescriptionId || null,
         pharmacyId: pharmacyId || null,
-        address: deliveryAddress.trim() || undefined,
+        address: deliveryAddress.trim() || savedLoc?.name || undefined,
+        latitude: savedLoc?.lat || undefined,
+        longitude: savedLoc?.lng || undefined,
         notes: notes.trim() || undefined,
       };
 
-      if (prescriptionId && !medicines) {
-        endpoint = `/api/medicine-orders/from-prescription/${prescriptionId}`;
-        body = {};
-      }
-
-      const res = await fetch(endpoint, {
+      const res = await fetch("/api/medicine-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

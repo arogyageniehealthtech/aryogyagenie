@@ -105,6 +105,49 @@ router.post("/prescriptions", requireAuth, requireRole(["doctor"]), async (req: 
     medicines, diagnosis, instructions, fileUrl, prescribedDate,
   }).returning();
 
+  // Automatically broadcast or assign prescription to nearby onboarded pharmacy (e.g. Medplus)
+  try {
+    const patientUser = await db.query.usersTable.findFirst({ where: eq(usersTable.id, patientId) });
+    const patientName = patientUser ? `${patientUser.firstName ?? ""} ${patientUser.lastName ?? ""}`.trim() || patientUser.email : `Patient #${patientId}`;
+    const patientPhone = patientUser?.phone || "";
+    const patientAddress = patientUser?.address || "Lake Town / Dum Dum, Kolkata";
+    const patientLat = patientUser?.latitude ?? 22.6057;
+    const patientLng = patientUser?.longitude ?? 88.4030;
+
+    const medplus = await db.query.pharmaciesTable.findFirst({
+      where: eq(pharmaciesTable.name, "Medplus"),
+    });
+
+    const targetPharmacyId = pharmacyId ?? medplus?.id ?? null;
+    const pharmacyName = targetPharmacyId && medplus ? medplus.name : null;
+    const pharmacyAddress = targetPharmacyId && medplus ? medplus.address : null;
+
+    const { pool } = await import("@workspace/db");
+    await pool.query(
+      `INSERT INTO medicine_orders (
+        patient_id, pharmacy_id, prescription_id, medicines,
+        patient_name, patient_phone, patient_address, patient_lat, patient_lng,
+        pharmacy_name, pharmacy_address, status, delivery_distance_km, estimated_delivery_mins, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'requested', 2.4, 18, $12)`,
+      [
+        patientId,
+        targetPharmacyId,
+        p.id,
+        medicines,
+        patientName,
+        patientPhone,
+        patientAddress,
+        patientLat,
+        patientLng,
+        pharmacyName,
+        pharmacyAddress,
+        `Doctor Prescription #${p.id}: ${diagnosis || "Consultation Rx"}`,
+      ]
+    );
+  } catch (orderErr) {
+    console.error("Failed to auto-create medicine order for prescription:", orderErr);
+  }
+
   res.status(201).json({ ...p, patientName: null, doctorName: null, createdAt: p.createdAt.toISOString() });
 });
 

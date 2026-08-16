@@ -411,18 +411,24 @@ router.post(
         ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email
         : "Patient";
 
-      const patientLat = user?.latitude ?? 22.5726;
-      const patientLng = user?.longitude ?? 88.3639;
+      const patientLat = user?.latitude ?? 22.6057;
+      const patientLng = user?.longitude ?? 88.4030;
+      const patientAddress = user?.address ?? "Lake Town / South Dum Dum, Kolkata";
 
+      const medplus = await db.query.pharmaciesTable.findFirst({
+        where: eq(pharmaciesTable.name, "Medplus"),
+      });
+
+      const effectivePharmacyId = prescription.pharmacyId ?? medplus?.id ?? null;
       let pharmacyName: string | null = null;
       let pharmacyAddress: string | null = null;
       let pharmacyLat: number | null = null;
       let pharmacyLng: number | null = null;
       let distanceKm: number | null = null;
 
-      if (prescription.pharmacyId) {
+      if (effectivePharmacyId) {
         const pharmacy = await db.query.pharmaciesTable.findFirst({
-          where: eq(pharmaciesTable.id, prescription.pharmacyId),
+          where: eq(pharmaciesTable.id, effectivePharmacyId),
         });
         if (pharmacy) {
           pharmacyName = pharmacy.name;
@@ -440,11 +446,11 @@ router.post(
         .values({
           patientId: req.userId!,
           prescriptionId: prescription.id,
-          pharmacyId: prescription.pharmacyId ?? null,
+          pharmacyId: effectivePharmacyId,
           medicines: prescription.medicines,
           patientName,
-          patientPhone: user?.phone ?? "",
-          patientAddress: user?.address ?? "Kolkata, West Bengal",
+          patientPhone: user?.phone ?? "+91 98300 11223",
+          patientAddress,
           patientLat,
           patientLng,
           pharmacyName,
@@ -452,10 +458,10 @@ router.post(
           pharmacyLat,
           pharmacyLng,
           status: "requested",
-          deliveryDistanceKm: distanceKm ?? 2.5,
-          estimatedDeliveryMins: 20,
+          deliveryDistanceKm: distanceKm ?? 2.4,
+          estimatedDeliveryMins: 18,
           totalPrice: null,
-          notes: prescription.instructions ? `Rx Notes: ${prescription.instructions}` : null,
+          notes: `Prescription #${prescription.id}: ${prescription.diagnosis || "Doorstep Delivery Request"}`,
         })
         .returning();
 
