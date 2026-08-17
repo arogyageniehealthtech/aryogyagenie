@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useListPrescriptions } from "@workspace/api-client-react";
+import { useListPrescriptions, customFetch } from "@workspace/api-client-react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import {
   FileText,
@@ -110,9 +110,8 @@ export function PatientPrescriptions() {
   const fetchOrders = async () => {
     setOrdersLoading(true);
     try {
-      const res = await fetch("/api/medicine-orders");
-      if (res.ok) {
-        const data = await res.json();
+      const data = await customFetch<MedicineOrderItem[]>("/api/medicine-orders");
+      if (Array.isArray(data)) {
         setOrders(data);
       }
     } catch (err) {
@@ -132,7 +131,7 @@ export function PatientPrescriptions() {
   useEffect(() => {
     if (!quickMedQuery.trim() || quickMedQuery.trim().length < 3) return;
     const timer = setTimeout(() => {
-      fetch("/api/medicine-orders/search-inquiry", {
+      customFetch("/api/medicine-orders/search-inquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,7 +151,7 @@ export function PatientPrescriptions() {
     if (!quickMedQuery.trim()) return;
     setIsSubmittingQuickMed(true);
     try {
-      const res = await fetch("/api/medicine-orders", {
+      await customFetch("/api/medicine-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -163,10 +162,6 @@ export function PatientPrescriptions() {
           notes: `Quick order from Prescription Section for "${quickMedQuery.trim()}"`,
         }),
       });
-
-      if (!res.ok) {
-        throw new Error("Failed to send order request");
-      }
 
       toast({
         title: "⚡ Request Broadcast to Nearby Pharmacies!",
@@ -190,14 +185,10 @@ export function PatientPrescriptions() {
   const handleRequestDeliveryFromPrescription = async (prescriptionId: number) => {
     setRequestingPrescriptionId(prescriptionId);
     try {
-      const res = await fetch(`/api/medicine-orders/from-prescription/${prescriptionId}`, {
+      await customFetch(`/api/medicine-orders/from-prescription/${prescriptionId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-
-      if (!res.ok) {
-        throw new Error("Failed to create medicine request");
-      }
 
       toast({
         title: "⚡ Request Broadcast to Nearby Pharmacies!",

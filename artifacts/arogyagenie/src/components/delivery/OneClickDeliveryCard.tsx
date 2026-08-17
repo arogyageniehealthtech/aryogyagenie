@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { customFetch } from "@workspace/api-client-react";
 import { BlinkitDeliveryTracker } from "./BlinkitDeliveryTracker";
 
 export interface MedicineOrderItem {
@@ -64,15 +65,11 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
   const handleAcceptOffer = async () => {
     setIsConfirming(true);
     try {
-      const res = await fetch(`/api/medicine-orders/${order.id}/confirm-delivery`, {
+      await customFetch(`/api/medicine-orders/${order.id}/confirm-delivery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paymentMethod: "cash_on_delivery" }),
       });
-
-      if (!res.ok) {
-        throw new Error("Failed to confirm delivery acceptance");
-      }
 
       toast({
         title: "⚡ Offer Accepted! Pharmacy Authorized to Dispense",
@@ -98,15 +95,11 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
   const handleDeclineOffer = async () => {
     setIsDeclining(true);
     try {
-      const res = await fetch(`/api/medicine-orders/${order.id}/decline`, {
+      await customFetch(`/api/medicine-orders/${order.id}/decline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: "Patient chose to decline this pharmacy offer", reopen: true }),
       });
-
-      if (!res.ok) {
-        throw new Error("Failed to decline offer");
-      }
 
       toast({
         title: "Offer Declined",

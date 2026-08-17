@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetPatientDashboard } from "@workspace/api-client-react";
+import { useGetPatientDashboard, customFetch } from "@workspace/api-client-react";
 import { Calendar, FileText, Pill, Clipboard, ArrowRight, Activity, Clock, Stethoscope, TestTube, Truck } from "lucide-react";
 import { Link } from "wouter";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
@@ -135,9 +135,8 @@ export function PatientDashboard() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch("/api/medicine-orders");
-      if (res.ok) {
-        const data = await res.json();
+      const data = await customFetch<MedicineOrderItem[]>("/api/medicine-orders");
+      if (Array.isArray(data)) {
         setOrders(data);
       }
     } catch (err) {
@@ -147,7 +146,7 @@ export function PatientDashboard() {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 8000);
+    const interval = setInterval(fetchOrders, 6000);
     return () => clearInterval(interval);
   }, []);
 

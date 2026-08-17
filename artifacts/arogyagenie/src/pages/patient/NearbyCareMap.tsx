@@ -170,7 +170,7 @@ export function NearbyCareMap() {
     if (!med || med.length < 3) return;
 
     const timer = setTimeout(() => {
-      fetch("/api/medicine-orders/search-inquiry", {
+      customFetch("/api/medicine-orders/search-inquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

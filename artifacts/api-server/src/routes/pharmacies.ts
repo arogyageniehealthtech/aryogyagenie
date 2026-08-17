@@ -137,9 +137,27 @@ router.put("/pharmacies/me/profile", requireAuth, requireRole(["pharmacy"]), asy
 });
 
 // GET /pharmacies/me/dashboard
-router.get("/pharmacies/me/dashboard", requireAuth, requireRole(["pharmacy"]), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const pharmacy = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
+router.get("/pharmacies/me/dashboard", requireAuth, requireRole(["pharmacy", "admin"]), async (req: AuthenticatedRequest, res): Promise<void> => {
+  let pharmacy = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
   const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
+
+  if (!pharmacy && user?.role === "pharmacy") {
+    const defaultName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email?.split("@")[0] || "Apex Healthcare Pharmacy";
+    const [newPharm] = await db
+      .insert(pharmaciesTable)
+      .values({
+        userId: req.userId!,
+        name: defaultName,
+        address: user.address || "Salt Lake Sector V, Kolkata",
+        city: user.city || "Kolkata",
+        phone: user.phone || "+91 98300 12345",
+        latitude: user.latitude || 22.5800,
+        longitude: user.longitude || 88.4200,
+        status: "active",
+      })
+      .returning();
+    pharmacy = newPharm;
+  }
 
   const firstName = user?.firstName ?? null;
   const lastName = user?.lastName ?? null;
@@ -162,7 +180,7 @@ router.get("/pharmacies/me/dashboard", requireAuth, requireRole(["pharmacy"]), a
 });
 
 // GET /pharmacies/me/prescriptions
-router.get("/pharmacies/me/prescriptions", requireAuth, requireRole(["pharmacy"]), async (req: AuthenticatedRequest, res): Promise<void> => {
+router.get("/pharmacies/me/prescriptions", requireAuth, requireRole(["pharmacy", "admin"]), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { status } = req.query as { status?: string };
   const pagination = parsePaginationParams(req);
 

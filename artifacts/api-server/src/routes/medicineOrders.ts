@@ -110,30 +110,48 @@ router.get("/medicine-orders", requireAuth, async (req: AuthenticatedRequest, re
     let whereClause: any;
     let pharmacyRecord: any = null;
 
-    if (user.role === "pharmacy") {
+    if (user.role === "pharmacy" || user.role === "admin") {
       pharmacyRecord = await db.query.pharmaciesTable.findFirst({
         where: eq(pharmaciesTable.userId, req.userId!),
       });
 
-      if (!pharmacyRecord) {
-        res.json([]);
-        return;
+      if (!pharmacyRecord && user.role === "pharmacy") {
+        // Auto-provision or link pharmacy profile for this user
+        const defaultName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email?.split("@")[0] || "Verified Partner Pharmacy";
+        const [newPharm] = await db
+          .insert(pharmaciesTable)
+          .values({
+            userId: req.userId!,
+            name: defaultName,
+            address: user.address || "Lake Town / South Dum Dum, Kolkata",
+            city: user.city || "Kolkata",
+            phone: user.phone || "+91 98300 12345",
+            latitude: user.latitude || 22.6057,
+            longitude: user.longitude || 88.4030,
+            status: "active",
+          })
+          .returning();
+        pharmacyRecord = newPharm;
       }
 
       // Pharmacies see:
       // 1. Orders assigned to / accepted by them
       // 2. Open unassigned patient requests / search inquiries waiting for acceptance (status = 'requested')
-      const pharmacyFilter = or(
-        eq(medicineOrdersTable.pharmacyId, pharmacyRecord.id),
-        and(eq(medicineOrdersTable.status, "requested"), isNull(medicineOrdersTable.pharmacyId)),
-        eq(medicineOrdersTable.status, "requested")
-      );
+      // 3. Any patient demand in their radius
+      let pharmacyFilter: any;
+      if (pharmacyRecord) {
+        pharmacyFilter = or(
+          eq(medicineOrdersTable.pharmacyId, pharmacyRecord.id),
+          and(eq(medicineOrdersTable.status, "requested"), isNull(medicineOrdersTable.pharmacyId)),
+          eq(medicineOrdersTable.status, "requested")
+        );
+      } else {
+        pharmacyFilter = eq(medicineOrdersTable.status, "requested");
+      }
 
       whereClause = status
         ? and(pharmacyFilter, eq(medicineOrdersTable.status, status as any))
         : pharmacyFilter;
-    } else if (user.role === "admin") {
-      whereClause = status ? eq(medicineOrdersTable.status, status as any) : undefined;
     } else {
       // Patient role
       const patientFilter = eq(medicineOrdersTable.patientId, req.userId!);

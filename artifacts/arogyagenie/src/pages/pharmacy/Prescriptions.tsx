@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListPharmacyPrescriptions, useUpdatePrescription, getListPharmacyPrescriptionsQueryKey } from "@workspace/api-client-react";
+import { useListPharmacyPrescriptions, useUpdatePrescription, getListPharmacyPrescriptionsQueryKey, customFetch } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,13 +83,12 @@ export function PharmacyPrescriptionsPage() {
   const [isAccepting, setIsAccepting] = useState(false);
   const [activeTrackingOrderId, setActiveTrackingOrderId] = useState<number | null>(null);
 
-  // Fetch patient medicine orders
+  // Fetch patient medicine orders using customFetch with Clerk auth token
   const fetchOrders = async () => {
     setOrdersLoading(true);
     try {
-      const res = await fetch("/api/medicine-orders");
-      if (res.ok) {
-        const data = await res.json();
+      const data = await customFetch<MedicineOrder[]>("/api/medicine-orders");
+      if (Array.isArray(data)) {
         setOrders(data);
       }
     } catch (err) {
@@ -101,7 +100,7 @@ export function PharmacyPrescriptionsPage() {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 8000);
+    const interval = setInterval(fetchOrders, 6000);
     return () => clearInterval(interval);
   }, []);
 
@@ -132,7 +131,7 @@ export function PharmacyPrescriptionsPage() {
     if (!selectedOrderForAccept) return;
     setIsAccepting(true);
     try {
-      const res = await fetch(`/api/medicine-orders/${selectedOrderForAccept.id}/accept`, {
+      await customFetch(`/api/medicine-orders/${selectedOrderForAccept.id}/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -141,13 +140,9 @@ export function PharmacyPrescriptionsPage() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error("Failed to accept medicine order");
-      }
-
       toast({
-        title: "Request Accepted & Confirmed!",
-        description: "Patient received 1-click doorstep delivery prompt!",
+        title: "Offer Sent to Patient!",
+        description: "Patient will confirm whether they want to take the medicine from your pharmacy before you dispense.",
       });
 
       setSelectedOrderForAccept(null);
@@ -166,21 +161,23 @@ export function PharmacyPrescriptionsPage() {
   // Update order status (packing, out for delivery, delivered)
   const handleUpdateOrderStatus = async (orderId: number, status: string) => {
     try {
-      const res = await fetch(`/api/medicine-orders/${orderId}/update-status`, {
+      await customFetch(`/api/medicine-orders/${orderId}/update-status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
 
-      if (res.ok) {
-        toast({
-          title: "Status Updated",
-          description: `Order #${orderId} marked as ${status.replace("_", " ")}.`,
-        });
-        fetchOrders();
-      }
-    } catch (err) {
-      console.error("Error updating order status:", err);
+      toast({
+        title: "Status Updated",
+        description: `Order #${orderId} marked as ${status.replace("_", " ")}.`,
+      });
+      fetchOrders();
+    } catch (err: any) {
+      toast({
+        title: "Update Failed",
+        description: err.message || "Cannot advance order status",
+        variant: "destructive",
+      });
     }
   };
 

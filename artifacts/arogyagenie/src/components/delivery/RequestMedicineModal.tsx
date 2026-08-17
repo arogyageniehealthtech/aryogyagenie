@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Pill, MapPin, Sparkles, Store, Clock, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { customFetch } from "@workspace/api-client-react";
 
 interface RequestMedicineModalProps {
   isOpen: boolean;
@@ -73,16 +74,11 @@ export function RequestMedicineModal({
         notes: notes.trim() || undefined,
       };
 
-      const res = await fetch("/api/medicine-orders", {
+      await customFetch("/api/medicine-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to submit request");
-      }
 
       toast({
         title: "Medicine Request Broadcasted!",
