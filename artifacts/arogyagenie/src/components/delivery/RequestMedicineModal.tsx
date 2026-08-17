@@ -85,8 +85,8 @@ export function RequestMedicineModal({
       }
 
       toast({
-        title: "Medicine Request Sent!",
-        description: "Nearby onboarded pharmacies are reviewing your medicines. You'll receive a 1-click doorstep delivery prompt once accepted!",
+        title: "Medicine Request Broadcasted!",
+        description: "Nearby verified pharmacies in your radius can view your request. When a pharmacy offers stock, you can accept before they dispense!",
       });
 
       if (onSuccess) onSuccess();
@@ -112,10 +112,10 @@ export function RequestMedicineModal({
             </div>
             <div>
               <DialogTitle className="text-lg font-bold text-white">
-                Request Medicine Delivery
+                Request OTC / Custom Medicines
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-400">
-                Broadcast request to verified onboarded pharmacies for fast doorstep delivery.
+                Broadcasts to verified pharmacies in your radius. Once a pharmacy offers availability, you decide whether to accept before they dispense.
               </DialogDescription>
             </div>
           </div>
@@ -173,7 +173,7 @@ export function RequestMedicineModal({
           <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex items-center gap-2.5 text-xs text-slate-400">
             <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
             <span>
-              Once a pharmacy accepts, you'll receive a 1-click confirmation with real-time Blinkit route tracking!
+              2-Way Approval: A pharmacy accepts and quotes price → You confirm to take it → Pharmacy is authorized to dispense!
             </span>
           </div>
 

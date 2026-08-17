@@ -415,11 +415,7 @@ router.post(
       const patientLng = user?.longitude ?? 88.4030;
       const patientAddress = user?.address ?? "Lake Town / South Dum Dum, Kolkata";
 
-      const medplus = await db.query.pharmaciesTable.findFirst({
-        where: eq(pharmaciesTable.name, "Medplus"),
-      });
-
-      const effectivePharmacyId = prescription.pharmacyId ?? medplus?.id ?? null;
+      const effectivePharmacyId = prescription.pharmacyId ?? null;
       let pharmacyName: string | null = null;
       let pharmacyAddress: string | null = null;
       let pharmacyLat: number | null = null;
@@ -500,7 +496,7 @@ router.get("/medicine-orders/:id", requireAuth, async (req: AuthenticatedRequest
 });
 
 // ─── POST /medicine-orders/:id/accept ──────────────────────────────────────
-// Pharmacy accepts the patient's medicine request and confirms stock availability
+// Pharmacy accepts the patient's medicine request and offers stock availability & price
 router.post(
   "/medicine-orders/:id/accept",
   requireAuth,
@@ -550,7 +546,7 @@ router.post(
           pharmacyAddress,
           pharmacyLat,
           pharmacyLng,
-          status: "accepted", // Accepted by pharmacy -> triggers patient 1-click doorstep prompt!
+          status: "accepted", // Accepted by pharmacy -> triggers patient confirmation prompt!
           totalPrice: price,
           estimatedDeliveryMins: deliveryMins,
           deliveryDistanceKm: distanceKm ?? 2.8,
@@ -568,7 +564,7 @@ router.post(
 );
 
 // ─── POST /medicine-orders/:id/confirm-delivery ────────────────────────────
-// Patient clicks "Yes, Deliver to My Doorstep (1-Click)"
+// Patient clicks "Yes, I'll take it from Pharmacy A" (1-Click Doorstep Confirmation)
 router.post(
   "/medicine-orders/:id/confirm-delivery",
   requireAuth,
@@ -587,6 +583,12 @@ router.post(
 
       if (!order) {
         res.status(404).json({ error: "Medicine order not found" });
+        return;
+      }
+
+      if (order.status !== "accepted" && order.status !== "requested") {
+        // Already confirmed or advanced
+        res.json(order);
         return;
       }
 
@@ -617,8 +619,68 @@ router.post(
   }
 );
 
+// ─── POST /medicine-orders/:id/decline ─────────────────────────────────────
+// Patient declines the offer from a pharmacy or cancels the request
+router.post(
+  "/medicine-orders/:id/decline",
+  requireAuth,
+  async (req: AuthenticatedRequest, res): Promise<void> => {
+    await ensureMedicineOrdersTable();
+    try {
+      const id = parseParamId(req.params.id);
+      if (isNaN(id)) {
+        res.status(400).json({ error: "Invalid order ID" });
+        return;
+      }
+
+      const order = await db.query.medicineOrdersTable.findFirst({
+        where: eq(medicineOrdersTable.id, id),
+      });
+
+      if (!order) {
+        res.status(404).json({ error: "Medicine order not found" });
+        return;
+      }
+
+      const { reason, reopen } = req.body;
+
+      if (reopen) {
+        const [updated] = await db
+          .update(medicineOrdersTable)
+          .set({
+            status: "requested",
+            pharmacyId: null,
+            pharmacyName: null,
+            pharmacyAddress: null,
+            pharmacyLat: null,
+            pharmacyLng: null,
+            totalPrice: null,
+            notes: reason ? `Patient reopened request (reason: ${reason})` : order.notes,
+          })
+          .where(eq(medicineOrdersTable.id, id))
+          .returning();
+        res.json({ success: true, message: "Request reopened to nearby radius pharmacies", order: updated });
+      } else {
+        const [updated] = await db
+          .update(medicineOrdersTable)
+          .set({
+            status: "cancelled",
+            notes: reason ? `Patient declined offer (${reason})` : (order.notes || "Patient declined pharmacy offer"),
+          })
+          .where(eq(medicineOrdersTable.id, id))
+          .returning();
+        res.json({ success: true, message: "Offer declined and order cancelled", order: updated });
+      }
+    } catch (error: any) {
+      console.error("Failed to decline order:", error);
+      res.status(500).json({ error: error.message || "Failed to decline order" });
+    }
+  }
+);
+
 // ─── POST /medicine-orders/:id/update-status ───────────────────────────────
 // Advances order status (packing, out_for_delivery, delivered, cancelled)
+// STRICT HANDSHAKE: Pharmacy CANNOT dispense (pack, dispatch, deliver) until patient confirms (delivery_confirmed)
 router.post(
   "/medicine-orders/:id/update-status",
   requireAuth,
@@ -628,6 +690,15 @@ router.post(
       const id = parseParamId(req.params.id);
       if (isNaN(id)) {
         res.status(400).json({ error: "Invalid order ID" });
+        return;
+      }
+
+      const order = await db.query.medicineOrdersTable.findFirst({
+        where: eq(medicineOrdersTable.id, id),
+      });
+
+      if (!order) {
+        res.status(404).json({ error: "Medicine order not found" });
         return;
       }
 
@@ -645,6 +716,30 @@ router.post(
       if (!validStatuses.includes(status)) {
         res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
         return;
+      }
+
+      // ── STRICT DISPENSING CONSENT VALIDATION ──
+      // Pharmacy CANNOT pack, dispatch, or deliver if patient has not accepted the offer yet!
+      const dispensingStatuses = ["packing", "out_for_delivery", "delivered"];
+      if (dispensingStatuses.includes(status)) {
+        if (order.status === "requested") {
+          res.status(400).json({
+            error: "Cannot dispense: No pharmacy offer has been accepted by the patient yet.",
+          });
+          return;
+        }
+        if (order.status === "accepted") {
+          res.status(400).json({
+            error: "Cannot dispense: Pharmacy has made an offer, but patient has not yet accepted ('Would you take it from this pharmacy?'). Dispensing is locked until patient confirms.",
+          });
+          return;
+        }
+        if (order.status === "cancelled") {
+          res.status(400).json({
+            error: "Cannot dispense on a cancelled or declined order.",
+          });
+          return;
+        }
       }
 
       const [updated] = await db

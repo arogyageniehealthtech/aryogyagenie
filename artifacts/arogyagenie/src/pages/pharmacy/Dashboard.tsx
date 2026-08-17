@@ -665,13 +665,22 @@ export function PharmacyDashboard() {
                   const isConfirmed = order.status === "delivery_confirmed";
                   const isPacking = order.status === "packing";
                   const isOutForDelivery = order.status === "out_for_delivery";
+                  const isDelivered = order.status === "delivered";
 
                   return (
                     <Card
                       key={order.id}
-                      className="border-2 border-emerald-500/40 bg-white shadow-md hover:shadow-lg transition-all rounded-2xl"
+                      className={`border-2 bg-white shadow-md hover:shadow-lg transition-all rounded-2xl overflow-hidden ${
+                        isAccepted
+                          ? "border-amber-400/80 bg-amber-50/20"
+                          : "border-emerald-500/40"
+                      }`}
                     >
-                      <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50/50 pb-3 border-b border-emerald-100">
+                      <CardHeader className={`pb-3 border-b ${
+                        isAccepted
+                          ? "bg-gradient-to-r from-amber-50 to-orange-50/50 border-amber-100"
+                          : "bg-gradient-to-r from-emerald-50 to-teal-50/50 border-emerald-100"
+                      }`}>
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="flex items-center gap-2">
@@ -680,14 +689,22 @@ export function PharmacyDashboard() {
                               </h3>
                               <Badge
                                 className={`text-[10px] font-bold uppercase ${
-                                  isOutForDelivery
-                                    ? "bg-purple-600 text-white animate-pulse"
+                                  isAccepted
+                                    ? "bg-amber-500 text-slate-950 font-black animate-pulse"
+                                    : isConfirmed
+                                    ? "bg-emerald-600 text-white font-bold"
+                                    : isOutForDelivery
+                                    ? "bg-purple-600 text-white"
                                     : isPacking
                                     ? "bg-blue-600 text-white"
                                     : "bg-emerald-600 text-white"
                                 }`}
                               >
-                                {order.status.replace("_", " ")}
+                                {isAccepted
+                                  ? "⚠️ AWAITING PATIENT ACCEPTANCE"
+                                  : isConfirmed
+                                  ? "✓ PATIENT ACCEPTED - READY TO DISPENSE"
+                                  : order.status.replace("_", " ")}
                               </Badge>
                             </div>
                             <p className="text-xs text-slate-500 mt-1">
@@ -698,6 +715,31 @@ export function PharmacyDashboard() {
                       </CardHeader>
 
                       <CardContent className="p-4 space-y-3">
+                        {/* Status Handshake Banner */}
+                        {isAccepted && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+                            <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping mt-1 shrink-0" />
+                            <div>
+                              <p className="font-bold text-amber-950">Offer Sent to Patient • Dispensing Locked</p>
+                              <p className="text-[11px] text-amber-800 mt-0.5">
+                                Prompt sent to patient: <em>"Would you like to take it from your pharmacy?"</em>. You CANNOT dispense or pack until the patient accepts your offer.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {isConfirmed && (
+                          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2.5">
+                            <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-emerald-950">Patient Accepted Your Offer!</p>
+                              <p className="text-[11px] text-emerald-800 mt-0.5">
+                                Patient confirmed to take the medicine from your pharmacy. You are now authorized to dispense and pack the order.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
                         {order.deliveryPartnerName && (
                           <div className="p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between text-xs">
                             <div>
@@ -723,23 +765,24 @@ export function PharmacyDashboard() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                          {/* When confirmed by patient, pharmacy can now dispense & mark packed */}
                           {isConfirmed && (
                             <Button
                               size="sm"
                               onClick={() => handleUpdateOrderStatus(order.id, "packing")}
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs gap-1.5"
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs gap-1.5 shadow-sm"
                             >
-                              <Package className="w-3.5 h-3.5" /> Mark Packed
+                              <Package className="w-3.5 h-3.5" /> Dispense & Mark Packed
                             </Button>
                           )}
 
-                          {(isPacking || isAccepted || isConfirmed) && (
+                          {isPacking && (
                             <Button
                               size="sm"
                               onClick={() => handleUpdateOrderStatus(order.id, "out_for_delivery")}
-                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs gap-1.5"
+                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs gap-1.5 shadow-sm"
                             >
-                              <Truck className="w-3.5 h-3.5" /> Handover to Rider
+                              <Truck className="w-3.5 h-3.5" /> Handover to Express Rider
                             </Button>
                           )}
 
@@ -747,7 +790,7 @@ export function PharmacyDashboard() {
                             <Button
                               size="sm"
                               onClick={() => handleUpdateOrderStatus(order.id, "delivered")}
-                              className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs gap-1.5"
+                              className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs gap-1.5 shadow-sm"
                             >
                               <CheckCircle className="w-3.5 h-3.5" /> Complete Handover
                             </Button>

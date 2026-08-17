@@ -128,7 +128,7 @@ export function PatientPrescriptions() {
     return () => clearInterval(interval);
   }, []);
 
-  // Transmit live search inquiry to Medplus as user types
+  // Transmit live search inquiry to nearby radius pharmacies as user types
   useEffect(() => {
     if (!quickMedQuery.trim() || quickMedQuery.trim().length < 3) return;
     const timer = setTimeout(() => {
@@ -146,7 +146,7 @@ export function PatientPrescriptions() {
     return () => clearTimeout(timer);
   }, [quickMedQuery, userLoc.lat, userLoc.lng, locationName]);
 
-  // Handle Quick Medicine Order Submission directly to Medplus
+  // Handle Quick Medicine Order Submission to nearby pharmacies
   const handleQuickMedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickMedQuery.trim()) return;
@@ -165,12 +165,12 @@ export function PatientPrescriptions() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to send order to Medplus");
+        throw new Error("Failed to send order request");
       }
 
       toast({
-        title: "⚡ Order Sent to Medplus!",
-        description: `Your request for "${quickMedQuery.trim()}" has been received by Medplus. You'll receive a 1-click doorstep delivery prompt once confirmed!`,
+        title: "⚡ Request Broadcast to Nearby Pharmacies!",
+        description: `Your request for "${quickMedQuery.trim()}" is visible to verified pharmacies in your radius. When a pharmacy accepts, you'll be prompted to confirm before they dispense!`,
       });
 
       setQuickMedQuery("");
@@ -200,9 +200,9 @@ export function PatientPrescriptions() {
       }
 
       toast({
-        title: "⚡ Order Request Sent to Medplus!",
+        title: "⚡ Request Broadcast to Nearby Pharmacies!",
         description:
-          "Medplus is reviewing your prescribed medicines. You'll receive a 1-click doorstep delivery prompt as soon as accepted!",
+          "Nearby pharmacies in your radius are reviewing your prescribed medicines. You will receive an offer to accept before dispensing!",
       });
 
       fetchOrders();
@@ -252,7 +252,7 @@ export function PatientPrescriptions() {
           </Button>
         </div>
 
-        {/* ── Quick Search & Order Medicine directly from Medplus ────────────── */}
+        {/* ── Quick Search & Order Medicine from Nearby Pharmacies ────────────── */}
         <Card className="border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent rounded-2xl shadow-xs overflow-hidden">
           <div className="p-4 sm:p-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
@@ -262,13 +262,13 @@ export function PatientPrescriptions() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <span>Order Any Medicine from Medplus</span>
+                    <span>Order Any Medicine from Nearby Pharmacies</span>
                     <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-[10px]">
-                      ⚡ Fast Doorstep Dispatch
+                      ⚡ Radius Broadcast & 2-Way Consent
                     </Badge>
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Type any prescribed or OTC medicine name below. Medplus will immediately receive your request!
+                    Type any OTC or prescribed medicine. Nearby pharmacies will view your request and offer stock. You choose to accept before they dispense!
                   </p>
                 </div>
               </div>
@@ -295,7 +295,7 @@ export function PatientPrescriptions() {
                 className="w-full sm:w-auto h-11 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-2 shrink-0 shadow-sm"
               >
                 <Flame className="w-4 h-4 fill-white" />
-                {isSubmittingQuickMed ? "Sending..." : "Order from Medplus (1-Click)"}
+                {isSubmittingQuickMed ? "Broadcasting..." : "Request from Nearby Pharmacies"}
               </Button>
             </form>
 

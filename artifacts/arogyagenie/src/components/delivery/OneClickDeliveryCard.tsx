@@ -48,6 +48,7 @@ interface OneClickDeliveryCardProps {
 
 export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDeliveryCardProps) {
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
   const [showTrackerModal, setShowTrackerModal] = useState(false);
   const { toast } = useToast();
 
@@ -59,8 +60,8 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
     "delivered",
   ].includes(order.status);
 
-  // 1-Click Doorstep Delivery Confirmation
-  const handleOneClickDelivery = async () => {
+  // 1-Click Patient Acceptance: Authorizes pharmacy to dispense
+  const handleAcceptOffer = async () => {
     setIsConfirming(true);
     try {
       const res = await fetch(`/api/medicine-orders/${order.id}/confirm-delivery`, {
@@ -70,12 +71,12 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
       });
 
       if (!res.ok) {
-        throw new Error("Failed to confirm 1-click delivery");
+        throw new Error("Failed to confirm delivery acceptance");
       }
 
       toast({
-        title: "⚡ Doorstep Delivery Confirmed!",
-        description: `Your order from ${order.pharmacyName || "Pharmacy"} is being packed. Express rider will arrive in ${order.estimatedDeliveryMins || 18} mins!`,
+        title: "⚡ Offer Accepted! Pharmacy Authorized to Dispense",
+        description: `You accepted the offer from ${order.pharmacyName || "the pharmacy"}. They are now preparing and dispensing your medicines!`,
       });
 
       if (onOrderUpdated) {
@@ -90,6 +91,39 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
       });
     } finally {
       setIsConfirming(false);
+    }
+  };
+
+  // Patient Declines Pharmacy Offer
+  const handleDeclineOffer = async () => {
+    setIsDeclining(true);
+    try {
+      const res = await fetch(`/api/medicine-orders/${order.id}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Patient chose to decline this pharmacy offer", reopen: true }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to decline offer");
+      }
+
+      toast({
+        title: "Offer Declined",
+        description: "Your request has been reopened for other nearby verified pharmacies in your radius.",
+      });
+
+      if (onOrderUpdated) {
+        onOrderUpdated();
+      }
+    } catch (err: any) {
+      toast({
+        title: "Decline Failed",
+        description: err.message || "Could not decline offer",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeclining(false);
     }
   };
 
@@ -113,7 +147,7 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             </span>
             <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
-              {isAccepted ? "⚡ Pharmacy Accepted Your Request" : "🛵 Live Doorstep Delivery Active"}
+              {isAccepted ? "⚡ Pharmacy Accepted & Offered Stock" : "🛵 Live Doorstep Delivery Active"}
             </span>
           </div>
 
@@ -128,11 +162,11 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
           {/* Main Acceptance Announcement Headline */}
           <div>
             <h3 className="text-xl font-black tracking-tight text-white md:text-2xl">
-              {pharmacyDisplayName} <span className="text-emerald-400">has your medicines!</span>
+              {pharmacyDisplayName} <span className="text-emerald-400">has your medicine!</span>
             </h3>
             <p className="mt-1 text-sm text-slate-300">
               {isAccepted
-                ? "Would you like them delivered to your doorstep in 1 click?"
+                ? `Would you like to take it from ${pharmacyDisplayName}? If you accept, they will immediately dispense and dispatch to your doorstep.`
                 : "Your delivery is in progress. Live route tracking is active."}
             </p>
           </div>
@@ -142,7 +176,7 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
             {/* Pharmacy Source */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
               <span className="flex items-center gap-1 text-[11px] font-bold uppercase text-emerald-400">
-                <Store className="h-3 w-3" /> Source Pharmacy
+                <Store className="h-3 w-3" /> Fulfilling Pharmacy
               </span>
               <p className="mt-0.5 truncate text-xs font-bold text-white">{pharmacyDisplayName}</p>
               <p className="truncate text-[11px] text-slate-400">
@@ -162,10 +196,10 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
             {/* Total Price & Free Delivery */}
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-3">
               <span className="flex items-center gap-1 text-[11px] font-bold uppercase text-emerald-300">
-                <BadgePercent className="h-3 w-3" /> Total Bill
+                <BadgePercent className="h-3 w-3" /> Quoted Bill
               </span>
               <p className="mt-0.5 text-base font-black text-white">₹{price}</p>
-              <p className="text-[11px] font-semibold text-emerald-400">Free 1-Click Delivery</p>
+              <p className="text-[11px] font-semibold text-emerald-400">Doorstep Express Delivery</p>
             </div>
           </div>
 
@@ -173,10 +207,10 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
           <div className="rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5">
             <div className="flex items-center justify-between text-xs font-semibold text-slate-400 mb-1.5">
               <span className="flex items-center gap-1">
-                <Pill className="h-3.5 w-3.5 text-indigo-400" /> Prescribed Medicines
+                <Pill className="h-3.5 w-3.5 text-indigo-400" /> Prescribed / Requested Medicines
               </span>
               <span className="text-[11px] text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" /> Verified in Stock
+                <CheckCircle2 className="h-3 w-3" /> Verified In Stock
               </span>
             </div>
             <p className="font-mono text-xs text-slate-200 whitespace-pre-wrap">{order.medicines}</p>
@@ -185,20 +219,31 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
           {/* Primary Action Section */}
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
             {isAccepted && (
-              <Button
-                onClick={handleOneClickDelivery}
-                disabled={isConfirming}
-                className="w-full sm:flex-1 h-12 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-sm tracking-wide shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
-              >
-                {isConfirming ? (
-                  "Confirming Delivery..."
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Flame className="h-4 w-4 fill-slate-950" />
-                    YES, DELIVER TO MY DOORSTEP (1-CLICK)
-                  </span>
-                )}
-              </Button>
+              <>
+                <Button
+                  onClick={handleAcceptOffer}
+                  disabled={isConfirming || isDeclining}
+                  className="w-full sm:flex-1 h-12 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-sm tracking-wide shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+                >
+                  {isConfirming ? (
+                    "Authorizing Dispense & Delivery..."
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Flame className="h-4 w-4 fill-slate-950" />
+                      YES, I'LL TAKE IT FROM {pharmacyDisplayName.toUpperCase()} (1-CLICK)
+                    </span>
+                  )}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={handleDeclineOffer}
+                  disabled={isConfirming || isDeclining}
+                  className="w-full sm:w-auto h-12 rounded-2xl border-rose-500/50 bg-rose-950/20 hover:bg-rose-950/40 text-rose-300 font-bold text-xs gap-2 px-5 cursor-pointer"
+                >
+                  {isDeclining ? "Declining..." : "Decline Offer"}
+                </Button>
+              </>
             )}
 
             {/* View Live Route Graph Button */}

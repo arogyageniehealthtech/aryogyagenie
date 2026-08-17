@@ -296,6 +296,8 @@ export function PharmacyPrescriptionsPage() {
                       className={`overflow-hidden border-t-4 hover:shadow-md transition-shadow ${
                         isRequested
                           ? "border-t-amber-500 bg-amber-50/10"
+                          : isAccepted
+                          ? "border-t-amber-400 bg-amber-50/20"
                           : isOutForDelivery
                           ? "border-t-purple-500"
                           : "border-t-emerald-500"
@@ -321,12 +323,22 @@ export function PharmacyPrescriptionsPage() {
                                     ? order.isSearchInquiry
                                       ? "bg-amber-500 text-slate-950 font-black"
                                       : "bg-amber-500 text-slate-950"
+                                    : isAccepted
+                                    ? "bg-amber-500 text-slate-950 font-black animate-pulse"
+                                    : isConfirmed
+                                    ? "bg-emerald-600 text-white font-bold"
                                     : isOutForDelivery
                                     ? "bg-purple-600 text-white"
                                     : "bg-emerald-600 text-white"
                                 }`}
                               >
-                                {isRequested && order.isSearchInquiry ? "⚡ Live Demand" : order.status.replace("_", " ")}
+                                {isRequested && order.isSearchInquiry
+                                  ? "⚡ Live Demand"
+                                  : isAccepted
+                                  ? "⚠️ Awaiting Patient Acceptance"
+                                  : isConfirmed
+                                  ? "✓ Patient Accepted - Ready to Dispense"
+                                  : order.status.replace("_", " ")}
                               </Badge>
                             </div>
                             <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
@@ -346,6 +358,19 @@ export function PharmacyPrescriptionsPage() {
                             <span className="text-xs font-mono text-slate-400">Order #{order.id}</span>
                           </div>
                         </div>
+
+                        {/* Handshake Consent Notices */}
+                        {isAccepted && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+                            <strong>Offer Sent to Patient • Dispensing Locked:</strong> Awaiting patient to confirm whether they want to take the medicine from your pharmacy. You cannot dispense or pack until patient accepts.
+                          </div>
+                        )}
+
+                        {isConfirmed && (
+                          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900">
+                            <strong>✓ Patient Accepted Your Offer!</strong> You are now authorized to dispense and pack the medicines.
+                          </div>
+                        )}
 
                         <div>
                           <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
@@ -391,11 +416,11 @@ export function PharmacyPrescriptionsPage() {
                               className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 font-bold text-xs"
                               onClick={() => handleUpdateOrderStatus(order.id, "packing")}
                             >
-                              <Package className="h-4 w-4" /> Mark Packed & Sealed
+                              <Package className="h-4 w-4" /> Dispense & Mark Packed
                             </Button>
                           )}
 
-                          {(isPacking || isAccepted) && (
+                          {isPacking && (
                             <Button
                               size="sm"
                               className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5 font-bold text-xs"
