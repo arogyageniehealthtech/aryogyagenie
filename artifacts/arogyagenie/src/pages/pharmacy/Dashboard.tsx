@@ -904,11 +904,11 @@ export function PharmacyDashboard() {
               <CardTitle className="text-lg font-bold text-slate-900">Doctor Prescriptions Queue</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              {dashboard.recentPrescriptions.length === 0 ? (
+              {activeDashboard.recentPrescriptions.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">No recent prescriptions in queue.</div>
               ) : (
                 <div className="space-y-3">
-                  {dashboard.recentPrescriptions.map((rx) => (
+                  {activeDashboard.recentPrescriptions.map((rx) => (
                     <div
                       key={rx.id}
                       className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4"
