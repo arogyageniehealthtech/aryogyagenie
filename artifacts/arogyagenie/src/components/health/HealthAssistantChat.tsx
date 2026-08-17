@@ -112,9 +112,15 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
           <div>
             <CardTitle className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
               AI Health Assistant
-              <Badge variant="outline" className="text-[10px] font-semibold text-primary border-primary/30 bg-primary/5">
-                <Sparkles className="h-3 w-3 mr-1 text-primary animate-pulse" /> Hybrid Patient & Vector RAG
-              </Badge>
+              {askAssistant.isPending ? (
+                <Badge variant="outline" className="text-[10px] font-semibold text-cyan-700 border-cyan-300 bg-cyan-50 animate-pulse flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-cyan-600 animate-spin" /> Neural Grounding...
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] font-semibold text-primary border-primary/30 bg-primary/5">
+                  <Sparkles className="h-3 w-3 mr-1 text-primary animate-pulse" /> Hybrid Patient & Vector RAG
+                </Badge>
+              )}
             </CardTitle>
             <p className="text-xs text-slate-500">Grounded in verified clinical guidelines & your medical records</p>
           </div>
@@ -133,6 +139,9 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
           </Button>
         )}
       </CardHeader>
+      {askAssistant.isPending && (
+        <div className="h-0.5 w-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 animate-pulse" />
+      )}
 
       {/* Messages Thread */}
       <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
