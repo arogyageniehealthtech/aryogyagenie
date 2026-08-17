@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogOut, Home, User, Calendar, Activity, Pill, Clock,
   Stethoscope, Clipboard, FileText, Settings, TestTube,
-  Users, LineChart, Building, Shield, MapPin, type LucideIcon
+  Users, LineChart, Building, Building2, Shield, MapPin, type LucideIcon
 } from "lucide-react";
 import { useGetMe } from "@workspace/api-client-react";
 
@@ -38,6 +38,7 @@ export function Sidebar() {
       { href: "/patient/dashboard",          label: "Dashboard",       icon: Home },
       { href: "/patient/appointments",        label: "Appointments",    icon: Calendar },
       { href: "/patient/doctors",             label: "Find Doctors",    icon: Stethoscope },
+      { href: "/patient/hospitals",           label: "Hospital",        icon: Building2 },
       { href: "/patient/nearby",              label: "Nearest Care Map", icon: MapPin },
       { href: "/patient/prescriptions",       label: "Prescriptions",   icon: Clipboard },
       { href: "/patient/lab-reports",         label: "Lab Reports",     icon: FileText },

@@ -43,6 +43,7 @@ const PatientTimeline = lazyNamed(() => import("./pages/patient/Timeline"), "Pat
 const PatientSymptomCheck = lazyNamed(() => import("./pages/patient/SymptomCheck"), "PatientSymptomCheck");
 const PatientProfile = lazyNamed(() => import("./pages/patient/Profile"), "PatientProfile");
 const PatientNearbyCareMap = lazyNamed(() => import("./pages/patient/NearbyCareMap"), "NearbyCareMap");
+const PatientHospitals = lazyNamed(() => import("./pages/patient/Hospitals"), "PatientHospitals");
 
 // Doctor Pages (Lazy loaded)
 const DoctorDashboard = lazyNamed(() => import("./pages/doctor/Dashboard"), "DoctorDashboard");
@@ -328,6 +329,9 @@ function ClerkProviderWithRoutes() {
                 </Route>
                 <Route path="/patient/nearby">
                   <ProtectedRoute component={PatientNearbyCareMap} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/hospitals">
+                  <ProtectedRoute component={PatientHospitals} allowedRoles={["patient"]} />
                 </Route>
 
                 {/* Doctor Routes */}

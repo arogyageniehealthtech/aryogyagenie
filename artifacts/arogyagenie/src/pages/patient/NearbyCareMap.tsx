@@ -39,6 +39,12 @@ const TYPE_CONFIG = {
     color: "bg-emerald-50 text-emerald-700 border-emerald-200",
     badgeColor: "bg-emerald-600 text-white",
   },
+  hospital: {
+    label: "Hospital",
+    emoji: "🏥",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    badgeColor: "bg-emerald-600 text-white",
+  },
 };
 
 export function NearbyCareMap() {

@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 
 export interface MapProviderItem {
   id: number;
-  type: "doctor" | "pharmacy" | "diagnostic_center";
+  type: "doctor" | "pharmacy" | "diagnostic_center" | "hospital";
   name: string;
   specialty?: string;
   address?: string;
   city?: string;
   phone?: string;
+  emergencyHelpline?: string;
   openingHours?: string;
   rating?: number;
   latitude: number;
@@ -21,6 +22,15 @@ export interface MapProviderItem {
     price?: number | null;
     inStock: boolean;
   } | null;
+  // Hospital specific properties
+  availableBeds?: number;
+  totalBeds?: number;
+  departments?: string[];
+  specialties?: Array<{
+    name: string;
+    availableBeds: number;
+    totalBeds?: number;
+  }>;
 }
 
 interface GoogleMapViewProps {
@@ -48,6 +58,11 @@ const TYPE_CONFIG = {
     pinColor: "#059669", // Emerald
     emoji: "💊",
     label: "Pharmacy",
+  },
+  hospital: {
+    pinColor: "#10B981", // Emerald Green for Hospitals with Medical Cross
+    emoji: "🏥",
+    label: "Hospital",
   },
 };
 
@@ -95,12 +110,32 @@ function computeDisambiguatedPositions(providers: MapProviderItem[]): Map<string
 
 /**
  * Creates custom SVG data URL icon for Google Maps markers.
+ * For hospitals, renders a Green Medical Plus marker (🟢 +).
  */
-function createSvgMarkerUrl(color: string, isSelected = false): string {
-  const width = isSelected ? 42 : 34;
-  const height = isSelected ? 52 : 42;
+function createSvgMarkerUrl(color: string, isSelected = false, type?: string): string {
+  const width = isSelected ? 44 : 34;
+  const height = isSelected ? 54 : 42;
   const stroke = isSelected ? "#F59E0B" : "#FFFFFF";
-  const strokeWidth = isSelected ? 3 : 2;
+  const strokeWidth = isSelected ? 3.5 : 2;
+
+  if (type === "hospital") {
+    // Green Medical Plus / Hospital Cross Marker
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 42" width="${width}" height="${height}">
+        <defs>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.4"/>
+          </filter>
+        </defs>
+        <path d="M17 0 C7.6 0 0 7.6 0 17 C0 29.8 17 42 17 42 C17 42 34 29.8 34 17 C34 7.6 26.4 0 17 0 Z" 
+              fill="#10B981" stroke="${stroke}" stroke-width="${strokeWidth}" filter="url(#shadow)"/>
+        <circle cx="17" cy="16" r="8.5" fill="#FFFFFF"/>
+        <!-- Green Medical Cross -->
+        <path d="M 15 11 L 19 11 L 19 14 L 22 14 L 22 18 L 19 18 L 19 21 L 15 21 L 15 18 L 12 18 L 12 14 L 15 14 Z" fill="#10B981"/>
+      </svg>
+    `;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+  }
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 42" width="${width}" height="${height}">
@@ -292,11 +327,11 @@ export function GoogleMapView({
           map,
           title: `${p.name} (${p.distanceKm} km)`,
           icon: {
-            url: createSvgMarkerUrl(typeCfg.pinColor, isSelected),
+            url: createSvgMarkerUrl(typeCfg.pinColor, isSelected, p.type),
             scaledSize: isSelected ? new google.maps.Size(42, 52) : new google.maps.Size(34, 42),
             anchor: isSelected ? new google.maps.Point(21, 52) : new google.maps.Point(17, 42),
           },
-          zIndex: isSelected ? 1000 : (p.type === "doctor" ? 50 : 10),
+          zIndex: isSelected ? 1000 : (p.type === "hospital" ? 60 : p.type === "doctor" ? 50 : 10),
         });
 
         marker.addListener("click", () => {
@@ -307,11 +342,11 @@ export function GoogleMapView({
       } else {
         marker.setPosition(pos);
         marker.setIcon({
-          url: createSvgMarkerUrl(typeCfg.pinColor, isSelected),
+          url: createSvgMarkerUrl(typeCfg.pinColor, isSelected, p.type),
           scaledSize: isSelected ? new google.maps.Size(42, 52) : new google.maps.Size(34, 42),
           anchor: isSelected ? new google.maps.Point(21, 52) : new google.maps.Point(17, 42),
         });
-        marker.setZIndex(isSelected ? 1000 : (p.type === "doctor" ? 50 : 10));
+        marker.setZIndex(isSelected ? 1000 : (p.type === "hospital" ? 60 : p.type === "doctor" ? 50 : 10));
       }
     });
   }, [mapLoaded, providers, selectedId, onSelectProvider]);
