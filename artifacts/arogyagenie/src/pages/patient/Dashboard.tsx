@@ -4,7 +4,6 @@ import { Calendar, FileText, Pill, Clipboard, ArrowRight, Activity, Clock, Steth
 import { Link } from "wouter";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { HealthSummaryCard } from "../../components/health/HealthSummaryCard";
-import { HealthAssistantChat } from "../../components/health/HealthAssistantChat";
 import { HealthEpisodeTracker } from "../../components/health/HealthEpisodeTracker";
 import { LabTrendVisualizer } from "../../components/health/LabTrendVisualizer";
 import { OneClickDeliveryCard, type MedicineOrderItem } from "@/components/delivery/OneClickDeliveryCard";
@@ -353,15 +352,6 @@ export function PatientDashboard() {
             subtitle="Synthesized from your verified medical timeline"
           />
           <HealthSummaryCard />
-        </div>
-
-        {/* ── AI Health Assistant ───────────────────────────────────────────── */}
-        <div>
-          <SectionHeading
-            title="AI Health Assistant"
-            subtitle="Ask questions about your health records or medical guidelines"
-          />
-          <HealthAssistantChat />
         </div>
 
         {/* ── Health Episodes + Lab Trends ─────────────────────────────────── */}

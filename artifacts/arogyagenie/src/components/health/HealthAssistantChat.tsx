@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bot, User, Send, Sparkles, BookOpen, AlertTriangle, ChevronDown, ChevronUp, FileText, CheckCircle2 } from "lucide-react";
+import { Bot, User, Send, Sparkles, BookOpen, AlertTriangle, ChevronDown, ChevronUp, FileText, CheckCircle2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessage {
@@ -35,7 +35,12 @@ const SAMPLE_PROMPTS = [
   "I have severe chest pain and difficulty breathing.",
 ];
 
-export function HealthAssistantChat() {
+export interface HealthAssistantChatProps {
+  className?: string;
+  onClose?: () => void;
+}
+
+export function HealthAssistantChat({ className = "", onClose }: HealthAssistantChatProps = {}) {
   const [inputQuery, setInputQuery] = useState("");
   const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -97,7 +102,7 @@ export function HealthAssistantChat() {
   };
 
   return (
-    <Card className="border-primary/20 bg-white shadow-sm overflow-hidden flex flex-col h-[620px]">
+    <Card className={`border-primary/20 bg-white shadow-sm overflow-hidden flex flex-col ${className || "h-[620px]"}`}>
       {/* Header */}
       <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/70 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -114,6 +119,19 @@ export function HealthAssistantChat() {
             <p className="text-xs text-slate-500">Grounded in verified clinical guidelines & your medical records</p>
           </div>
         </div>
+        {onClose && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors shrink-0"
+            title="Close Assistant"
+            aria-label="Close Assistant"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </CardHeader>
 
       {/* Messages Thread */}
