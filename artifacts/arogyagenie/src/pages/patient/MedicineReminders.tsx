@@ -1,27 +1,43 @@
-import { useState } from "react";
-import { useListMedicineReminders, useCreateMedicineReminder, useUpdateMedicineReminder, useDeleteMedicineReminder, getListMedicineRemindersQueryKey } from "@workspace/api-client-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useListPrescriptions, customFetch } from "@workspace/api-client-react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useQueryClient } from "@tanstack/react-query";
-import { Pill, Trash2, Edit2, Plus, Clock, Repeat, FileText, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Link } from "wouter";
+import {
+  Pill,
+  Clock,
+  Repeat,
+  FileText,
+  CheckCircle2,
+  Stethoscope,
+  Calendar,
+  Truck,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  AlertCircle,
+  Flame,
+  Info,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-const reminderSchema = z.object({
-  medicineName: z.string().min(2, "Medicine name is required"),
-  dosage: z.string().min(1, "Dosage is required"),
-  frequency: z.enum(["once_daily", "twice_daily", "thrice_daily", "every_8_hours", "weekly", "as_needed"]),
-  times: z.string().min(1, "Times are required (e.g. 08:00 AM, 08:00 PM)"),
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().optional(),
-  instructions: z.string().optional(),
-});
+interface PrescribedMedItem {
+  id: string;
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration?: string;
+  instructions?: string;
+  prescribedDate: string;
+  doctorName?: string | null;
+  prescriptionId?: number;
+  status: "active" | "dispensed" | "expired";
+  diagnosis?: string | null;
+  dailyTimes: string[];
+  isActiveReminder: boolean;
+}
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 function MedicineCardSkeleton() {
@@ -49,347 +65,218 @@ function MedicineCardSkeleton() {
       </div>
       <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
         <div className="h-8 w-8 skeleton-shimmer rounded-lg" />
-        <div className="h-8 w-8 skeleton-shimmer rounded-lg" />
       </div>
     </div>
   );
 }
 
-// ─── Main Component ─────────────────────────────────────────────────────────
 export function PatientMedicineReminders() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  
-  const { data: reminders, isLoading } = useListMedicineReminders();
-  const createReminder = useCreateMedicineReminder();
-  const updateReminder = useUpdateMedicineReminder();
-  const deleteReminder = useDeleteMedicineReminder();
-  const queryClient = useQueryClient();
+  const { data: prescriptions, isLoading } = useListPrescriptions();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [activeReminders, setActiveReminders] = useState<Record<string, boolean>>({});
+  const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof reminderSchema>>({
-    resolver: zodResolver(reminderSchema),
-    defaultValues: {
-      medicineName: "", dosage: "", frequency: "once_daily", times: "", startDate: new Date().toISOString().split('T')[0]
-    }
-  });
-
-  const onSubmit = (data: z.infer<typeof reminderSchema>) => {
-    if (editingId) {
-      updateReminder.mutate({ id: editingId, data }, {
-        onSuccess: () => {
-          setIsOpen(false);
-          setEditingId(null);
-          form.reset();
-          queryClient.invalidateQueries({ queryKey: getListMedicineRemindersQueryKey() });
+  // Fetch orders fulfilled on the platform
+  useEffect(() => {
+    let isMounted = true;
+    customFetch<any[]>("/api/medicine-orders")
+      .then((data) => {
+        if (isMounted && Array.isArray(data)) {
+          setOrders(data);
         }
-      });
-    } else {
-      createReminder.mutate({ data }, {
-        onSuccess: () => {
-          setIsOpen(false);
-          form.reset();
-          queryClient.invalidateQueries({ queryKey: getListMedicineRemindersQueryKey() });
+      })
+      .catch((err) => console.error("Error fetching medicine orders:", err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Parse structured medicine items from all prescriptions and platform deliveries
+  const prescribedMedicines = useMemo<PrescribedMedItem[]>(() => {
+    const list: PrescribedMedItem[] = [];
+
+    if (!prescriptions || !Array.isArray(prescriptions)) return list;
+
+    prescriptions.forEach((rx) => {
+      const rxDate = rx.prescribedDate
+        ? new Date(rx.prescribedDate).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })
+        : "Recent";
+
+      if (!rx.medicines) return;
+
+      // Try parsing JSON medicines if structured
+      let parsedFromJSON = false;
+      try {
+        if (rx.medicines.trim().startsWith("[") || rx.medicines.trim().startsWith("{")) {
+          const parsed = JSON.parse(rx.medicines);
+          const items = Array.isArray(parsed) ? parsed : [parsed];
+          items.forEach((item: any, idx: number) => {
+            if (item && (item.name || item.medicineName)) {
+              parsedFromJSON = true;
+              const name = item.name || item.medicineName || "Prescribed Medicine";
+              const id = `rx-${rx.id}-item-${idx}-${name.replace(/\s+/g, "_")}`;
+              list.push({
+                id,
+                name,
+                dosage: item.dosage || "1 dose",
+                frequency: item.frequency || "Twice Daily",
+                duration: item.duration || "5 days",
+                instructions: item.instructions || rx.instructions || "Take as directed by physician",
+                prescribedDate: rxDate,
+                doctorName: rx.doctorName || "Treating Physician",
+                prescriptionId: rx.id,
+                status: (rx.status as any) || "active",
+                diagnosis: rx.diagnosis || null,
+                dailyTimes: ["08:00 AM", "08:00 PM"],
+                isActiveReminder: activeReminders[id] ?? true,
+              });
+            }
+          });
         }
-      });
-    }
-  };
-
-  const handleEdit = (reminder: any) => {
-    setEditingId(reminder.id);
-    form.reset({
-      medicineName: reminder.medicineName,
-      dosage: reminder.dosage,
-      frequency: reminder.frequency,
-      times: reminder.times,
-      startDate: reminder.startDate.split('T')[0],
-      endDate: reminder.endDate ? reminder.endDate.split('T')[0] : undefined,
-      instructions: reminder.instructions || ""
-    });
-    setIsOpen(true);
-  };
-
-  const handleDelete = (id: number) => {
-    if (confirm("Are you sure you want to delete this reminder?")) {
-      deleteReminder.mutate({ id }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListMedicineRemindersQueryKey() });
-        }
-      });
-    }
-  };
-
-  const toggleActive = (id: number, isActive: boolean) => {
-    updateReminder.mutate({ id, data: { isActive: !isActive } }, {
-      onSuccess: () => {
-         queryClient.setQueryData(getListMedicineRemindersQueryKey(), (old: any) => 
-           old ? old.map((r: any) => r.id === id ? { ...r, isActive: !isActive } : r) : old
-         );
+      } catch {
+        parsedFromJSON = false;
       }
+
+      // If plain text format, split lines/items
+      if (!parsedFromJSON) {
+        const lines = rx.medicines
+          .split(/\n|\r\n|;/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        lines.forEach((line, idx) => {
+          const id = `rx-${rx.id}-line-${idx}`;
+          // Extract dosage/frequency if line contains hyphens or parentheses
+          const parts = line.split(/-|•|\(|\)/).map((p) => p.trim()).filter(Boolean);
+          const name = parts[0] || line;
+          const dosage = parts[1] || "1 unit";
+          const freq = parts[2] || "Twice Daily";
+
+          list.push({
+            id,
+            name,
+            dosage,
+            frequency: freq,
+            duration: "As prescribed",
+            instructions: rx.instructions || "Take as advised by your doctor",
+            prescribedDate: rxDate,
+            doctorName: rx.doctorName || "Consultant Doctor",
+            prescriptionId: rx.id,
+            status: (rx.status as any) || "active",
+            diagnosis: rx.diagnosis || null,
+            dailyTimes: ["08:00 AM", "08:00 PM"],
+            isActiveReminder: activeReminders[id] ?? true,
+          });
+        });
+      }
+    });
+
+    return list;
+  }, [prescriptions, activeReminders]);
+
+  const toggleReminder = (id: string) => {
+    setActiveReminders((prev) => {
+      const nextVal = !(prev[id] ?? true);
+      toast({
+        title: nextVal ? "Dose Reminder Activated" : "Dose Reminder Paused",
+        description: `Daily dose notifications ${nextVal ? "enabled" : "paused"} for this prescribed medicine.`,
+      });
+      return { ...prev, [id]: nextVal };
     });
   };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-
-        {/* ── Page Header ──────────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* ── Header ────────────────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Medicines</h1>
-            <p className="text-sm text-slate-500 mt-1">Manage your pill box and daily dose reminders.</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <span>Prescribed Medicines</span>
+              <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs">
+                Platform Prescriptions Only
+              </Badge>
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Medicines prescribed to you by verified doctors on the platform and fulfilled via digital prescriptions.
+            </p>
           </div>
 
-          <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if(!open) setEditingId(null); }}>
-            <DialogTrigger asChild>
-              <Button 
-                onClick={() => form.reset()}
-                className="gap-2 rounded-xl font-semibold shadow-sm"
-                style={{
-                  background: "linear-gradient(135deg, hsl(243,75%,59%), hsl(260,70%,58%))",
-                  border: "none",
-                  color: "white",
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Add Medicine
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] rounded-2xl">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-bold">
-                  {editingId ? "Edit Medicine Reminder" : "Add New Medicine"}
-                </DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="medicineName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Medicine Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g. Paracetamol 650, Metformin" className="rounded-xl" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="dosage"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Dosage</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g. 1 tablet, 500mg" className="rounded-xl" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+          <Link href="/patient/prescriptions">
+            <Button
+              className="rounded-xl font-bold text-xs gap-1.5 shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white self-start"
+            >
+              <FileText className="h-4 w-4" />
+              View Digital Prescriptions
+            </Button>
+          </Link>
+        </div>
 
-                    {/* Quick Medicine Suggestions */}
-                    <div className="space-y-1.5 pt-1">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        Suggested Options:
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { name: "Paracetamol 650", dose: "1 tablet", freq: "twice_daily", times: "08:00 AM, 08:00 PM" },
-                          { name: "Dolo 650", dose: "1 tablet", freq: "as_needed", times: "08:00 AM" },
-                          { name: "Amoxicillin 500mg", dose: "1 capsule", freq: "thrice_daily", times: "08:00 AM, 02:00 PM, 08:00 PM" },
-                          { name: "Pantoprazole 40mg", dose: "1 tablet before meal", freq: "once_daily", times: "07:30 AM" },
-                          { name: "Cetirizine 10mg", dose: "1 tablet at night", freq: "once_daily", times: "09:30 PM" },
-                        ].map((sug) => (
-                          <button
-                            key={sug.name}
-                            type="button"
-                            onClick={() => {
-                              form.setValue("medicineName", sug.name);
-                              form.setValue("dosage", sug.dose);
-                              form.setValue("frequency", sug.freq as any);
-                              form.setValue("times", sug.times);
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200/60 text-xs font-medium transition-colors"
-                          >
-                            + {sug.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="frequency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Frequency</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="rounded-xl">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="once_daily">Once Daily</SelectItem>
-                              <SelectItem value="twice_daily">Twice Daily</SelectItem>
-                              <SelectItem value="thrice_daily">Thrice Daily</SelectItem>
-                              <SelectItem value="every_8_hours">Every 8 Hours</SelectItem>
-                              <SelectItem value="weekly">Weekly</SelectItem>
-                              <SelectItem value="as_needed">As Needed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="times"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Times</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. 08:00 AM, 08:00 PM" className="rounded-xl" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Start Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" className="rounded-xl" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="endDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>End Date <span className="text-slate-400 font-normal">(Optional)</span></FormLabel>
-                          <FormControl>
-                            <Input type="date" className="rounded-xl" {...field} value={field.value || ""} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="instructions"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Instructions <span className="text-slate-400 font-normal">(Optional)</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Take after meals with glass of water" className="rounded-xl" {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="pt-2 flex justify-end gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={createReminder.isPending || updateReminder.isPending}
-                      className="rounded-xl gap-2"
-                      style={{
-                        background: "linear-gradient(135deg, hsl(243,75%,59%), hsl(260,70%,58%))",
-                        border: "none",
-                        color: "white",
-                      }}
-                    >
-                      {(createReminder.isPending || updateReminder.isPending) ? "Saving..." : "Save Medicine"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+        {/* ── Informational Notice ──────────────────────────────────────────── */}
+        <div className="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5 shadow-2xs">
+          <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold text-indigo-950">Strict Medical Integrity: </span>
+            This section only displays medications officially prescribed by doctors or fulfilled through your digital prescriptions. Manual unauthorized additions are disabled to ensure medical record safety.
+          </div>
         </div>
 
         {/* ── Content Grid ──────────────────────────────────────────────────── */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[...Array(6)].map((_, i) => <MedicineCardSkeleton key={i} />)}
+            {[...Array(6)].map((_, i) => (
+              <MedicineCardSkeleton key={i} />
+            ))}
           </div>
-        ) : reminders?.length === 0 ? (
+        ) : prescribedMedicines.length === 0 ? (
           /* Empty state */
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
-            <div 
-              className="h-16 w-16 rounded-2xl flex items-center justify-center mb-4"
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+            <div
+              className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1"
               style={{ background: "hsl(243,75%,97%)" }}
             >
               <Pill className="h-8 w-8" style={{ color: "hsl(243,75%,59%)" }} />
             </div>
-            <h3 className="text-base font-semibold text-slate-800 mb-1">Your pill box is empty</h3>
-            <p className="text-sm text-slate-500 max-w-xs mb-5">
-              Add your prescribed medications to organize daily dose schedules and active reminders.
+            <h3 className="text-lg font-bold text-slate-800">No Prescribed Medicines Yet</h3>
+            <p className="text-sm text-slate-500 max-w-md leading-relaxed">
+              When your doctor issues a digital prescription after a consultation or when you order prescribed medicines through the platform, they will automatically appear here with their dosage schedules.
             </p>
-            <Button
-              onClick={() => { form.reset(); setIsOpen(true); }}
-              className="rounded-xl gap-2"
-              style={{
-                background: "linear-gradient(135deg, hsl(243,75%,59%), hsl(260,70%,58%))",
-                border: "none",
-                color: "white",
-              }}
-            >
-              <Plus className="h-4 w-4" />
-              Add First Medicine
-            </Button>
+            <Link href="/patient/prescriptions">
+              <Button
+                className="rounded-xl gap-2 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+              >
+                <FileText className="h-4 w-4" />
+                Go to Prescriptions & Doorstep Delivery
+              </Button>
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {reminders?.map((reminder) => {
-              const isActive = reminder.isActive;
-              const formattedFreq = reminder.frequency
-                ? reminder.frequency.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-                : "";
+            {prescribedMedicines.map((med) => {
+              const isActive = med.isActiveReminder;
 
               return (
-                <div 
-                  key={reminder.id} 
+                <div
+                  key={med.id}
                   className={`bg-white rounded-2xl border shadow-sm flex flex-col justify-between overflow-hidden transition-all duration-180 ${
-                    isActive 
-                      ? "border-slate-100/90 hover:shadow-md" 
+                    isActive
+                      ? "border-slate-100/90 hover:shadow-md"
                       : "border-slate-200/70 bg-slate-50/60 opacity-70"
                   }`}
                 >
                   <div>
                     {/* Top Accent Line */}
-                    <div 
+                    <div
                       className="h-1.5 w-full"
                       style={{
-                        background: isActive 
-                          ? "linear-gradient(90deg, hsl(158,60%,42%), hsl(243,75%,59%))" 
+                        background: isActive
+                          ? "linear-gradient(90deg, hsl(158,60%,42%), hsl(243,75%,59%))"
                           : "hsl(214,32%,85%)",
                       }}
                     />
@@ -398,35 +285,59 @@ export function PatientMedicineReminders() {
                       {/* Header row: Icon, Name, Dosage, Switch */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div 
+                          <div
                             className="h-10 w-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-2xs"
                             style={{
-                              background: isActive 
-                                ? "linear-gradient(135deg, hsl(158,60%,42%), hsl(158,50%,34%))" 
+                              background: isActive
+                                ? "linear-gradient(135deg, hsl(158,60%,42%), hsl(158,50%,34%))"
                                 : "hsl(214,32%,75%)",
                             }}
                           >
                             <Pill className="h-5 w-5" />
                           </div>
                           <div>
-                            <h3 className="font-bold text-slate-900 text-sm leading-snug">{reminder.medicineName}</h3>
-                            <span 
+                            <h3 className="font-bold text-slate-900 text-sm leading-snug">{med.name}</h3>
+                            <span
                               className="inline-block text-xs font-semibold px-2 py-0.5 rounded-md mt-0.5"
                               style={{
                                 background: isActive ? "rgba(16,185,129,0.1)" : "rgba(100,116,139,0.1)",
                                 color: isActive ? "#059669" : "#64748b",
                               }}
                             >
-                              {reminder.dosage}
+                              {med.dosage}
                             </span>
                           </div>
                         </div>
 
-                        {/* Switch toggle */}
-                        <Switch 
-                          checked={reminder.isActive} 
-                          onCheckedChange={() => toggleActive(reminder.id, reminder.isActive)} 
-                        />
+                        {/* Switch toggle for daily schedule reminder */}
+                        <div className="flex flex-col items-end gap-1">
+                          <Switch
+                            checked={isActive}
+                            onCheckedChange={() => toggleReminder(med.id)}
+                          />
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {isActive ? "Active" : "Paused"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Doctor & Prescription Origin */}
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1">
+                        <div className="flex items-center justify-between text-slate-700">
+                          <span className="flex items-center gap-1 font-semibold">
+                            <Stethoscope className="w-3.5 h-3.5 text-indigo-600" />
+                            Dr. {med.doctorName}
+                          </span>
+                          <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {med.prescribedDate}
+                          </span>
+                        </div>
+                        {med.diagnosis && (
+                          <p className="text-[11px] text-slate-500 truncate">
+                            <strong>For:</strong> {med.diagnosis}
+                          </p>
+                        )}
                       </div>
 
                       {/* Detail Rows */}
@@ -436,29 +347,34 @@ export function PatientMedicineReminders() {
                             <Repeat className="h-3.5 w-3.5" />
                             Frequency
                           </span>
-                          <span className="font-semibold text-slate-800">{formattedFreq}</span>
+                          <span className="font-semibold text-slate-800">{med.frequency}</span>
                         </div>
 
                         <div className="flex items-center justify-between text-slate-600">
                           <span className="flex items-center gap-1.5 text-slate-400">
                             <Clock className="h-3.5 w-3.5" />
-                            Times
+                            Daily Schedule
                           </span>
-                          <span 
-                            className="font-semibold px-2 py-0.5 rounded-md text-[11px]"
-                            style={{ background: "hsl(243,75%,96%)", color: "hsl(243,75%,50%)" }}
-                          >
-                            {reminder.times}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            {med.dailyTimes.map((time, tIdx) => (
+                              <span
+                                key={tIdx}
+                                className="font-semibold px-2 py-0.5 rounded-md text-[11px]"
+                                style={{ background: "hsl(243,75%,96%)", color: "hsl(243,75%,50%)" }}
+                              >
+                                {time}
+                              </span>
+                            ))}
+                          </div>
                         </div>
 
-                        {reminder.instructions && (
+                        {med.instructions && (
                           <div className="pt-2 border-t border-slate-100 text-slate-600">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-                              Instructions
+                              Clinical Instructions
                             </span>
-                            <p className="text-xs text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                              {reminder.instructions}
+                            <p className="text-xs text-slate-700 bg-amber-50/50 p-2 rounded-lg border border-amber-100/70">
+                              {med.instructions}
                             </p>
                           </div>
                         )}
@@ -467,25 +383,22 @@ export function PatientMedicineReminders() {
                   </div>
 
                   {/* Card Action Footer */}
-                  <div className="px-5 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleEdit(reminder)}
-                      className="h-8 px-2.5 text-xs text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg gap-1.5"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleDelete(reminder.id)}
-                      className="h-8 px-2.5 text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg gap-1.5"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </Button>
+                  <div className="px-5 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Prescription Verified
+                    </span>
+
+                    <Link href="/patient/prescriptions">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg gap-1 font-semibold"
+                      >
+                        Prescription Details
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               );

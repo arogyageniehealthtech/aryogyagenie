@@ -468,7 +468,7 @@ export function PatientDashboard() {
                   <p className="text-sm text-slate-400">No active reminders.</p>
                   <Link href="/patient/medicine-reminders">
                     <span className="text-xs font-semibold mt-1 inline-block hover:opacity-80" style={{ color: "hsl(238,53%,49%)" }}>
-                      Add medicines →
+                      View prescribed medicines →
                     </span>
                   </Link>
                 </div>

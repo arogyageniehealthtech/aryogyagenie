@@ -27,7 +27,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { OneClickDeliveryCard, type MedicineOrderItem } from "@/components/delivery/OneClickDeliveryCard";
-import { RequestMedicineModal } from "@/components/delivery/RequestMedicineModal";
 import { BlinkitDeliveryTracker } from "@/components/delivery/BlinkitDeliveryTracker";
 import { useUserLocation } from "@/hooks/useUserLocation";
 
@@ -99,13 +98,29 @@ export function PatientPrescriptions() {
   const [orders, setOrders] = useState<MedicineOrderItem[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [requestingPrescriptionId, setRequestingPrescriptionId] = useState<number | null>(null);
-  const [showRequestModal, setShowRequestModal] = useState(false);
   const [trackingOrderId, setTrackingOrderId] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // Quick medicine search / order state
-  const [quickMedQuery, setQuickMedQuery] = useState("");
-  const [isSubmittingQuickMed, setIsSubmittingQuickMed] = useState(false);
+  // Multi-select medicine basket state
+  const [selectedMeds, setSelectedMeds] = useState<string[]>([]);
+  const [customMedInput, setCustomMedInput] = useState("");
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  // Camera & file upload state
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [attachedImageName, setAttachedImageName] = useState<string | null>(null);
+
+  const commonMeds = [
+    "Paracetamol 650",
+    "Dolo 650",
+    "Azithromycin 500mg",
+    "Amoxicillin 500mg",
+    "Pantoprazole 40mg",
+    "Cetirizine 10mg",
+    "Cough Syrup",
+    "ORS Electrolyte",
+    "Vitamin C + Zinc",
+  ];
 
   const fetchOrders = async () => {
     setOrdersLoading(true);
@@ -127,57 +142,105 @@ export function PatientPrescriptions() {
     return () => clearInterval(interval);
   }, []);
 
-  // Transmit live search inquiry to nearby radius pharmacies as user types
-  useEffect(() => {
-    if (!quickMedQuery.trim() || quickMedQuery.trim().length < 3) return;
-    const timer = setTimeout(() => {
-      customFetch("/api/medicine-orders/search-inquiry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          medicineName: quickMedQuery.trim(),
-          lat: userLoc.lat,
-          lng: userLoc.lng,
-          address: locationName,
-        }),
-      }).catch(() => {});
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [quickMedQuery, userLoc.lat, userLoc.lng, locationName]);
+  // Toggle quick select medicine chip in multi-select basket
+  const handleToggleMed = (med: string) => {
+    setSelectedMeds((prev) =>
+      prev.includes(med) ? prev.filter((m) => m !== med) : [...prev, med]
+    );
+  };
 
-  // Handle Quick Medicine Order Submission to nearby pharmacies
-  const handleQuickMedSubmit = async (e: React.FormEvent) => {
+  // Add custom typed medicine to multi-select basket
+  const handleAddCustomMed = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = customMedInput.trim();
+    if (!trimmed) return;
+    if (!selectedMeds.includes(trimmed)) {
+      setSelectedMeds((prev) => [...prev, trimmed]);
+    }
+    setCustomMedInput("");
+  };
+
+  // Remove individual medicine from basket
+  const handleRemoveMed = (medToRemove: string) => {
+    setSelectedMeds((prev) => prev.filter((m) => m !== medToRemove));
+  };
+
+  // Handle file or phone camera capture
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAttachedImageName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAttachedImage(reader.result as string);
+      toast({
+        title: "Photo / Document Attached!",
+        description: `"${file.name}" ready to broadcast with your medicine request.`,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Clear attached photo
+  const handleRemoveAttachedImage = () => {
+    setAttachedImage(null);
+    setAttachedImageName(null);
+  };
+
+  // Broadcast Multi-selected Medicines & Attached Photo to Nearby Pharmacies
+  const handleBroadcastMultiSelect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickMedQuery.trim()) return;
-    setIsSubmittingQuickMed(true);
+    if (selectedMeds.length === 0 && !attachedImage) {
+      toast({
+        title: "Selection Empty",
+        description: "Please choose at least one medicine or attach a prescription photo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsBroadcasting(true);
     try {
+      const medicinesText = selectedMeds.length > 0
+        ? selectedMeds.join("\n")
+        : `Prescription / Medicine Photo Attached: ${attachedImageName || "prescription_image.jpg"}`;
+
+      const notesText = [
+        `Patient requested ${selectedMeds.length} medicine(s) via multi-select.`,
+        attachedImageName ? `[Attached File: ${attachedImageName}]` : null,
+      ].filter(Boolean).join(" ");
+
       await customFetch("/api/medicine-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          medicines: quickMedQuery.trim(),
+          medicines: medicinesText,
           address: locationName,
           latitude: userLoc.lat,
           longitude: userLoc.lng,
-          notes: `Quick order from Prescription Section for "${quickMedQuery.trim()}"`,
+          notes: notesText,
         }),
       });
 
       toast({
         title: "⚡ Request Broadcast to Nearby Pharmacies!",
-        description: `Your request for "${quickMedQuery.trim()}" is visible to verified pharmacies in your radius. When a pharmacy accepts, you'll be prompted to confirm before they dispense!`,
+        description: `Your bundle with ${selectedMeds.length} medicine(s) ${attachedImage ? "and attached photo " : ""}has been broadcast to verified pharmacies in your radius.`,
       });
 
-      setQuickMedQuery("");
+      setSelectedMeds([]);
+      setCustomMedInput("");
+      setAttachedImage(null);
+      setAttachedImageName(null);
       fetchOrders();
     } catch (err: any) {
       toast({
-        title: "Order Failed",
-        description: err.message || "Could not submit medicine order",
+        title: "Request Failed",
+        description: err.message || "Could not broadcast medicine request",
         variant: "destructive",
       });
     } finally {
-      setIsSubmittingQuickMed(false);
+      setIsBroadcasting(false);
     }
   };
 
@@ -234,84 +297,205 @@ export function PatientPrescriptions() {
               </span>
             </p>
           </div>
-
-          <Button
-            onClick={() => setShowRequestModal(true)}
-            className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 shadow-md self-start"
-          >
-            <Plus className="w-4 h-4" /> Order OTC / Custom Medicine
-          </Button>
         </div>
 
-        {/* ── Quick Search & Order Medicine from Nearby Pharmacies ────────────── */}
-        <Card className="border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent rounded-2xl shadow-xs overflow-hidden">
-          <div className="p-4 sm:p-5">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-xs">
+        {/* ── Quick Multi-Select & Camera Upload Card ────────────────────────── */}
+        <Card className="border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="p-4 sm:p-6 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-xs">
                   <Pill className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <span>Order Any Medicine from Nearby Pharmacies</span>
+                    <span>Quick Select & Request Medicines</span>
                     <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-[10px]">
                       ⚡ Radius Broadcast & 2-Way Consent
                     </Badge>
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Type any OTC or prescribed medicine. Nearby pharmacies will view your request and offer stock. You choose to accept before they dispense!
+                    Choose multiple medicines below or snap a prescription photo from your phone camera. Nearby pharmacies will view and quote before dispensing!
                   </p>
                 </div>
               </div>
 
               <div className="text-xs font-medium text-slate-500 flex items-center gap-1 self-start">
                 <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Detected Delivery: <strong className="text-slate-800">{locationName}</strong></span>
+                <span>Radius Delivery: <strong className="text-slate-800">{locationName}</strong></span>
               </div>
             </div>
 
-            <form onSubmit={handleQuickMedSubmit} className="flex flex-col sm:flex-row items-center gap-2">
-              <div className="relative flex-1 w-full">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <Input
-                  placeholder="Enter medicine name (e.g. Paracetamol 650, Amoxicillin 500mg, Dolo 650, Azithromycin)..."
-                  value={quickMedQuery}
-                  onChange={(e) => setQuickMedQuery(e.target.value)}
-                  className="pl-10 text-xs sm:text-sm h-11 bg-white border-emerald-200 rounded-xl shadow-2xs font-medium"
-                />
+            {/* Quick Multi-Select Pill Options */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Select Common & Essential Medicines (Tap to Add/Remove):
+                </span>
+                {selectedMeds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMeds([])}
+                    className="text-[11px] font-bold text-red-600 hover:text-red-700 transition-colors"
+                  >
+                    Clear Selection ({selectedMeds.length})
+                  </button>
+                )}
               </div>
-              <Button
-                type="submit"
-                disabled={isSubmittingQuickMed || !quickMedQuery.trim()}
-                className="w-full sm:w-auto h-11 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-2 shrink-0 shadow-sm"
-              >
-                <Flame className="w-4 h-4 fill-white" />
-                {isSubmittingQuickMed ? "Broadcasting..." : "Request from Nearby Pharmacies"}
-              </Button>
-            </form>
 
-            {/* Popular Quick Pills */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-emerald-100/80">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">
-                Quick Select:
-              </span>
-              {[
-                "Paracetamol 650",
-                "Amoxicillin 500mg",
-                "Dolo 650",
-                "Pantoprazole 40mg",
-                "Cetirizine 10mg",
-                "Azithromycin 500mg",
-              ].map((med) => (
-                <button
-                  key={med}
+              <div className="flex flex-wrap gap-2">
+                {commonMeds.map((med) => {
+                  const isSelected = selectedMeds.includes(med);
+                  return (
+                    <button
+                      key={med}
+                      type="button"
+                      onClick={() => handleToggleMed(med)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-2xs ${
+                        isSelected
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-xs scale-102 ring-2 ring-emerald-300"
+                          : "bg-white hover:bg-emerald-50 text-slate-700 border-slate-200 hover:border-emerald-300"
+                      }`}
+                    >
+                      <span>{isSelected ? "✓" : "+"}</span>
+                      <span>💊 {med}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Medicine Input & Photo Buttons */}
+            <div className="space-y-3 pt-2 border-t border-emerald-100/90">
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                <div className="relative flex-1 w-full">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Input
+                    placeholder="Type any other medicine name and press Enter to add..."
+                    value={customMedInput}
+                    onChange={(e) => setCustomMedInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddCustomMed();
+                      }
+                    }}
+                    className="pl-10 text-xs sm:text-sm h-11 bg-white border-emerald-200 rounded-xl shadow-2xs font-medium"
+                  />
+                </div>
+                <Button
                   type="button"
-                  onClick={() => setQuickMedQuery(med)}
-                  className="px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 text-slate-700 text-xs font-semibold transition-all"
+                  onClick={() => handleAddCustomMed()}
+                  disabled={!customMedInput.trim()}
+                  variant="outline"
+                  className="h-11 px-4 text-xs font-bold border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-xl shrink-0"
                 >
-                  💊 {med}
-                </button>
-              ))}
+                  <Plus className="w-4 h-4 mr-1" /> Add to List
+                </Button>
+              </div>
+
+              {/* Selected Medicines Basket */}
+              {selectedMeds.length > 0 && (
+                <div className="p-3 bg-white rounded-xl border border-emerald-200/80 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Selected Medicines ({selectedMeds.length} items):
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedMeds.map((med) => (
+                      <span
+                        key={med}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold"
+                      >
+                        <span>{med}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMed(med)}
+                          className="text-emerald-500 hover:text-red-600 font-bold transition-colors"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Camera Snap & File Upload Controls */}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                {/* Phone Camera Snap */}
+                <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span>📷 Snap Photo (Phone Camera)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Upload File / Document */}
+                <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs">
+                  <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  <span>📁 Upload Prescription / Doc</span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Attached Photo Preview */}
+                {attachedImage && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs shadow-2xs">
+                    <img
+                      src={attachedImage}
+                      alt="Attachment Preview"
+                      className="w-7 h-7 rounded-lg object-cover border border-indigo-100"
+                    />
+                    <span className="font-semibold text-slate-700 truncate max-w-[150px]">
+                      {attachedImageName || "Attached Image"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveAttachedImage}
+                      className="text-red-500 hover:text-red-700 font-bold ml-1"
+                      title="Remove attached image"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Main Submit Button */}
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  onClick={handleBroadcastMultiSelect}
+                  disabled={isBroadcasting || (selectedMeds.length === 0 && !attachedImage)}
+                  className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm gap-2 shadow-md"
+                >
+                  <Flame className="w-4 h-4 fill-white" />
+                  {isBroadcasting
+                    ? "Broadcasting to Nearby Pharmacies..."
+                    : selectedMeds.length > 0
+                    ? `Request ${selectedMeds.length} Selected Medicine(s) from Nearby Pharmacies`
+                    : attachedImage
+                    ? "Broadcast Attached Prescription Photo to Nearby Pharmacies"
+                    : "Select Medicines or Attach Photo to Request"}
+                </Button>
+              </div>
             </div>
           </div>
         </Card>
@@ -493,13 +677,6 @@ export function PatientPrescriptions() {
           )}
         </div>
       </div>
-
-      {/* OTC / Custom Medicine Request Modal */}
-      <RequestMedicineModal
-        isOpen={showRequestModal}
-        onClose={() => setShowRequestModal(false)}
-        onSuccess={fetchOrders}
-      />
 
       {/* Live Route Tracker Modal */}
       {trackingOrderId && (
