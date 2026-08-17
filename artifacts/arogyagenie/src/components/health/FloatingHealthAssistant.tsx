@@ -50,17 +50,17 @@ export function FloatingHealthAssistant() {
               damping: 28,
               mass: 0.9,
             }}
-            className="fixed bottom-20 sm:bottom-24 right-3 sm:right-6 z-50 w-[430px] max-w-[calc(100vw-1.5rem)] h-[600px] max-h-[calc(100vh-7rem)] bg-white rounded-3xl overflow-hidden flex flex-col border border-indigo-100"
+            className="fixed bottom-20 sm:bottom-24 right-2 sm:right-6 z-50 w-[720px] max-w-[calc(100vw-1rem)] h-[640px] max-h-[calc(100vh-6.5rem)] bg-[#07091d] rounded-3xl overflow-hidden flex flex-col border border-indigo-500/30"
             style={{
               boxShadow:
-                "0 24px 70px -15px rgba(59, 63, 191, 0.28), 0 10px 30px -10px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(99, 102, 241, 0.15)",
+                "0 30px 90px -15px rgba(59, 63, 191, 0.45), 0 10px 30px -10px rgba(15, 23, 42, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.25)",
             }}
           >
             {/* Top ambient accent beam */}
-            <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 shrink-0" />
+            <div className="h-1 w-full bg-gradient-to-r from-purple-600 via-indigo-500 to-cyan-400 shrink-0" />
             
             <HealthAssistantChat
-              className="h-full w-full border-0 shadow-none rounded-3xl"
+              className="h-full w-full border-0 shadow-none rounded-none"
               onClose={() => setIsOpen(false)}
             />
           </motion.div>

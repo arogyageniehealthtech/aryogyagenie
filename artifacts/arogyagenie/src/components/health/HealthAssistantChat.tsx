@@ -1,11 +1,35 @@
 import { useState } from "react";
-import { useAskHealthAssistant } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  useAskHealthAssistant,
+  useListSymptomAssessments,
+  useGetMe,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bot, User, Send, Sparkles, BookOpen, AlertTriangle, ChevronDown, ChevronUp, FileText, CheckCircle2, X } from "lucide-react";
+import {
+  Sparkles,
+  Send,
+  User,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  CheckCircle2,
+  X,
+  MessageSquareText,
+  Activity,
+  Lightbulb,
+  HeartPulse,
+  Phone,
+  ArrowRight,
+  ShieldAlert,
+  MapPin,
+  Flame,
+  Stethoscope,
+  ExternalLink,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface ChatMessage {
   id: string;
@@ -29,10 +53,46 @@ interface ChatMessage {
 }
 
 const SAMPLE_PROMPTS = [
-  "Did I ever face any health issue?",
+  "I have severe headaches and mild fever for 2 days.",
   "What does my low hemoglobin mean?",
-  "What are common causes and warning signs of iron-deficiency anemia?",
-  "I have severe chest pain and difficulty breathing.",
+  "What are common warning signs of iron-deficiency anemia?",
+  "Did I ever face any health issue in my records?",
+];
+
+const QUICK_SYMPTOM_CATEGORIES = [
+  { label: "Headache & Migraine", query: "I have a pulsating headache and sensitivity to light. What could be the causes?" },
+  { label: "Fever & Chills", query: "I have a high fever with chills and body ache. What are the recommended next steps?" },
+  { label: "Chest Discomfort", query: "I feel chest tightness and mild breathlessness. What should I check immediately?" },
+  { label: "Cough & Throat", query: "I have a persistent dry cough and sore throat for 3 days." },
+  { label: "Stomach Ache & Nausea", query: "I have sharp abdominal pain and nausea after eating." },
+  { label: "Joint & Muscle Pain", query: "I have stiffness and pain in my knee joints in the morning." },
+];
+
+const HEALTH_TIPS = [
+  {
+    title: "Cardiovascular & Aerobic Fitness",
+    category: "Vitals & Heart",
+    desc: "Aim for 30 minutes of moderate aerobic activity 5 days a week to maintain endothelial flexibility and blood pressure regulation.",
+    prompt: "What are the clinically proven benefits of 30-minute daily cardio on cardiovascular health?",
+  },
+  {
+    title: "Hydration & Renal Filtration",
+    category: "Kidney & Metabolism",
+    desc: "Maintaining 2.5–3L of daily hydration optimizes glomerular filtration rate and prevents kidney stone formation.",
+    prompt: "How does optimal daily water intake protect renal function and metabolic efficiency?",
+  },
+  {
+    title: "Sleep Architecture & Immune Recovery",
+    category: "Immunity & Brain",
+    desc: "7–8 hours of consistent slow-wave sleep regulates natural killer cell activity and suppresses systemic inflammatory cytokines.",
+    prompt: "Explain how deep restorative sleep strengthens immune resilience against infections.",
+  },
+  {
+    title: "Iron & Vitamin C Absorption",
+    category: "Nutrition",
+    desc: "Pair non-heme plant-based iron sources (spinach, lentils) with Vitamin C (citrus, amla) for up to 3x higher bio-absorption.",
+    prompt: "What dietary pairings maximize iron absorption to prevent nutritional anemia?",
+  },
 ];
 
 export interface HealthAssistantChatProps {
@@ -41,23 +101,32 @@ export interface HealthAssistantChatProps {
 }
 
 export function HealthAssistantChat({ className = "", onClose }: HealthAssistantChatProps = {}) {
+  const [activeNavTab, setActiveNavTab] = useState<"chat" | "symptoms" | "health_tips" | "emergency">("chat");
   const [inputQuery, setInputQuery] = useState("");
   const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       sender: "assistant",
-      text: "Hello! I am your ArogyaGenie AI Health Assistant. Ask me medical questions, guidelines, or questions about your personal health records.",
+      text: "Hello! 👋\nI'm your ArogyaGenie AI Health Assistant.\nHow can I help you today? Ask me medical questions, clinical guidelines, or questions about your personal health records.",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
 
   const askAssistant = useAskHealthAssistant();
+  const { data: user } = useGetMe();
+  const { data: assessments } = useListSymptomAssessments();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const handleSend = (queryText?: string) => {
     const textToSend = queryText || inputQuery;
     if (!textToSend.trim() || askAssistant.isPending) return;
+
+    // Switch to chat tab if sent from another tab
+    if (activeNavTab !== "chat") {
+      setActiveNavTab("chat");
+    }
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -80,7 +149,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
             usedRag: data.usedRag ?? false,
             sources: (data.sources as any[]) ?? [],
             retrieval: (data.retrieval as any) ?? undefined,
-            disclaimer: data.disclaimer ?? "⚠️ Informational reference only.",
+            disclaimer: data.disclaimer ?? "⚠️ Informational clinical reference only.",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           };
 
@@ -102,210 +171,486 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
   };
 
   return (
-    <Card className={`border-primary/20 bg-white shadow-sm overflow-hidden flex flex-col ${className || "h-[620px]"}`}>
-      {/* Header */}
-      <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/70 flex flex-row items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-primary text-primary-foreground shadow-xs">
-            <Bot className="h-5 w-5" />
-          </div>
-          <div>
-            <CardTitle className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              AI Health Assistant
-              {askAssistant.isPending ? (
-                <Badge variant="outline" className="text-[10px] font-semibold text-cyan-700 border-cyan-300 bg-cyan-50 animate-pulse flex items-center gap-1">
-                  <Sparkles className="h-3 w-3 text-cyan-600 animate-spin" /> Neural Grounding...
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-[10px] font-semibold text-primary border-primary/30 bg-primary/5">
-                  <Sparkles className="h-3 w-3 mr-1 text-primary animate-pulse" /> Hybrid Patient & Vector RAG
-                </Badge>
-              )}
-            </CardTitle>
-            <p className="text-xs text-slate-500">Grounded in verified clinical guidelines & your medical records</p>
+    <div
+      className={`relative w-full h-full flex flex-col md:flex-row overflow-hidden select-none ${className}`}
+      style={{
+        background: "linear-gradient(145deg, #0b0e26 0%, #080a1c 50%, #050612 100%)",
+      }}
+    >
+      {/* ── Background Atmospheric Light Effects ───────────────────────────── */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-0 left-20 w-60 h-60 bg-purple-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+      {/* ── LEFT SIDEBAR (Matching Image 2) ────────────────────────────────── */}
+      <aside className="w-full md:w-20 lg:w-[88px] shrink-0 bg-[#070918]/90 border-b md:border-b-0 md:border-r border-indigo-950/80 p-2 md:py-4 flex md:flex-col items-center justify-between md:justify-start gap-1.5 md:gap-3.5 z-20 backdrop-blur-xl">
+        {/* Top AI Avatar (Image 2 style) */}
+        <div className="hidden md:flex flex-col items-center mb-1 group">
+          <div className="relative w-11 h-11 rounded-2xl flex items-center justify-center">
+            {/* Ambient Aura */}
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-500 to-cyan-400 blur-[4px] opacity-70 group-hover:opacity-90 transition-opacity" />
+            
+            {/* Inner Bot Visor Pod */}
+            <div className="relative w-full h-full rounded-2xl bg-gradient-to-b from-[#1e1b4b] to-[#0d0f28] border border-cyan-400/50 flex items-center justify-center shadow-inner overflow-hidden">
+              <svg viewBox="0 0 48 48" className="w-7 h-7 drop-shadow-[0_0_6px_rgba(56,189,248,0.8)]">
+                <rect x="8" y="10" width="32" height="28" rx="12" fill="#1e1b4b" stroke="#818cf8" strokeWidth="1.5" />
+                <rect x="4" y="18" width="4" height="12" rx="2" fill="#38bdf8" />
+                <rect x="40" y="18" width="4" height="12" rx="2" fill="#38bdf8" />
+                <rect x="12" y="15" width="24" height="16" rx="7" fill="#070919" stroke="#38bdf8" strokeWidth="1.2" />
+                <circle cx="18" cy="23" r="2.8" fill="#38bdf8" className={askAssistant.isPending ? "animate-ping" : ""} />
+                <circle cx="30" cy="23" r="2.8" fill="#38bdf8" className={askAssistant.isPending ? "animate-ping" : ""} />
+                <ellipse cx="24" cy="13" rx="8" ry="2" fill="rgba(255,255,255,0.4)" />
+                <path d="M 21 27 Q 24 29 27 27" fill="none" stroke="#38bdf8" strokeWidth="1" strokeLinecap="round" />
+              </svg>
+            </div>
           </div>
         </div>
-        {onClose && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors shrink-0"
-            title="Close Assistant"
-            aria-label="Close Assistant"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </CardHeader>
-      {askAssistant.isPending && (
-        <div className="h-0.5 w-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 animate-pulse" />
-      )}
 
-      {/* Messages Thread */}
-      <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex gap-3 max-w-[85%] ${
-              msg.sender === "patient" ? "ml-auto flex-row-reverse" : "mr-auto flex-row"
+        {/* 4 Required Sidebar Navigation Items */}
+        <div className="flex md:flex-col items-center justify-around w-full gap-1.5 md:gap-2.5">
+          {/* 1. Chat */}
+          <button
+            type="button"
+            onClick={() => setActiveNavTab("chat")}
+            className={`group w-14 h-12 md:w-16 md:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+              activeNavTab === "chat"
+                ? "bg-gradient-to-b from-purple-600 via-indigo-600 to-indigo-700 border border-purple-400/50 text-white shadow-[0_4px_20px_rgba(168,85,247,0.45)] scale-105"
+                : "bg-transparent hover:bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent"
             }`}
           >
-            {/* Avatar */}
-            <div
-              className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
-                msg.sender === "patient"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-teal-600 text-white shadow-xs"
-              }`}
-            >
-              {msg.sender === "patient" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+            <MessageSquareText className={`h-4 w-4 md:h-5 md:w-5 ${activeNavTab === "chat" ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : ""}`} />
+            <span className="text-[10px] font-semibold tracking-tight">Chat</span>
+          </button>
+
+          {/* 2. Symptoms */}
+          <button
+            type="button"
+            onClick={() => setActiveNavTab("symptoms")}
+            className={`group w-14 h-12 md:w-16 md:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+              activeNavTab === "symptoms"
+                ? "bg-gradient-to-b from-purple-600 via-indigo-600 to-indigo-700 border border-purple-400/50 text-white shadow-[0_4px_20px_rgba(168,85,247,0.45)] scale-105"
+                : "bg-transparent hover:bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            <Activity className={`h-4 w-4 md:h-5 md:w-5 ${activeNavTab === "symptoms" ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : ""}`} />
+            <span className="text-[10px] font-semibold tracking-tight">Symptoms</span>
+          </button>
+
+          {/* 3. Health Tips */}
+          <button
+            type="button"
+            onClick={() => setActiveNavTab("health_tips")}
+            className={`group w-14 h-12 md:w-16 md:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+              activeNavTab === "health_tips"
+                ? "bg-gradient-to-b from-purple-600 via-indigo-600 to-indigo-700 border border-purple-400/50 text-white shadow-[0_4px_20px_rgba(168,85,247,0.45)] scale-105"
+                : "bg-transparent hover:bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            <Lightbulb className={`h-4 w-4 md:h-5 md:w-5 ${activeNavTab === "health_tips" ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : ""}`} />
+            <span className="text-[10px] font-semibold tracking-tight whitespace-nowrap">Tips</span>
+          </button>
+
+          {/* 4. Emergency */}
+          <button
+            type="button"
+            onClick={() => setActiveNavTab("emergency")}
+            className={`group w-14 h-12 md:w-16 md:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+              activeNavTab === "emergency"
+                ? "bg-gradient-to-b from-red-600 via-rose-600 to-red-700 border border-red-400/60 text-white shadow-[0_4px_20px_rgba(239,68,68,0.45)] scale-105"
+                : "bg-transparent hover:bg-red-950/30 text-red-400 hover:text-red-300 border border-transparent"
+            }`}
+          >
+            <HeartPulse className={`h-4 w-4 md:h-5 md:w-5 ${activeNavTab === "emergency" ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : "animate-pulse"}`} />
+            <span className="text-[10px] font-semibold tracking-tight">SOS</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* ── MAIN CONTENT CONTAINER ─────────────────────────────────────────── */}
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Header (Matching Image 2) */}
+        <header className="px-5 py-3.5 border-b border-indigo-950/80 flex items-center justify-between bg-[#080b20]/80 backdrop-blur-md shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg sm:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-100 to-cyan-200 bg-clip-text text-transparent">
+                Arogyagenie AI
+              </h2>
+              {/* Dynamic RAG / Thinking Status */}
+              {askAssistant.isPending ? (
+                <Badge className="bg-amber-950/80 text-amber-300 border border-amber-500/50 text-[10px] font-bold flex items-center gap-1 animate-pulse">
+                  <Sparkles className="w-3 h-3 text-amber-400 animate-spin" /> Neural Grounding...
+                </Badge>
+              ) : (
+                <Badge className="bg-indigo-950/80 text-cyan-300 border border-cyan-500/40 text-[10px] font-semibold flex items-center gap-1 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                  <Sparkles className="w-3 h-3 text-cyan-400 animate-pulse" /> Verified Clinical RAG
+                </Badge>
+              )}
             </div>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">Your smart health companion</p>
+          </div>
 
-            {/* Message Bubble */}
-            <div className="space-y-2 flex-1">
-              <div
-                className={`p-4 rounded-2xl text-sm leading-relaxed ${
-                  msg.sender === "patient"
-                    ? "bg-primary text-primary-foreground rounded-tr-none shadow-xs font-medium"
-                    : msg.text.startsWith("🚨 EMERGENCY ALERT")
-                    ? "bg-red-50 border-2 border-red-200 text-red-950 rounded-tl-none font-medium"
-                    : "bg-white border border-slate-200 text-slate-900 rounded-tl-none shadow-xs"
-                }`}
+          <div className="flex items-center gap-2">
+            {onClose && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="h-8 w-8 rounded-full text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
+                title="Close Assistant"
+                aria-label="Close Assistant"
               >
-                <p className="whitespace-pre-wrap">{msg.text}</p>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </header>
 
-                {/* Grounding & Evidence Badge Section */}
-                {msg.sender === "assistant" && msg.id !== "welcome" && (
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      {msg.usedRag ? (
-                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] gap-1 font-semibold">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                          RAG Grounded {msg.retrieval ? `(${msg.retrieval.resultsUsed}/${msg.retrieval.topK} Chunks)` : ""}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] text-slate-500">
-                          Patient Context Grounded
-                        </Badge>
-                      )}
-                    </div>
-
-                    {msg.sources && msg.sources.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-[11px] text-primary hover:bg-primary/10 gap-1 font-semibold"
-                        onClick={() => toggleEvidence(msg.id)}
-                      >
-                        <BookOpen className="h-3 w-3" />
-                        {expandedMessageId === msg.id ? "Hide Evidence" : `View Evidence (${msg.sources.length})`}
-                        {expandedMessageId === msg.id ? (
-                          <ChevronUp className="h-3 w-3" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3" />
-                        )}
-                      </Button>
+        {/* ── Active Tab View ──────────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* TAB 1: CHAT (Image 2 Main Chat Experience) */}
+          {activeNavTab === "chat" && (
+            <div className="flex-1 flex flex-col min-h-0">
+              {/* Message Thread */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 scrollbar-thin scrollbar-thumb-indigo-900/60">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex gap-3 max-w-[88%] ${
+                      msg.sender === "patient" ? "ml-auto flex-row-reverse" : "mr-auto flex-row"
+                    }`}
+                  >
+                    {/* Avatar */}
+                    {msg.sender === "patient" ? (
+                      <div className="h-7 w-7 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                        <User className="h-3.5 w-3.5" />
+                      </div>
+                    ) : (
+                      <div className="h-7 w-7 rounded-full bg-indigo-950 border border-cyan-400/50 text-cyan-300 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(56,189,248,0.4)]">
+                        <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                      </div>
                     )}
+
+                    {/* Bubble */}
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div
+                        className={`p-3.5 sm:p-4 rounded-2xl text-sm leading-relaxed ${
+                          msg.sender === "patient"
+                            ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 text-white rounded-tr-xs shadow-lg shadow-purple-950/40 font-medium"
+                            : msg.text.startsWith("🚨 EMERGENCY ALERT")
+                            ? "bg-red-950/80 border-2 border-red-500/80 text-red-100 rounded-tl-xs shadow-xl"
+                            : "bg-[#121636]/90 border border-indigo-900/60 text-slate-100 rounded-tl-xs shadow-md backdrop-blur-md"
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                        {/* RAG Evidence Drawer */}
+                        {msg.sender === "assistant" && msg.id !== "welcome" && (
+                          <div className="mt-3 pt-2.5 border-t border-indigo-900/50 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-1.5">
+                              {msg.usedRag ? (
+                                <Badge className="bg-emerald-950/70 text-emerald-300 border-emerald-500/40 text-[10px] gap-1 font-semibold">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                  RAG Verified {msg.retrieval ? `(${msg.retrieval.resultsUsed}/${msg.retrieval.topK} Chunks)` : ""}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] text-slate-400 border-slate-700">
+                                  Patient Context Grounded
+                                </Badge>
+                              )}
+                            </div>
+
+                            {msg.sources && msg.sources.length > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-[11px] text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40 gap-1 font-semibold"
+                                onClick={() => toggleEvidence(msg.id)}
+                              >
+                                <BookOpen className="h-3 w-3" />
+                                {expandedMessageId === msg.id ? "Hide Sources" : `Sources (${msg.sources.length})`}
+                                {expandedMessageId === msg.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Expandable Source Drawer */}
+                      {msg.sender === "assistant" && expandedMessageId === msg.id && msg.sources && msg.sources.length > 0 && (
+                        <div className="bg-[#0b0e24]/90 border border-indigo-500/30 p-3 rounded-xl text-xs space-y-2 animate-in fade-in-50 duration-200">
+                          <span className="font-bold text-cyan-300 flex items-center gap-1.5 pb-1 border-b border-indigo-900/60">
+                            <FileText className="h-3.5 w-3.5 text-cyan-400" />
+                            Retrieved Clinical Guidelines & Attributed Sources
+                          </span>
+                          <div className="space-y-1.5">
+                            {msg.sources.map((src, idx) => (
+                              <div key={idx} className="bg-[#14183d] p-2.5 rounded-lg border border-indigo-500/20 text-slate-200 space-y-0.5">
+                                <div className="font-bold text-white flex items-center justify-between">
+                                  <span>{src.title || "Clinical Protocol"}</span>
+                                  {src.documentId && <span className="font-mono text-[9px] text-cyan-300">{src.documentId}</span>}
+                                </div>
+                                {src.publisher && <p className="text-[11px] text-slate-400">Publisher: {src.publisher}</p>}
+                                {src.section && (
+                                  <p className="text-[11px] text-indigo-300">
+                                    Section: {src.section} {src.page ? `• Page ${src.page}` : ""}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Timestamp & Disclaimer */}
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                        <span>{msg.timestamp}</span>
+                        {msg.disclaimer && <span className="italic text-slate-400">{msg.disclaimer}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Thinking Indicator */}
+                {askAssistant.isPending && (
+                  <div className="flex items-center gap-3 mr-auto">
+                    <div className="h-7 w-7 rounded-full bg-indigo-950 border border-cyan-400/50 text-cyan-300 flex items-center justify-center shrink-0">
+                      <Sparkles className="h-3.5 w-3.5 text-cyan-400 animate-spin" />
+                    </div>
+                    <div className="bg-[#121636]/90 border border-indigo-900/60 p-3 rounded-2xl rounded-tl-xs text-xs text-cyan-300 flex items-center gap-2 shadow-md">
+                      <Sparkles className="h-4 w-4 text-cyan-400 animate-spin" />
+                      Retrieving medical guidelines & patient health records...
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Expandable Evidence Drawer */}
-              {msg.sender === "assistant" && expandedMessageId === msg.id && msg.sources && msg.sources.length > 0 && (
-                <div className="bg-blue-50/60 border border-blue-100 p-3.5 rounded-xl text-xs space-y-2.5 animate-in fade-in-50 duration-200">
-                  <div className="flex items-center justify-between font-bold text-blue-900 border-b border-blue-200/60 pb-1.5">
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5 text-blue-600" />
-                      Retrieved Clinical Evidence & Attributed Sources
-                    </span>
-                  </div>
+              {/* Suggestion Chips (Image 2 style) */}
+              <div className="px-4 py-2 border-t border-indigo-950/60 bg-[#080b20]/60 flex items-center gap-2 overflow-x-auto text-xs scrollbar-none">
+                {SAMPLE_PROMPTS.map((prompt, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSend(prompt)}
+                    disabled={askAssistant.isPending}
+                    className="shrink-0 px-3.5 py-1.5 bg-[#101438]/90 hover:bg-indigo-900/60 border border-indigo-500/40 hover:border-cyan-400/80 text-slate-200 hover:text-white rounded-full text-xs font-medium transition-all shadow-sm cursor-pointer disabled:opacity-50 text-left"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
 
+              {/* Input Form (Image 2 style) */}
+              <div className="p-3.5 border-t border-indigo-950/80 bg-[#070919]/90">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSend();
+                  }}
+                  className="bg-[#0c0f2a]/95 border border-indigo-500/35 focus-within:border-cyan-400/80 focus-within:ring-2 focus-within:ring-cyan-400/20 rounded-full p-1 pl-4 flex items-center gap-2 shadow-inner transition-all"
+                >
+                  <input
+                    value={inputQuery}
+                    onChange={(e) => setInputQuery(e.target.value)}
+                    placeholder="Type your message..."
+                    disabled={askAssistant.isPending}
+                    className="bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none focus:ring-0 text-xs sm:text-sm flex-1"
+                  />
+                  <button
+                    type="submit"
+                    disabled={askAssistant.isPending || !inputQuery.trim()}
+                    aria-label="Send message"
+                    className="h-9 w-9 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-950/60 shrink-0 transition-transform active:scale-95 disabled:opacity-40 cursor-pointer"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: SYMPTOMS (Quick AI Symptom Assessment) */}
+          {activeNavTab === "symptoms" && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              <div className="bg-[#121638]/80 border border-indigo-500/30 rounded-2xl p-4 space-y-2">
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-cyan-400" /> AI Symptom Intelligence
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Select a common symptom category to quickly consult the AI, or open the full 2-stage clinical symptom assessment.
+                </p>
+              </div>
+
+              {/* Symptom Quick Launch Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {QUICK_SYMPTOM_CATEGORIES.map((cat, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSend(cat.query)}
+                    className="p-3 rounded-xl bg-[#101438]/90 hover:bg-indigo-900/50 border border-indigo-500/30 hover:border-cyan-400 text-left transition-all group cursor-pointer"
+                  >
+                    <span className="font-bold text-xs text-white group-hover:text-cyan-300 block mb-1">
+                      {cat.label}
+                    </span>
+                    <p className="text-[11px] text-slate-400 line-clamp-1">{cat.query}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Shortcut to full symptom check page */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-purple-950/50 to-indigo-950/50 border border-purple-500/40 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-xs text-white">Need a comprehensive assessment?</h4>
+                  <p className="text-[11px] text-slate-400">Launch the 2-stage interactive body area symptom checker</p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (onClose) onClose();
+                    setLocation("/patient/symptom-check");
+                  }}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shrink-0 gap-1"
+                >
+                  Open Checker <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
+              {/* Recent assessments summary if available */}
+              {assessments && assessments.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
+                    Recent AI Assessments ({assessments.length})
+                  </span>
                   <div className="space-y-2">
-                    {msg.sources.map((src, idx) => (
-                      <div key={idx} className="bg-white p-2.5 rounded-lg border border-blue-100/80 shadow-2xs space-y-1">
-                        <div className="font-bold text-slate-900 flex items-center justify-between">
-                          <span>{src.title || "Clinical Guideline"}</span>
-                          {src.documentId && (
-                            <Badge variant="outline" className="text-[9px] font-mono text-slate-500">
-                              {src.documentId}
-                            </Badge>
-                          )}
+                    {assessments.slice(0, 3).map((a: any) => (
+                      <div key={a.id} className="p-2.5 rounded-xl bg-[#0f1230] border border-indigo-900/50 flex items-center justify-between text-xs">
+                        <div>
+                          <p className="font-semibold text-slate-200">{a.symptoms}</p>
+                          <span className="text-[10px] text-slate-400">{a.assessmentDate}</span>
                         </div>
-                        {src.publisher && <p className="text-[11px] text-slate-600 font-medium">Publisher: {src.publisher}</p>}
-                        {src.source && <p className="text-[11px] text-slate-500 italic">Source: {src.source}</p>}
-                        {src.section && (
-                          <p className="text-[11px] text-slate-700">
-                            <span className="font-semibold">Section:</span> {src.section}
-                            {src.page ? ` • Page ${src.page}` : ""}
-                          </p>
-                        )}
+                        <Badge className="bg-indigo-950 text-cyan-300 border-indigo-700 text-[10px]">
+                          {a.severity || "Evaluated"}
+                        </Badge>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+            </div>
+          )}
 
-              {/* Timestamp & Disclaimer */}
-              <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-                <span>{msg.timestamp}</span>
-                {msg.disclaimer && <span className="italic">{msg.disclaimer}</span>}
+          {/* TAB 3: HEALTH TIPS (AI Daily Clinical Insights) */}
+          {activeNavTab === "health_tips" && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+              <div className="bg-[#121638]/80 border border-indigo-500/30 rounded-2xl p-4 space-y-1">
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4 text-amber-400" /> AI Daily Health & Wellness Insights
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Personalized evidence-based health guidance grounded in verified medical literature.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {HEALTH_TIPS.map((tip, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-2xl bg-[#0e1233]/90 border border-indigo-500/30 hover:border-indigo-400 transition-all space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-xs text-white">{tip.title}</span>
+                      <Badge className="bg-indigo-950 text-indigo-300 border-indigo-700 text-[9px]">
+                        {tip.category}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">{tip.desc}</p>
+                    <div className="pt-1 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleSend(tip.prompt)}
+                        className="h-7 text-[11px] text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40 gap-1 font-semibold"
+                      >
+                        <Sparkles className="h-3 w-3" /> Ask AI about this
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        ))}
+          )}
 
-        {askAssistant.isPending && (
-          <div className="flex items-center gap-3 mr-auto">
-            <div className="h-8 w-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold shadow-xs">
-              <Bot className="h-4 w-4" />
+          {/* TAB 4: EMERGENCY (Emergency SOS & Safety Hub) */}
+          {activeNavTab === "emergency" && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              {/* Emergency Banner */}
+              <div className="bg-red-950/80 border-2 border-red-500/80 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-red-300 font-bold text-sm">
+                  <ShieldAlert className="h-5 w-5 text-red-400 animate-bounce" />
+                  EMERGENCY MEDICAL ASSISTANCE
+                </div>
+                <p className="text-xs text-red-200 leading-relaxed">
+                  If you or someone nearby is experiencing acute chest pain, severe breathing difficulty, sudden speech/facial paralysis, or uncontrollable bleeding, call emergency services immediately.
+                </p>
+              </div>
+
+              {/* 1-Click Helpline Numbers */}
+              <div className="grid grid-cols-2 gap-3">
+                <a
+                  href="tel:108"
+                  className="p-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white flex items-center justify-between shadow-lg shadow-red-950/50 transition-transform active:scale-95"
+                >
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-red-200 block">Ambulance</span>
+                    <span className="text-xl font-black">108</span>
+                  </div>
+                  <Phone className="h-5 w-5" />
+                </a>
+
+                <a
+                  href="tel:112"
+                  className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 text-white flex items-center justify-between shadow-lg transition-transform active:scale-95"
+                >
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-indigo-200 block">National SOS</span>
+                    <span className="text-xl font-black">112</span>
+                  </div>
+                  <Phone className="h-5 w-5" />
+                </a>
+              </div>
+
+              {/* Patient Emergency Contact */}
+              {user?.emergencyContact && (
+                <div className="p-3.5 rounded-2xl bg-[#121638] border border-indigo-500/30 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Your Emergency Contact</span>
+                    <span className="font-bold text-white text-sm">{user.emergencyContact}</span>
+                  </div>
+                  <a
+                    href={`tel:${user.emergencyContact}`}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1"
+                  >
+                    <Phone className="h-3.5 w-3.5" /> Call
+                  </a>
+                </div>
+              )}
+
+              {/* Nearest Emergency Care Shortcut */}
+              <Button
+                type="button"
+                onClick={() => {
+                  if (onClose) onClose();
+                  setLocation("/patient/nearby");
+                }}
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-xs h-11 rounded-2xl gap-2 shadow-md"
+              >
+                <MapPin className="h-4 w-4 text-emerald-400" /> Open Nearest Emergency Hospital Map
+              </Button>
             </div>
-            <div className="bg-white border border-slate-200 p-3 rounded-2xl rounded-tl-none shadow-xs text-xs text-slate-500 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary animate-spin" />
-              Retrieving patient context & medical RAG knowledge base...
-            </div>
-          </div>
-        )}
-      </CardContent>
-
-      {/* Suggested Prompts */}
-      <div className="px-4 py-2 bg-slate-50/80 border-t border-slate-100 flex items-center gap-2 overflow-x-auto text-xs">
-        <span className="text-[11px] font-bold text-slate-500 shrink-0">Try asking:</span>
-        {SAMPLE_PROMPTS.map((prompt, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleSend(prompt)}
-            disabled={askAssistant.isPending}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-full text-slate-700 font-medium transition-colors text-[11px] text-left"
-          >
-            {prompt.length > 45 ? `${prompt.slice(0, 45)}...` : prompt}
-          </button>
-        ))}
-      </div>
-
-      {/* Input Form */}
-      <div className="p-3 bg-white border-t border-slate-100">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="flex gap-2"
-        >
-          <Input
-            value={inputQuery}
-            onChange={(e) => setInputQuery(e.target.value)}
-            placeholder="Ask a medical question or search clinical guidelines..."
-            disabled={askAssistant.isPending}
-            className="flex-1"
-          />
-          <Button type="submit" disabled={askAssistant.isPending || !inputQuery.trim()} className="gap-2">
-            <Send className="h-4 w-4" />
-            Send
-          </Button>
-        </form>
-      </div>
-    </Card>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
+
