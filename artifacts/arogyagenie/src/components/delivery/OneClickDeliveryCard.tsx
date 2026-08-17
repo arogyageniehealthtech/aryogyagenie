@@ -246,7 +246,7 @@ export function OneClickDeliveryCard({ order, onOrderUpdated }: OneClickDelivery
               className="w-full sm:w-auto h-12 rounded-2xl border-emerald-500/50 bg-slate-900/90 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 font-bold text-xs gap-2 px-5 cursor-pointer"
             >
               <Navigation className="h-4 w-4" />
-              {isAccepted ? "Preview Live Route Graph" : "Track Live Delivery (Blinkit View)"}
+              {isAccepted ? "Preview Live Route Graph" : "Track Live Delivery"}
             </Button>
           </div>
         </div>

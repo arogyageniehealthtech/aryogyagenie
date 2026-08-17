@@ -310,9 +310,6 @@ export function PatientPrescriptions() {
                 <div>
                   <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                     <span>Quick Select & Request Medicines</span>
-                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-[10px]">
-                      ⚡ Radius Broadcast & 2-Way Consent
-                    </Badge>
                   </h3>
                   <p className="text-xs text-slate-500">
                     Choose multiple medicines below or snap a prescription photo from your phone camera. Nearby pharmacies will view and quote before dispensing!

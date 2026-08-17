@@ -345,7 +345,7 @@ export function BlinkitDeliveryTracker({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-extrabold uppercase tracking-wider bg-yellow-400 text-slate-950 px-2.5 py-0.5 rounded-full">
-                ⚡ Blinkit Instant Health
+                ⚡ Instant Doorstep Delivery
               </span>
               <span className="text-xs text-emerald-100 font-medium">Order #{orderId}</span>
             </div>
