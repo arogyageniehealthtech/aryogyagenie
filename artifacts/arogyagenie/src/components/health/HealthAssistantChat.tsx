@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   useAskHealthAssistant,
   useListSymptomAssessments,
@@ -27,6 +27,7 @@ import {
   MapPin,
   Flame,
   Stethoscope,
+  Building2,
   ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -54,49 +55,60 @@ interface ChatMessage {
 }
 
 const HEALTH_FALLING_ELEMENTS = [
-  { id: "pill-1", type: "pill", left: "12%", delay: 0, duration: 12, size: 22, colorA: "#38bdf8", colorB: "#a855f7" },
-  { id: "cross-1", type: "cross", left: "26%", delay: 2.5, duration: 15, size: 16, color: "#818cf8" },
-  { id: "sparkle-1", type: "sparkle", left: "42%", delay: 0.8, duration: 10, size: 16, color: "#c084fc" },
-  { id: "dna-1", type: "dna", left: "58%", delay: 4.2, duration: 16, size: 20, color: "#34d399" },
-  { id: "pulse-1", type: "pulse", left: "74%", delay: 1.5, duration: 13, size: 26, color: "#f43f5e" },
-  { id: "pill-2", type: "pill", left: "86%", delay: 5.5, duration: 11, size: 20, colorA: "#c084fc", colorB: "#38bdf8" },
-  { id: "sparkle-2", type: "sparkle", left: "18%", delay: 6.2, duration: 14, size: 18, color: "#38bdf8" },
-  { id: "cross-2", type: "cross", left: "50%", delay: 7.8, duration: 14, size: 15, color: "#34d399" },
-  { id: "sparkle-3", type: "sparkle", left: "68%", delay: 3.8, duration: 9, size: 14, color: "#fbbf24" },
-  { id: "pill-3", type: "pill", left: "34%", delay: 8.5, duration: 15, size: 22, colorA: "#34d399", colorB: "#818cf8" },
-  { id: "cross-3", type: "cross", left: "82%", delay: 3.2, duration: 13, size: 16, color: "#38bdf8" },
-  { id: "dna-2", type: "dna", left: "6%", delay: 7.0, duration: 17, size: 18, color: "#a855f7" },
-  { id: "sparkle-4", type: "sparkle", left: "92%", delay: 1.8, duration: 11, size: 15, color: "#ffffff" },
+  { id: "pill-1", type: "pill", left: "10%", delay: 0, duration: 10, colorA: "#38bdf8", colorB: "#a855f7" },
+  { id: "cross-1", type: "cross", left: "24%", delay: 2, duration: 13, color: "#818cf8" },
+  { id: "sparkle-1", type: "sparkle", left: "38%", delay: 0.5, duration: 8, color: "#c084fc" },
+  { id: "dna-1", type: "dna", left: "54%", delay: 3.5, duration: 14, color: "#34d399" },
+  { id: "pulse-1", type: "pulse", left: "70%", delay: 1.2, duration: 11, color: "#f43f5e" },
+  { id: "pill-2", type: "pill", left: "84%", delay: 4.5, duration: 9, colorA: "#c084fc", colorB: "#38bdf8" },
+  { id: "sparkle-2", type: "sparkle", left: "16%", delay: 5.5, duration: 12, color: "#38bdf8" },
+  { id: "cross-2", type: "cross", left: "46%", delay: 6.8, duration: 12, color: "#34d399" },
+  { id: "sparkle-3", type: "sparkle", left: "64%", delay: 3.0, duration: 7, color: "#fbbf24" },
+  { id: "pill-3", type: "pill", left: "30%", delay: 7.5, duration: 13, colorA: "#34d399", colorB: "#818cf8" },
+  { id: "cross-3", type: "cross", left: "78%", delay: 2.8, duration: 11, color: "#38bdf8" },
+  { id: "dna-2", type: "dna", left: "5%", delay: 6.0, duration: 15, color: "#a855f7" },
+  { id: "sparkle-4", type: "sparkle", left: "92%", delay: 1.5, duration: 9, color: "#ffffff" },
 ];
 
 function HealthcareFallingParticles() {
-  const shouldReduceMotion = useReducedMotion();
-
-  if (shouldReduceMotion) {
-    return (
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-40">
-        <div className="absolute top-12 left-10 w-4 h-4 bg-cyan-400/60 rounded-full blur-[1px]" />
-        <div className="absolute top-1/3 right-14 w-5 h-5 bg-purple-400/60 rounded-full blur-[1px]" />
-        <div className="absolute bottom-20 left-1/2 w-4 h-4 bg-indigo-400/60 rounded-full blur-[1px]" />
-      </div>
-    );
-  }
-
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 select-none">
-      {/* Ambient background glow orbs */}
-      <div className="absolute top-10 right-10 w-72 h-72 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/3 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      <style>{`
+        @keyframes healthFallAnim {
+          0% {
+            transform: translateY(-40px) translateX(0px) rotate(0deg);
+            opacity: 0.3;
+          }
+          15% {
+            opacity: 0.95;
+          }
+          50% {
+            transform: translateY(280px) translateX(14px) rotate(180deg);
+            opacity: 1;
+          }
+          85% {
+            opacity: 0.9;
+          }
+          100% {
+            transform: translateY(620px) translateX(-10px) rotate(360deg);
+            opacity: 0.2;
+          }
+        }
+      `}</style>
+
+      {/* Ambient background glow nebulas */}
+      <div className="absolute top-10 right-10 w-72 h-72 bg-indigo-500/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 left-10 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-1/3 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Shooting Star Arc & Star Cluster (Image 2 style) */}
-      <div className="absolute top-2 right-4 sm:right-8 w-60 h-32 pointer-events-none opacity-80">
+      <div className="absolute top-2 right-4 sm:right-8 w-60 h-32 pointer-events-none opacity-95">
         <svg viewBox="0 0 200 100" className="w-full h-full">
           <path
             d="M 10 90 Q 95 25 185 10"
             fill="none"
             stroke="url(#shooting-star-gradient)"
-            strokeWidth="2"
+            strokeWidth="2.2"
             strokeDasharray="4 6"
           />
           <circle cx="185" cy="10" r="3.5" fill="#c084fc" className="animate-ping" />
@@ -115,34 +127,19 @@ function HealthcareFallingParticles() {
 
       {/* Floating & Falling Healthcare Particles */}
       {HEALTH_FALLING_ELEMENTS.map((el) => (
-        <motion.div
+        <div
           key={el.id}
-          initial={{
-            y: -60,
-            x: 0,
-            rotate: 0,
-            opacity: 0,
-          }}
-          animate={{
-            y: [-60, 680],
-            x: [0, 18, -18, 0],
-            rotate: [0, 180, 360],
-            opacity: [0, 0.7, 0.95, 0.7, 0],
-          }}
-          transition={{
-            duration: el.duration,
-            repeat: Infinity,
-            delay: el.delay,
-            ease: "linear",
-          }}
           style={{
             position: "absolute",
             left: el.left,
             top: 0,
+            animation: `healthFallAnim ${el.duration}s linear infinite`,
+            animationDelay: `${el.delay}s`,
+            willChange: "transform, opacity",
           }}
         >
           {el.type === "pill" && (
-            <svg viewBox="0 0 24 12" className="w-6 h-3 drop-shadow-[0_0_8px_rgba(56,189,248,0.9)]">
+            <svg viewBox="0 0 24 12" className="w-6 h-3 drop-shadow-[0_0_10px_rgba(56,189,248,1)]">
               <rect x="1" y="1" width="11" height="10" rx="5" fill={el.colorA} />
               <rect x="12" y="1" width="11" height="10" rx="5" fill={el.colorB} />
               <line x1="12" y1="1" x2="12" y2="11" stroke="#050716" strokeWidth="1" />
@@ -150,7 +147,7 @@ function HealthcareFallingParticles() {
           )}
 
           {el.type === "cross" && (
-            <svg viewBox="0 0 20 20" className="w-4 h-4 drop-shadow-[0_0_8px_rgba(129,140,248,0.9)]">
+            <svg viewBox="0 0 20 20" className="w-4 h-4 drop-shadow-[0_0_10px_rgba(129,140,248,1)]">
               <path
                 d="M 7 2 L 13 2 L 13 7 L 18 7 L 18 13 L 13 13 L 13 18 L 7 18 L 7 13 L 2 13 L 2 7 L 7 7 Z"
                 fill={el.color}
@@ -159,7 +156,7 @@ function HealthcareFallingParticles() {
           )}
 
           {el.type === "sparkle" && (
-            <svg viewBox="0 0 24 24" className="w-4 h-4 drop-shadow-[0_0_10px_rgba(192,132,252,1)]">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 drop-shadow-[0_0_12px_rgba(192,132,252,1)]">
               <path
                 d="M 12 0 Q 12 12 24 12 Q 12 12 12 24 Q 12 12 0 12 Q 12 12 12 0 Z"
                 fill={el.color}
@@ -168,7 +165,7 @@ function HealthcareFallingParticles() {
           )}
 
           {el.type === "dna" && (
-            <svg viewBox="0 0 24 24" className="w-5 h-5 drop-shadow-[0_0_8px_rgba(52,211,153,0.9)]">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 drop-shadow-[0_0_10px_rgba(52,211,153,1)]">
               <circle cx="6" cy="6" r="3.5" fill="#34d399" />
               <circle cx="18" cy="18" r="3.5" fill="#38bdf8" />
               <line x1="6" y1="6" x2="18" y2="18" stroke="#818cf8" strokeWidth="2" strokeDasharray="3 3" />
@@ -176,7 +173,7 @@ function HealthcareFallingParticles() {
           )}
 
           {el.type === "pulse" && (
-            <svg viewBox="0 0 28 14" className="w-7 h-3.5 drop-shadow-[0_0_8px_rgba(244,63,94,0.9)]">
+            <svg viewBox="0 0 28 14" className="w-7 h-3.5 drop-shadow-[0_0_10px_rgba(244,63,94,1)]">
               <path
                 d="M 1 7 L 7 7 L 10 2 L 14 12 L 18 4 L 21 8 L 27 7"
                 fill="none"
@@ -187,7 +184,7 @@ function HealthcareFallingParticles() {
               />
             </svg>
           )}
-        </motion.div>
+        </div>
       ))}
     </div>
   );
@@ -769,11 +766,11 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                 type="button"
                 onClick={() => {
                   if (onClose) onClose();
-                  setLocation("/patient/nearby");
+                  setLocation("/patient/hospitals");
                 }}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-xs h-11 rounded-2xl gap-2 shadow-md"
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-xs h-11 rounded-2xl gap-2 shadow-md cursor-pointer"
               >
-                <MapPin className="h-4 w-4 text-emerald-400" /> Open Nearest Emergency Hospital Map
+                <Building2 className="h-4 w-4 text-emerald-400" /> Open Partner Hospital Discovery Map
               </Button>
             </div>
           )}
