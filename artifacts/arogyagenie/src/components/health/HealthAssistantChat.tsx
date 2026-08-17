@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   useAskHealthAssistant,
   useListSymptomAssessments,
@@ -50,6 +51,140 @@ interface ChatMessage {
   };
   disclaimer?: string;
   timestamp: string;
+}
+
+const HEALTH_FALLING_ELEMENTS = [
+  { id: "pill-1", type: "pill", left: "14%", delay: 0, duration: 16, size: 18, colorA: "#38bdf8", colorB: "#a855f7" },
+  { id: "cross-1", type: "cross", left: "28%", delay: 3.5, duration: 20, size: 14, color: "#818cf8" },
+  { id: "sparkle-1", type: "sparkle", left: "44%", delay: 1.2, duration: 14, size: 12, color: "#c084fc" },
+  { id: "dna-1", type: "dna", left: "60%", delay: 5.5, duration: 22, size: 16, color: "#34d399" },
+  { id: "pulse-1", type: "pulse", left: "76%", delay: 2.2, duration: 18, size: 22, color: "#f43f5e" },
+  { id: "pill-2", type: "pill", left: "88%", delay: 7.8, duration: 15, size: 16, colorA: "#a855f7", colorB: "#38bdf8" },
+  { id: "sparkle-2", type: "sparkle", left: "20%", delay: 8.5, duration: 17, size: 14, color: "#38bdf8" },
+  { id: "cross-2", type: "cross", left: "52%", delay: 10.5, duration: 19, size: 12, color: "#c084fc" },
+  { id: "sparkle-3", type: "sparkle", left: "70%", delay: 6.2, duration: 13, size: 11, color: "#e879f9" },
+  { id: "pill-3", type: "pill", left: "36%", delay: 11.8, duration: 21, size: 18, colorA: "#34d399", colorB: "#818cf8" },
+  { id: "cross-3", type: "cross", left: "84%", delay: 4.2, duration: 18, size: 13, color: "#38bdf8" },
+  { id: "dna-2", type: "dna", left: "8%", delay: 9.2, duration: 23, size: 15, color: "#a855f7" },
+];
+
+function HealthcareFallingParticles() {
+  const shouldReduceMotion = useReducedMotion();
+
+  if (shouldReduceMotion) {
+    return (
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-0 opacity-20">
+        <div className="absolute top-12 left-10 w-3 h-3 bg-cyan-400/40 rounded-full blur-[1px]" />
+        <div className="absolute top-1/3 right-14 w-4 h-4 bg-purple-400/40 rounded-full blur-[1px]" />
+        <div className="absolute bottom-20 left-1/2 w-3 h-3 bg-indigo-400/40 rounded-full blur-[1px]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none -z-0 select-none">
+      {/* Top Shooting Star Arc & Star Cluster (Image 2 style) */}
+      <div className="absolute top-1.5 right-6 sm:right-12 w-48 sm:w-56 h-28 pointer-events-none opacity-45">
+        <svg viewBox="0 0 200 100" className="w-full h-full">
+          <path
+            d="M 10 90 Q 95 25 185 10"
+            fill="none"
+            stroke="url(#shooting-star-gradient)"
+            strokeWidth="1.6"
+            strokeDasharray="4 6"
+          />
+          <circle cx="185" cy="10" r="3" fill="#c084fc" className="animate-ping" />
+          <circle cx="185" cy="10" r="2" fill="#ffffff" />
+          <circle cx="140" cy="24" r="1.8" fill="#38bdf8" />
+          <circle cx="75" cy="52" r="1.5" fill="#818cf8" />
+          <defs>
+            <linearGradient id="shooting-star-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0" />
+              <stop offset="60%" stopColor="#818cf8" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#c084fc" stopOpacity="1" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
+      {/* Floating & Falling Healthcare Particles */}
+      {HEALTH_FALLING_ELEMENTS.map((el) => (
+        <motion.div
+          key={el.id}
+          initial={{
+            y: -50,
+            x: 0,
+            rotate: 0,
+            opacity: 0,
+          }}
+          animate={{
+            y: [-50, 720],
+            x: [0, 14, -14, 0],
+            rotate: [0, 180, 360],
+            opacity: [0, 0.35, 0.45, 0.25, 0],
+          }}
+          transition={{
+            duration: el.duration,
+            repeat: Infinity,
+            delay: el.delay,
+            ease: "linear",
+          }}
+          style={{
+            position: "absolute",
+            left: el.left,
+            top: 0,
+          }}
+        >
+          {el.type === "pill" && (
+            <svg viewBox="0 0 24 12" className="w-5 h-2.5 drop-shadow-[0_0_6px_rgba(56,189,248,0.7)]">
+              <rect x="1" y="1" width="11" height="10" rx="5" fill={el.colorA} />
+              <rect x="12" y="1" width="11" height="10" rx="5" fill={el.colorB} />
+              <line x1="12" y1="1" x2="12" y2="11" stroke="#070919" strokeWidth="0.8" />
+            </svg>
+          )}
+
+          {el.type === "cross" && (
+            <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 drop-shadow-[0_0_6px_rgba(129,140,248,0.7)]">
+              <path
+                d="M 7 2 L 13 2 L 13 7 L 18 7 L 18 13 L 13 13 L 13 18 L 7 18 L 7 13 L 2 13 L 2 7 L 7 7 Z"
+                fill={el.color}
+              />
+            </svg>
+          )}
+
+          {el.type === "sparkle" && (
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 drop-shadow-[0_0_8px_rgba(192,132,252,0.9)]">
+              <path
+                d="M 12 0 Q 12 12 24 12 Q 12 12 12 24 Q 12 12 0 12 Q 12 12 12 0 Z"
+                fill={el.color}
+              />
+            </svg>
+          )}
+
+          {el.type === "dna" && (
+            <svg viewBox="0 0 24 24" className="w-4 h-4 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]">
+              <circle cx="6" cy="6" r="3" fill="#34d399" />
+              <circle cx="18" cy="18" r="3" fill="#38bdf8" />
+              <line x1="6" y1="6" x2="18" y2="18" stroke="#818cf8" strokeWidth="1.5" strokeDasharray="2 2" />
+            </svg>
+          )}
+
+          {el.type === "pulse" && (
+            <svg viewBox="0 0 28 14" className="w-6 h-3 drop-shadow-[0_0_6px_rgba(244,63,94,0.7)]">
+              <path
+                d="M 1 7 L 7 7 L 10 2 L 14 12 L 18 4 L 21 8 L 27 7"
+                fill="none"
+                stroke={el.color}
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </motion.div>
+      ))}
+    </div>
+  );
 }
 
 const SAMPLE_PROMPTS = [
@@ -180,6 +315,9 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
       {/* ── Background Atmospheric Light Effects ───────────────────────────── */}
       <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
       <div className="absolute bottom-0 left-20 w-60 h-60 bg-purple-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+      {/* ── Falling Healthcare & AI Particles Background ────────────────────── */}
+      <HealthcareFallingParticles />
 
       {/* ── LEFT SIDEBAR (Matching Image 2) ────────────────────────────────── */}
       <aside className="w-full md:w-20 lg:w-[88px] shrink-0 bg-[#070918]/90 border-b md:border-b-0 md:border-r border-indigo-950/80 p-2 md:py-4 flex md:flex-col items-center justify-between md:justify-start gap-1.5 md:gap-3.5 z-20 backdrop-blur-xl">
