@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useGetPatientDashboard, customFetch } from "@workspace/api-client-react";
-import { Calendar, FileText, Pill, Clipboard, ArrowRight, Activity, Clock, Stethoscope, TestTube, Truck } from "lucide-react";
+import { Calendar, FileText, Pill, Clipboard, ArrowRight, Activity, Clock, Stethoscope, TestTube, Truck, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { HealthSummaryCard } from "../../components/health/HealthSummaryCard";
@@ -234,7 +234,6 @@ export function PatientDashboard() {
               <div className="flex flex-wrap gap-2.5 pt-2">
                 <QuickAction label="Book Visit" icon={Calendar} href="/patient/appointments" color="purple" />
                 <QuickAction label="Find Doctor" icon={Stethoscope} href="/patient/doctors" color="blue" />
-                <QuickAction label="Symptom AI" icon={Activity} href="/patient/symptom-check" color="teal" />
                 <QuickAction label="Book Test" icon={TestTube} href="/patient/diagnostic-bookings" color="orange" />
               </div>
             </div>
@@ -279,6 +278,69 @@ export function PatientDashboard() {
               </div>
             </div>
 
+          </div>
+
+          {/* ── AarogyaGenie AI Promotional Banner ──────────────────────────── */}
+          <div
+            className="mt-6 p-4 sm:p-4.5 rounded-2xl border border-indigo-400/25 backdrop-blur-md relative overflow-hidden group transition-all duration-300"
+            style={{
+              background: "linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(99, 102, 241, 0.14) 50%, rgba(6, 182, 212, 0.08) 100%)",
+              boxShadow: "0 4px 20px rgba(15, 10, 45, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15)",
+            }}
+          >
+            {/* Ambient subtle glow within banner */}
+            <div
+              className="absolute -top-10 -right-10 w-36 h-36 rounded-full opacity-25 pointer-events-none blur-2xl transition-opacity duration-500 group-hover:opacity-45"
+              style={{ background: "radial-gradient(circle, #00D2FF 0%, #6C63FF 100%)" }}
+            />
+
+            <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              
+              {/* Left: AI Icon Orb + Promotional Copy */}
+              <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+                {/* Glowing AI Orb Icon */}
+                <div
+                  className="relative h-11 w-11 sm:h-12 sm:w-12 rounded-2xl flex items-center justify-center shrink-0 border border-white/30 shadow-lg overflow-hidden"
+                  style={{
+                    background: "radial-gradient(circle at 35% 30%, #38bdf8 0%, #6366f1 55%, #312e81 100%)",
+                    boxShadow: "0 0 16px rgba(56, 189, 248, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.5)",
+                  }}
+                >
+                  <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] animate-pulse" />
+                  {/* Specular highlight */}
+                  <div className="absolute top-0.5 inset-x-1.5 h-2 rounded-full bg-white/40 blur-[0.5px] pointer-events-none" />
+                </div>
+
+                {/* Text content */}
+                <div className="space-y-0.5">
+                  <h3 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-1.5">
+                    <span>✨</span> Meet your new health companion
+                  </h3>
+                  <p className="text-xs sm:text-[13px] text-violet-200/80 leading-snug">
+                    Ask AarogyaGenie AI about your symptoms, health, wellness, and personal health data — all in one conversation.
+                  </p>
+                </div>
+              </div>
+
+              {/* Right: CTA Button */}
+              <button
+                type="button"
+                id="explore-arogyagenie-ai-btn"
+                onClick={() => window.dispatchEvent(new CustomEvent("open-ai-assistant"))}
+                className="group/btn relative inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white shrink-0 cursor-pointer overflow-hidden transition-all duration-200 ease-out hover:-translate-y-0.5 hover:translate-x-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 shadow-md hover:shadow-[0_6px_20px_rgba(6,182,212,0.4)]"
+                style={{
+                  background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 50%, #06B6D4 100%)",
+                  border: "1px solid rgba(255, 255, 255, 0.35)",
+                }}
+              >
+                {/* Glow layer on hover */}
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-indigo-400 opacity-0 group-hover/btn:opacity-20 transition-opacity duration-200 pointer-events-none" />
+                <Sparkles className="h-4 w-4 text-cyan-200 group-hover/btn:rotate-12 transition-transform duration-200" />
+                <span>Explore AarogyaGenie AI</span>
+                <ArrowRight className="h-4 w-4 text-white group-hover/btn:translate-x-0.5 transition-transform duration-200" />
+              </button>
+
+            </div>
           </div>
 
           {/* Bottom Vitals Strip (Matching reference screenshot) */}

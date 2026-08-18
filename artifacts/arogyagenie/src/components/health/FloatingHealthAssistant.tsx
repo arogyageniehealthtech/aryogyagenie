@@ -9,15 +9,22 @@ export function FloatingHealthAssistant() {
   const containerRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
 
-  // Close on Escape key press
+  // Close on Escape key press, and open on custom trigger event
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
         setIsOpen(false);
       }
     };
+    const handleOpen = () => {
+      setIsOpen(true);
+    };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("open-ai-assistant", handleOpen);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("open-ai-assistant", handleOpen);
+    };
   }, [isOpen]);
 
   return (
