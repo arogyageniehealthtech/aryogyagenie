@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
+import { validateAppointmentBooking, normalizeTimeString } from "../services/schedulingService";
 
 const router = Router();
 
@@ -82,21 +83,57 @@ router.post("/appointments", requireAuth, async (req: AuthenticatedRequest, res)
   }
 
   const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.id, doctorId) });
+  if (!doctorRow) {
+    res.status(404).json({ error: "Doctor not found" });
+    return;
+  }
+
+  // Backend Slot & Schedule Validation
+  const validation = await validateAppointmentBooking(doctorId, appointmentDate, appointmentTime);
+  if (!validation.valid) {
+    res.status(400).json({ error: validation.error });
+    return;
+  }
+
+  const targetTime = validation.normalizedTime || normalizeTimeString(appointmentTime);
+
+  // Immediate double-booking check right before creation
+  const existingConflict = await db.query.appointmentsTable.findFirst({
+    where: and(
+      eq(appointmentsTable.doctorId, doctorId),
+      eq(appointmentsTable.appointmentDate, appointmentDate),
+      eq(appointmentsTable.appointmentTime, targetTime),
+      inArray(appointmentsTable.status, ["pending", "confirmed", "completed"])
+    ),
+  });
+
+  if (existingConflict) {
+    res.status(409).json({ error: "Sorry, this slot is no longer available. Please select another time." });
+    return;
+  }
 
   const [appt] = await db.insert(appointmentsTable).values({
     patientId: req.userId!,
     doctorId,
     appointmentDate,
-    appointmentTime,
+    appointmentTime: targetTime,
     type,
     symptoms,
     notes,
     consultationFee: doctorRow?.consultationFee ?? null,
   }).returning();
 
+  // Query doctor and patient for rich response
+  const [patientUser, doctorUser] = await Promise.all([
+    db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) }),
+    db.query.usersTable.findFirst({ where: eq(usersTable.id, doctorRow.userId) }),
+  ]);
+
   res.status(201).json({
     ...appt,
-    patientName: null, doctorName: null, doctorSpecialty: null,
+    patientName: patientUser ? `${patientUser.firstName ?? ""} ${patientUser.lastName ?? ""}`.trim() : null,
+    doctorName: doctorUser ? `${doctorUser.firstName ?? ""} ${doctorUser.lastName ?? ""}`.trim() : null,
+    doctorSpecialty: doctorRow.specialty ?? null,
     consultationFee: appt.consultationFee ?? null,
     createdAt: appt.createdAt.toISOString(),
   });

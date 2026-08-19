@@ -235,12 +235,39 @@ export interface DoctorDashboard {
   /** @nullable */
   lastName?: string | null;
   todayAppointments: number;
+  todayRemainingAppointments?: number;
   totalPatients: number;
   pendingAppointments: number;
+  upcomingAppointmentsCount?: number;
   completedAppointments: number;
   totalPrescriptions: number;
   upcomingAppointments: Appointment[];
   recentPatients: PatientSummary[];
+}
+
+export type DoctorTimeSlotReason = typeof DoctorTimeSlotReason[keyof typeof DoctorTimeSlotReason];
+
+
+export const DoctorTimeSlotReason = {
+  booked: 'booked',
+  past: 'past',
+  unavailable: 'unavailable',
+} as const;
+
+export interface DoctorTimeSlot {
+  time: string;
+  time24: string;
+  available: boolean;
+  reason?: DoctorTimeSlotReason;
+}
+
+export interface DoctorAvailableSlotsResponse {
+  doctorId: number;
+  date: string;
+  dayOfWeek: string;
+  isAvailable: boolean;
+  slotDuration: number;
+  slots: DoctorTimeSlot[];
 }
 
 export type AppointmentInputType = typeof AppointmentInputType[keyof typeof AppointmentInputType];
@@ -879,6 +906,13 @@ search?: string;
 lat?: number;
 lng?: number;
 radius?: number;
+};
+
+export type GetDoctorAvailableSlotsParams = {
+/**
+ * Date in YYYY-MM-DD format
+ */
+date?: string;
 };
 
 export type ListDoctorAppointmentsParams = {

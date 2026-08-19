@@ -1,5 +1,13 @@
-import { useState } from "react";
-import { useListAppointments, useCreateAppointment, useListDoctors } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import {
+  useListAppointments,
+  useCreateAppointment,
+  useListDoctors,
+  useGetDoctorAvailableSlots,
+  getListAppointmentsQueryKey,
+  getGetPatientDashboardQueryKey,
+  getGetDoctorAvailableSlotsQueryKey,
+} from "@workspace/api-client-react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -11,16 +19,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { getListAppointmentsQueryKey, getGetPatientDashboardQueryKey } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   Calendar, Plus, Video, Phone, User, Clock, CheckCircle2, XCircle, AlertCircle,
-  Search, Sparkles, MapPin
+  Search, Sparkles, MapPin, Loader2, Check,
 } from "lucide-react";
 
 const appointmentSchema = z.object({
   doctorId: z.coerce.number().min(1, "Please select a doctor"),
   appointmentDate: z.string().min(1, "Date is required"),
-  appointmentTime: z.string().min(1, "Time is required"),
+  appointmentTime: z.string().min(1, "Please select an available consultation slot"),
   type: z.enum(["in_person", "video", "phone"]),
   symptoms: z.string().optional(),
 });
@@ -127,22 +135,91 @@ export function PatientAppointments() {
   const { data: doctors } = useListDoctors();
   const createAppointment = useCreateAppointment();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const todayStr = new Date().toISOString().split("T")[0];
 
   const form = useForm<z.infer<typeof appointmentSchema>>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
+      doctorId: 0,
+      appointmentDate: todayStr,
+      appointmentTime: "",
       type: "in_person",
       symptoms: ""
     }
   });
 
+  const selectedDoctorId = form.watch("doctorId");
+  const selectedDate = form.watch("appointmentDate");
+  const selectedTime = form.watch("appointmentTime");
+
+  // Query doctor's available slots for selected doctor and date
+  const {
+    data: slotData,
+    isLoading: isLoadingSlots,
+    refetch: refetchSlots,
+  } = useGetDoctorAvailableSlots(
+    selectedDoctorId,
+    { date: selectedDate },
+    {
+      query: {
+        queryKey: getGetDoctorAvailableSlotsQueryKey(selectedDoctorId, { date: selectedDate }),
+        enabled: Boolean(selectedDoctorId && selectedDoctorId > 0 && selectedDate),
+      },
+    }
+  );
+
+  // Auto-open modal if navigated with ?doctorId=...
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const docIdParam = params.get("doctorId");
+    if (docIdParam) {
+      const docIdNum = parseInt(docIdParam, 10);
+      if (!isNaN(docIdNum)) {
+        form.setValue("doctorId", docIdNum);
+        form.setValue("appointmentDate", todayStr);
+        setIsOpen(true);
+      }
+    }
+  }, [todayStr, form]);
+
+  // Reset selected slot when doctor or date changes
+  useEffect(() => {
+    form.setValue("appointmentTime", "");
+  }, [selectedDoctorId, selectedDate, form]);
+
   const onSubmit = (data: z.infer<typeof appointmentSchema>) => {
     createAppointment.mutate({ data }, {
       onSuccess: () => {
+        toast({
+          title: "Appointment Requested",
+          description: `Your consultation request for ${data.appointmentDate} at ${data.appointmentTime} has been submitted.`,
+        });
         setIsOpen(false);
-        form.reset();
+        form.reset({
+          doctorId: 0,
+          appointmentDate: todayStr,
+          appointmentTime: "",
+          type: "in_person",
+          symptoms: "",
+        });
         queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetPatientDashboardQueryKey() });
+      },
+      onError: (err: any) => {
+        const errMsg = err?.message || "Failed to book appointment. Please try another slot.";
+        toast({
+          title: "Booking Failed",
+          description: errMsg,
+          variant: "destructive",
+        });
+        // Invalidate slots to refresh availability state
+        if (selectedDoctorId && selectedDate) {
+          queryClient.invalidateQueries({
+            queryKey: getGetDoctorAvailableSlotsQueryKey(selectedDoctorId, { date: selectedDate }),
+          });
+        }
       }
     });
   };
@@ -213,28 +290,32 @@ export function PatientAppointments() {
                   Book New Appointment
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px] rounded-3xl">
+              <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto rounded-3xl">
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-bold">Book New Appointment</DialogTitle>
+                  <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary" />
+                    Book Consultation Appointment
+                  </DialogTitle>
                 </DialogHeader>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-1">
+                    {/* Doctor Selector */}
                     <FormField
                       control={form.control}
                       name="doctorId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="font-semibold">Doctor</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                          <FormLabel className="font-semibold text-slate-800">Select Doctor *</FormLabel>
+                          <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value ? field.value.toString() : ""}>
                             <FormControl>
-                              <SelectTrigger className="rounded-xl h-11">
-                                <SelectValue placeholder="Select a doctor" />
+                              <SelectTrigger className="rounded-xl h-11 bg-white border-slate-200 shadow-2xs">
+                                <SelectValue placeholder="Choose a specialist..." />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent className="rounded-xl">
-                              {doctors?.map(doc => (
+                            <SelectContent className="rounded-xl max-h-[260px]">
+                              {doctors?.map((doc) => (
                                 <SelectItem key={doc.id} value={doc.id.toString()}>
-                                  Dr. {doc.firstName} {doc.lastName} - {doc.specialty}
+                                  Dr. {doc.firstName} {doc.lastName} — {doc.specialty} (₹{doc.consultationFee || 500})
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -244,68 +325,148 @@ export function PatientAppointments() {
                       )}
                     />
 
+                    {/* Date Selector */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <FormField
                         control={form.control}
                         name="appointmentDate"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="font-semibold">Date</FormLabel>
+                            <FormLabel className="font-semibold text-slate-800">Appointment Date *</FormLabel>
                             <FormControl>
-                              <Input type="date" className="rounded-xl h-11" {...field} />
+                              <Input
+                                type="date"
+                                min={todayStr}
+                                className="rounded-xl h-11 bg-white border-slate-200 shadow-2xs"
+                                {...field}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
                       <FormField
                         control={form.control}
-                        name="appointmentTime"
+                        name="type"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="font-semibold">Time</FormLabel>
-                            <FormControl>
-                              <Input type="time" className="rounded-xl h-11" {...field} />
-                            </FormControl>
+                            <FormLabel className="font-semibold text-slate-800">Consultation Type *</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger className="rounded-xl h-11 bg-white border-slate-200 shadow-2xs">
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="rounded-xl">
+                                <SelectItem value="in_person">🏥 In-Person Clinic Visit</SelectItem>
+                                <SelectItem value="video">📹 Video Consultation</SelectItem>
+                                <SelectItem value="phone">📞 Phone Call</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
 
+                    {/* Doctor-Provided Available Consultation Slots */}
                     <FormField
                       control={form.control}
-                      name="type"
+                      name="appointmentTime"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="font-semibold">Consultation Type</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="rounded-xl h-11">
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="in_person">In Person</SelectItem>
-                              <SelectItem value="video">Video Call</SelectItem>
-                              <SelectItem value="phone">Phone Call</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        <FormItem className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <FormLabel className="font-semibold text-slate-800 flex items-center gap-1.5">
+                              <Clock className="h-4 w-4 text-primary" />
+                              Available Consultation Slots *
+                            </FormLabel>
+                            {slotData?.slotDuration && (
+                              <span className="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-full">
+                                {slotData.slotDuration} min intervals
+                              </span>
+                            )}
+                          </div>
+
+                          {!selectedDoctorId || selectedDoctorId === 0 ? (
+                            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-center text-xs text-slate-500">
+                              Please select a doctor to view available consultation slots.
+                            </div>
+                          ) : !selectedDate ? (
+                            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-center text-xs text-slate-500">
+                              Please select an appointment date.
+                            </div>
+                          ) : isLoadingSlots ? (
+                            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/80 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                              <span>Retrieving doctor's consultation slots for {selectedDate}...</span>
+                            </div>
+                          ) : !slotData?.isAvailable || slotData?.slots?.length === 0 ? (
+                            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-center text-xs text-amber-800 space-y-1">
+                              <p className="font-bold flex items-center justify-center gap-1">
+                                <AlertCircle className="h-4 w-4 text-amber-600" />
+                                No Consultation Slots Available
+                              </p>
+                              <p className="text-[11px] text-amber-700">
+                                Doctor is not available for checkups on {slotData?.dayOfWeek || "this date"}. Please choose another date.
+                              </p>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[180px] overflow-y-auto p-1 border border-slate-100 rounded-2xl bg-slate-50/50">
+                                {slotData.slots.map((slot) => {
+                                  const isSelected = field.value === slot.time;
+                                  return (
+                                    <button
+                                      key={slot.time}
+                                      type="button"
+                                      disabled={!slot.available}
+                                      onClick={() => field.onChange(slot.time)}
+                                      className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                                        isSelected
+                                          ? "bg-violet-600 text-white shadow-md ring-2 ring-violet-500/30 scale-102"
+                                          : slot.available
+                                          ? "bg-white text-slate-800 border border-slate-200 hover:border-violet-400 hover:bg-violet-50/60 shadow-2xs cursor-pointer"
+                                          : "bg-slate-100 text-slate-400 border border-slate-200/60 cursor-not-allowed line-through opacity-60"
+                                      }`}
+                                    >
+                                      <span>{slot.time}</span>
+                                      {!slot.available && (
+                                        <span className="text-[9px] font-semibold no-underline tracking-tighter uppercase text-slate-400">
+                                          {slot.reason === "booked" ? "Booked" : "Past"}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {field.value && (
+                                <p className="text-xs text-emerald-700 font-semibold mt-1.5 flex items-center gap-1">
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                  Selected Time: <span className="underline">{field.value}</span>
+                                </p>
+                              )}
+                            </div>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
+                    {/* Symptoms Textarea */}
                     <FormField
                       control={form.control}
                       name="symptoms"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="font-semibold">Symptoms <span className="text-slate-400 font-normal">(Optional)</span></FormLabel>
+                          <FormLabel className="font-semibold text-slate-800">
+                            Reason for Visit / Symptoms <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                          </FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Briefly describe your symptoms"
-                              className="rounded-xl resize-none p-3"
+                              placeholder="Briefly describe your symptoms, health concerns, or reason for checkup..."
+                              className="rounded-xl resize-none p-3 text-xs bg-white border-slate-200 shadow-2xs"
                               rows={3}
                               {...field}
                             />
@@ -319,21 +480,21 @@ export function PatientAppointments() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="rounded-xl h-11 px-5 font-semibold w-full sm:w-auto"
+                        className="rounded-xl h-11 px-5 font-semibold w-full sm:w-auto border-slate-200"
                         onClick={() => setIsOpen(false)}
                       >
                         Cancel
                       </Button>
                       <Button
                         type="submit"
-                        disabled={createAppointment.isPending}
+                        disabled={createAppointment.isPending || !selectedTime}
                         className="rounded-xl h-11 px-6 font-bold shadow-md w-full sm:w-auto"
                         style={{
                           background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)",
                           color: "white",
                         }}
                       >
-                        {createAppointment.isPending ? "Booking..." : "Confirm Booking"}
+                        {createAppointment.isPending ? "Booking Appointment..." : "Confirm Booking"}
                       </Button>
                     </div>
                   </form>

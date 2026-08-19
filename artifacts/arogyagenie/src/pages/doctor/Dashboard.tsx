@@ -76,43 +76,55 @@ export function DoctorDashboard() {
 
         {/* Metric Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+          <Card className="border-slate-200/80 shadow-xs hover:shadow-sm transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">Today's Appointments</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-600">Today's Appointments</CardTitle>
               <Calendar className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{dashboard.todayAppointments}</div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-extrabold text-slate-900">{dashboard.todayAppointments}</span>
+                <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1 font-medium">
+                <span className="font-bold text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded border border-violet-200/60">
+                  {dashboard.todayRemainingAppointments ?? dashboard.todayAppointments}
+                </span>
+                <span>remaining today</span>
+              </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-slate-200/80 shadow-xs hover:shadow-sm transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">Total Patients</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-600">Total Patients</CardTitle>
               <Users className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{dashboard.totalPatients}</div>
+              <div className="text-3xl font-extrabold text-slate-900">{dashboard.totalPatients}</div>
+              <p className="text-xs text-slate-500 mt-1.5 font-medium">Unique patients served</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-slate-200/80 shadow-xs hover:shadow-sm transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">Pending Appointments</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-600" />
+              <CardTitle className="text-sm font-semibold text-slate-600">Pending Requests</CardTitle>
+              <Clock className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{dashboard.pendingAppointments}</div>
+              <div className="text-3xl font-extrabold text-amber-600">{dashboard.pendingAppointments}</div>
+              <p className="text-xs text-amber-700/80 mt-1.5 font-medium">Awaiting your confirmation</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-slate-200/80 shadow-xs hover:shadow-sm transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">Prescriptions Issued</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-600">Prescriptions Issued</CardTitle>
               <Clipboard className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{dashboard.totalPrescriptions}</div>
+              <div className="text-3xl font-extrabold text-slate-900">{dashboard.totalPrescriptions}</div>
+              <p className="text-xs text-slate-500 mt-1.5 font-medium">Digital Rx records issued</p>
             </CardContent>
           </Card>
         </div>

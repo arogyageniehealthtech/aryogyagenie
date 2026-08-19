@@ -25,6 +25,7 @@ import { inArray } from "drizzle-orm";
 import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 import { parseCoordinates, clampRadiusKm, searchNearbyDoctors, resolveProviderCoordinates } from "../lib/locationService";
+import { getDoctorAvailableSlots, formatDateToYYYYMMDD, parseDoctorSchedule } from "../services/schedulingService";
 
 // GET /doctors - list approved doctors (with optional location-based radius filtering)
 router.get("/doctors", async (req, res): Promise<void> => {
@@ -130,6 +131,27 @@ router.get("/doctors", async (req, res): Promise<void> => {
   res.json(paginatedResult);
 });
 
+// GET /doctors/:id/available-slots
+router.get("/doctors/:id/available-slots", async (req, res): Promise<void> => {
+  const doctorId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  if (isNaN(doctorId)) {
+    res.status(400).json({ error: "Invalid doctor id" });
+    return;
+  }
+
+  const { date } = req.query as { date?: string };
+  const targetDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? date
+    : formatDateToYYYYMMDD(new Date());
+
+  try {
+    const slotResult = await getDoctorAvailableSlots(doctorId, targetDate);
+    res.json(slotResult);
+  } catch (err: any) {
+    res.status(err.message?.includes("not found") ? 404 : 400).json({ error: err.message });
+  }
+});
+
 // GET /doctors/:id
 router.get("/doctors/:id", async (req, res): Promise<void> => {
   const doctorId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
@@ -156,6 +178,7 @@ router.get("/doctors/:id", async (req, res): Promise<void> => {
     experience: d.experience, bio: d.bio, rating: d.rating,
     reviewCount: d.reviewCount, status: d.status,
     availableDays: d.availableDays, availableHours: d.availableHours,
+    scheduleConfig: parseDoctorSchedule(d.availableDays, d.availableHours),
   });
 });
 
@@ -181,12 +204,13 @@ router.get("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (r
     experience: d.experience, bio: d.bio, rating: d.rating,
     reviewCount: d.reviewCount, status: d.status,
     availableDays: d.availableDays, availableHours: d.availableHours,
+    scheduleConfig: parseDoctorSchedule(d.availableDays, d.availableHours),
   });
 });
 
 // PUT /doctors/me/profile
 router.put("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { specialty, qualification, licenseNumber, clinicName, clinicAddress, consultationFee, experience, bio, availableDays, availableHours, latitude, longitude } = req.body;
+  const { specialty, qualification, licenseNumber, clinicName, clinicAddress, consultationFee, experience, bio, availableDays, availableHours, latitude, longitude, scheduleConfig } = req.body;
 
   const existingDoc = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
   const u = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
@@ -202,6 +226,19 @@ router.put("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (r
     city: u?.city || "Kolkata",
   });
 
+  // If structured scheduleConfig is supplied, serialize to availableHours or availableDays cleanly
+  let effectiveAvailableHours = availableHours;
+  let effectiveAvailableDays = availableDays;
+
+  if (scheduleConfig && typeof scheduleConfig === "object") {
+    effectiveAvailableHours = JSON.stringify(scheduleConfig);
+    // Also build a clean readable summary string for availableDays
+    const activeDaysList = Object.entries(scheduleConfig.schedule || {})
+      .filter(([_, s]: any) => s.available)
+      .map(([day]) => day.slice(0, 3));
+    effectiveAvailableDays = activeDaysList.length > 0 ? activeDaysList.join(", ") : "Mon, Tue, Wed, Thu, Fri";
+  }
+
   const [d] = await db
     .update(doctorsTable)
     .set({
@@ -213,8 +250,8 @@ router.put("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (r
       consultationFee,
       experience,
       bio,
-      availableDays,
-      availableHours,
+      availableDays: effectiveAvailableDays !== undefined ? effectiveAvailableDays : existingDoc?.availableDays,
+      availableHours: effectiveAvailableHours !== undefined ? effectiveAvailableHours : existingDoc?.availableHours,
       latitude: resolvedCoords.lat,
       longitude: resolvedCoords.lng,
     })
@@ -241,6 +278,7 @@ router.put("/doctors/me/profile", requireAuth, requireRole(["doctor"]), async (r
     experience: d.experience, bio: d.bio, rating: d.rating,
     reviewCount: d.reviewCount, status: d.status,
     availableDays: d.availableDays, availableHours: d.availableHours,
+    scheduleConfig: parseDoctorSchedule(d.availableDays, d.availableHours),
   });
 });
 
@@ -249,7 +287,7 @@ router.get("/doctors/me/dashboard", requireAuth, requireRole(["doctor"]), async 
   const doctorRow = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
   if (!doctorRow) { res.status(404).json({ error: "Doctor not found" }); return; }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = formatDateToYYYYMMDD(new Date());
 
   const [allAppts, patients, prescriptions, user] = await Promise.all([
     db.select().from(appointmentsTable).where(eq(appointmentsTable.doctorId, doctorRow.id)),
@@ -258,22 +296,60 @@ router.get("/doctors/me/dashboard", requireAuth, requireRole(["doctor"]), async 
     db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) }),
   ]);
 
-  const todayCount = allAppts.filter((a) => a.appointmentDate === today).length;
-  const pending = allAppts.filter((a) => a.status === "pending").length;
-  const completed = allAppts.filter((a) => a.status === "completed").length;
+  // 1. Today's Appointments: Total scheduled today (excluding cancelled)
+  const todayScheduledAppts = allAppts.filter((a) => a.appointmentDate === today && a.status !== "cancelled");
+  const todayTotalCount = todayScheduledAppts.length;
 
-  const upcoming = allAppts
-    .filter((a) => a.appointmentDate >= today && a.status !== "cancelled")
-    .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate))
-    .slice(0, 5);
+  // 2. Today's Remaining: Actionable today (not completed and not cancelled)
+  const todayRemainingCount = todayScheduledAppts.filter((a) => a.status !== "completed").length;
 
-  // Batch fetch recent patient details
-  const recentPatientIds = [...new Set(allAppts.map((a) => a.patientId))].slice(0, 5);
-  const patientUsers = recentPatientIds.length > 0
-    ? await db.select().from(usersTable).where(inArray(usersTable.id, recentPatientIds))
+  // 3. Pending Appointments: Unconfirmed requests waiting for doctor acceptance (all dates)
+  const pendingCount = allAppts.filter((a) => a.status === "pending").length;
+
+  // 4. Completed Appointments: Total consultations completed
+  const completedCount = allAppts.filter((a) => a.status === "completed").length;
+
+  // 5. Upcoming Appointments: Future date + confirmed by doctor
+  const upcomingList = allAppts
+    .filter((a) => a.appointmentDate > today && a.status === "confirmed")
+    .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate) || a.appointmentTime.localeCompare(b.appointmentTime));
+  const upcomingCount = upcomingList.length;
+
+  // 6. Total Prescriptions Issued: Direct from prescriptions table
+  const totalPrescriptionsCount = prescriptions.length;
+
+  // Consultations for dashboard display (today's active/pending/confirmed + upcoming)
+  const displayAppts = allAppts
+    .filter((a) => (a.appointmentDate === today || a.appointmentDate > today) && a.status !== "cancelled")
+    .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate) || a.appointmentTime.localeCompare(b.appointmentTime))
+    .slice(0, 10);
+
+  // Batch fetch patient details for display appointments and recent patients
+  const neededPatientIds = Array.from(new Set([
+    ...displayAppts.map((a) => a.patientId),
+    ...allAppts.map((a) => a.patientId),
+  ])).slice(0, 20);
+
+  const patientUsers = neededPatientIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, neededPatientIds))
     : [];
   const patientUserMap = new Map(patientUsers.map((u) => [u.id, u]));
 
+  const enrichedDisplayAppts = displayAppts.map((a) => {
+    const patient = patientUserMap.get(a.patientId);
+    const pName = patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null;
+    return {
+      ...a,
+      patientName: pName || (patient?.email ? patient.email : null),
+      doctorName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
+      doctorSpecialty: doctorRow.specialty,
+      consultationFee: a.consultationFee ?? null,
+      createdAt: a.createdAt.toISOString(),
+    };
+  });
+
+  // Recent patients
+  const recentPatientIds = [...new Set(allAppts.map((a) => a.patientId))].slice(0, 5);
   const recentPatientData = recentPatientIds.map((pid) => {
     const u = patientUserMap.get(pid);
     const visits = allAppts.filter((a) => a.patientId === pid).length;
@@ -299,17 +375,14 @@ router.get("/doctors/me/dashboard", requireAuth, requireRole(["doctor"]), async 
     userName,
     firstName,
     lastName,
-    todayAppointments: todayCount,
+    todayAppointments: todayTotalCount,
+    todayRemainingAppointments: todayRemainingCount,
     totalPatients: patients.length,
-    pendingAppointments: pending,
-    completedAppointments: completed,
-    totalPrescriptions: prescriptions.length,
-    upcomingAppointments: upcoming.map((a) => ({
-      ...a,
-      patientName: null, doctorName: null, doctorSpecialty: null,
-      consultationFee: a.consultationFee ?? null,
-      createdAt: a.createdAt.toISOString(),
-    })),
+    pendingAppointments: pendingCount,
+    upcomingAppointmentsCount: upcomingCount,
+    completedAppointments: completedCount,
+    totalPrescriptions: totalPrescriptionsCount,
+    upcomingAppointments: enrichedDisplayAppts,
     recentPatients: recentPatientData,
   });
 });

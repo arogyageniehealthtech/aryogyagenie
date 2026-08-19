@@ -31,11 +31,13 @@ import type {
   DiagnosticCenterDashboard,
   DiagnosticCenterUpdate,
   Doctor,
+  DoctorAvailableSlotsResponse,
   DoctorBriefing,
   DoctorDashboard,
   DoctorProfileUpdate,
   FollowUpQuestionsInput,
   FollowUpQuestionsOutput,
+  GetDoctorAvailableSlotsParams,
   HealthAssistantInput,
   HealthAssistantResponse,
   HealthEpisode,
@@ -550,6 +552,95 @@ export function useGetDoctor<TData = Awaited<ReturnType<typeof getDoctor>>, TErr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDoctorQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDoctorAvailableSlotsUrl = (id: number,
+    params?: GetDoctorAvailableSlotsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/doctors/${id}/available-slots?${stringifiedParams}` : `/api/doctors/${id}/available-slots`
+}
+
+/**
+ * @summary Get doctor's consultation time slots for a specific date
+ */
+export const getDoctorAvailableSlots = async (id: number,
+    params?: GetDoctorAvailableSlotsParams, options?: Parameters<typeof customFetch>[1]): Promise<DoctorAvailableSlotsResponse> => {
+
+  return customFetch<DoctorAvailableSlotsResponse>(getGetDoctorAvailableSlotsUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDoctorAvailableSlotsQueryKey = (id: number,
+    params?: GetDoctorAvailableSlotsParams,) => {
+    return [
+    `/api/doctors/${id}/available-slots`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDoctorAvailableSlotsQueryOptions = <TData = Awaited<ReturnType<typeof getDoctorAvailableSlots>>, TError = ErrorType<void>>(id: number,
+    params?: GetDoctorAvailableSlotsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDoctorAvailableSlots>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDoctorAvailableSlotsQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDoctorAvailableSlots>>> = ({ signal }) => getDoctorAvailableSlots(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDoctorAvailableSlots>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDoctorAvailableSlotsQueryResult = NonNullable<Awaited<ReturnType<typeof getDoctorAvailableSlots>>>
+export type GetDoctorAvailableSlotsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get doctor's consultation time slots for a specific date
+ */
+
+export function useGetDoctorAvailableSlots<TData = Awaited<ReturnType<typeof getDoctorAvailableSlots>>, TError = ErrorType<void>>(
+ id: number,
+    params?: GetDoctorAvailableSlotsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDoctorAvailableSlots>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDoctorAvailableSlotsQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

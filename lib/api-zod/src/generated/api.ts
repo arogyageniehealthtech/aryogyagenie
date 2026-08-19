@@ -145,7 +145,10 @@ export const OnboardUserResponse = zod.object({
  */
 export const ListDoctorsQueryParams = zod.object({
   "specialty": zod.coerce.string().optional(),
-  "search": zod.coerce.string().optional()
+  "search": zod.coerce.string().optional(),
+  "lat": zod.coerce.number().optional(),
+  "lng": zod.coerce.number().optional(),
+  "radius": zod.coerce.number().optional()
 })
 
 export const ListDoctorsResponseItem = zod.object({
@@ -199,6 +202,32 @@ export const GetDoctorResponse = zod.object({
   "status": zod.string(),
   "availableDays": zod.string().nullish(),
   "availableHours": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get doctor's consultation time slots for a specific date
+ */
+export const GetDoctorAvailableSlotsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDoctorAvailableSlotsQueryParams = zod.object({
+  "date": zod.coerce.string().optional().describe('Date in YYYY-MM-DD format')
+})
+
+export const GetDoctorAvailableSlotsResponse = zod.object({
+  "doctorId": zod.number(),
+  "date": zod.string(),
+  "dayOfWeek": zod.string(),
+  "isAvailable": zod.boolean(),
+  "slotDuration": zod.number(),
+  "slots": zod.array(zod.object({
+  "time": zod.string(),
+  "time24": zod.string(),
+  "available": zod.boolean(),
+  "reason": zod.enum(['booked', 'past', 'unavailable']).optional()
+}))
 })
 
 
@@ -275,8 +304,10 @@ export const GetDoctorDashboardResponse = zod.object({
   "firstName": zod.string().nullish(),
   "lastName": zod.string().nullish(),
   "todayAppointments": zod.number(),
+  "todayRemainingAppointments": zod.number().optional(),
   "totalPatients": zod.number(),
   "pendingAppointments": zod.number(),
+  "upcomingAppointmentsCount": zod.number().optional(),
   "completedAppointments": zod.number(),
   "totalPrescriptions": zod.number(),
   "upcomingAppointments": zod.array(zod.object({

@@ -16,8 +16,10 @@ export interface DoctorDashboard {
   /** @nullable */
   lastName?: string | null;
   todayAppointments: number;
+  todayRemainingAppointments?: number;
   totalPatients: number;
   pendingAppointments: number;
+  upcomingAppointmentsCount?: number;
   completedAppointments: number;
   totalPrescriptions: number;
   upcomingAppointments: Appointment[];

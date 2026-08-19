@@ -159,6 +159,32 @@ paths:
         "404":
           description: Not found
 
+  /doctors/{id}/available-slots:
+    get:
+      operationId: getDoctorAvailableSlots
+      tags: [doctors]
+      summary: Get doctor's consultation time slots for a specific date
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+        - name: date
+          in: query
+          description: Date in YYYY-MM-DD format
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Doctor available slots
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorAvailableSlotsResponse"
+        "404":
+          description: Doctor not found
+
   /doctors/me/profile:
     get:
       operationId: getDoctorProfile
@@ -1302,9 +1328,13 @@ components:
           type: ["string", "null"]
         todayAppointments:
           type: number
+        todayRemainingAppointments:
+          type: number
         totalPatients:
           type: number
         pendingAppointments:
+          type: number
+        upcomingAppointmentsCount:
           type: number
         completedAppointments:
           type: number
@@ -1326,6 +1356,48 @@ components:
         - totalPrescriptions
         - upcomingAppointments
         - recentPatients
+
+    DoctorAvailableSlotsResponse:
+      type: object
+      properties:
+        doctorId:
+          type: number
+        date:
+          type: string
+        dayOfWeek:
+          type: string
+        isAvailable:
+          type: boolean
+        slotDuration:
+          type: number
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/DoctorTimeSlot"
+      required:
+        - doctorId
+        - date
+        - dayOfWeek
+        - isAvailable
+        - slotDuration
+        - slots
+
+    DoctorTimeSlot:
+      type: object
+      properties:
+        time:
+          type: string
+        time24:
+          type: string
+        available:
+          type: boolean
+        reason:
+          type: string
+          enum: [booked, past, unavailable]
+      required:
+        - time
+        - time24
+        - available
 
     PatientSummary:
       type: object
