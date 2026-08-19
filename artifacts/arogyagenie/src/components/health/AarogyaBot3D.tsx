@@ -5,12 +5,344 @@ interface AarogyaBot3DProps {
   className?: string;
 }
 
+/**
+ * Generates a high-resolution 2048x2048 procedural Cyber-Medical HUD Texture
+ * matching the rich futuristic holographic projection disc in Reference Image 2.
+ */
+function createCyberHudCanvasTexture(): THREE.CanvasTexture {
+  const size = 2048;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  const cx = size / 2;
+  const cy = size / 2;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Helper function for radial drawing
+  const drawCircle = (radius: number, color: string, lineWidth: number, dash: number[] = []) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash(dash);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const drawArc = (
+    radius: number,
+    startAngle: number,
+    endAngle: number,
+    color: string,
+    lineWidth: number,
+    dash: number[] = []
+  ) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, startAngle, endAngle);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash(dash);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 14;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // 1. Soft Radial Glow Background Under Base
+  const bgGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, 980);
+  bgGrad.addColorStop(0, "rgba(56, 189, 248, 0.22)");
+  bgGrad.addColorStop(0.35, "rgba(168, 85, 247, 0.14)");
+  bgGrad.addColorStop(0.70, "rgba(14, 165, 233, 0.08)");
+  bgGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = bgGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 980, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Outermost Primary Perimeter Track (Radius ~960)
+  drawCircle(960, "#00f5ff", 4);
+  drawCircle(946, "rgba(56, 189, 248, 0.4)", 1.5);
+
+  // 120 Radial Millimeter / Degree Tick Marks around outer ring
+  const numTicks = 120;
+  for (let i = 0; i < numTicks; i++) {
+    const angle = (i * Math.PI * 2) / numTicks;
+    const isMajor = i % 10 === 0;
+    const isMid = i % 5 === 0;
+    const len = isMajor ? 32 : isMid ? 20 : 10;
+    const innerR = 946 - len;
+    const outerR = 946;
+
+    const x1 = cx + Math.cos(angle) * innerR;
+    const y1 = cy + Math.sin(angle) * innerR;
+    const x2 = cx + Math.cos(angle) * outerR;
+    const y2 = cy + Math.sin(angle) * outerR;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = isMajor ? "#00f5ff" : isMid ? "#a855f7" : "rgba(56, 189, 248, 0.6)";
+    ctx.lineWidth = isMajor ? 3 : isMid ? 2 : 1.2;
+    ctx.shadowColor = isMajor ? "#00f5ff" : "#a855f7";
+    ctx.shadowBlur = isMajor ? 8 : 4;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 4 Cardinal HUD Text Badges
+  const labels = [
+    { text: "SYS:ONLINE", angle: 0 },
+    { text: "AAROGYA:AI", angle: Math.PI / 2 },
+    { text: "VITAL:SYNC", angle: Math.PI },
+    { text: "FREQ:98.4", angle: (Math.PI * 3) / 2 },
+  ];
+  ctx.font = "bold 20px 'Inter', sans-serif";
+  ctx.fillStyle = "#38bdf8";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  labels.forEach(({ text, angle }) => {
+    const r = 905;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    ctx.save();
+    ctx.shadowColor = "#38bdf8";
+    ctx.shadowBlur = 10;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  });
+
+  // 3. Segmented Outer Neon Shield Brackets (Radius ~880)
+  for (let i = 0; i < 4; i++) {
+    const start = (i * Math.PI) / 2 + 0.18;
+    const end = (i * Math.PI) / 2 + Math.PI / 2 - 0.18;
+    drawArc(880, start, end, "#d946ef", 5);
+    drawArc(868, start + 0.05, end - 0.05, "#38bdf8", 2, [14, 8]);
+  }
+
+  // 4. Middle Track - Circular Data Orbit & Medical Glyphs (Radius ~780)
+  drawCircle(780, "#00f5ff", 3);
+  drawCircle(764, "rgba(168, 85, 247, 0.7)", 2, [18, 12]);
+
+  // Small Glowing Circular Tech Nodes & Crosses
+  for (let i = 0; i < 16; i++) {
+    const angle = (i * Math.PI * 2) / 16;
+    const r = 746;
+    const nx = cx + Math.cos(angle) * r;
+    const ny = cy + Math.sin(angle) * r;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(nx, ny, 6, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 === 0 ? "#00f5ff" : "#a855f7";
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 12;
+    ctx.fill();
+
+    // Radial bracket lines between nodes
+    if (i % 2 === 0) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 746, angle - 0.12, angle + 0.12);
+      ctx.strokeStyle = "#38bdf8";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 5. Middle Dense Telemetry Rail (Radius ~650)
+  drawCircle(650, "#38bdf8", 3.5);
+  drawCircle(635, "#a855f7", 2, [6, 6]);
+
+  // Embedded ECG Waveform etched radially
+  for (let i = 0; i < 4; i++) {
+    const baseAngle = (i * Math.PI) / 2 + 0.35;
+    ctx.save();
+    ctx.beginPath();
+    for (let step = 0; step < 40; step++) {
+      const a = baseAngle + (step * 0.45) / 40;
+      let wave = 0;
+      if (step === 15) wave = 18;
+      else if (step === 18) wave = -24;
+      else if (step === 22) wave = 28;
+      else if (step === 25) wave = -12;
+
+      const r = 600 + wave;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (step === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = "#00f5ff";
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = "#00f5ff";
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 6. Inner Fast Orbital Rings (Radius ~480 & ~360)
+  drawCircle(480, "#d946ef", 4);
+  drawCircle(462, "#00f5ff", 2, [10, 10]);
+  drawCircle(360, "#00f5ff", 4.5);
+  drawCircle(345, "rgba(56, 189, 248, 0.6)", 2, [4, 6]);
+
+  // 7. Center Radiant Energy Core (Radius ~220)
+  const coreGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, 220);
+  coreGrad.addColorStop(0, "rgba(0, 245, 255, 0.85)");
+  coreGrad.addColorStop(0.4, "rgba(168, 85, 247, 0.65)");
+  coreGrad.addColorStop(0.8, "rgba(14, 165, 233, 0.3)");
+  coreGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 220, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawCircle(220, "#00f5ff", 4);
+  drawCircle(140, "#a855f7", 3, [8, 8]);
+  drawCircle(70, "#00f5ff", 3);
+
+  // Center Medical Cross
+  ctx.save();
+  ctx.fillStyle = "#00f5ff";
+  ctx.shadowColor = "#00f5ff";
+  ctx.shadowBlur = 15;
+  ctx.fillRect(cx - 6, cy - 32, 12, 64);
+  ctx.fillRect(cx - 32, cy - 6, 64, 12);
+  ctx.restore();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
+/**
+ * Generates floating mini holographic HUD data panels (left & right widgets)
+ */
+function createFloatingHudPanelTexture(type: "ecg" | "metrics"): THREE.CanvasTexture {
+  const w = 512;
+  const h = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Semi-transparent glowing card background
+  ctx.fillStyle = "rgba(6, 12, 38, 0.75)";
+  ctx.roundRect(8, 8, w - 16, h - 16, 16);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.7)";
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = "#00f5ff";
+  ctx.shadowBlur = 10;
+  ctx.roundRect(8, 8, w - 16, h - 16, 16);
+  ctx.stroke();
+
+  if (type === "ecg") {
+    // Header
+    ctx.font = "bold 22px 'Inter', sans-serif";
+    ctx.fillStyle = "#00f5ff";
+    ctx.fillText("LIVE VITAL STATUS", 28, 44);
+
+    ctx.font = "16px 'Inter', sans-serif";
+    ctx.fillStyle = "#a855f7";
+    ctx.fillText("HEART PULSE: 72 BPM • OPTIMAL", 28, 72);
+
+    // EKG Graph
+    ctx.beginPath();
+    ctx.moveTo(28, 150);
+    ctx.lineTo(80, 150);
+    ctx.lineTo(110, 140);
+    ctx.lineTo(130, 190);
+    ctx.lineTo(160, 90);
+    ctx.lineTo(190, 180);
+    ctx.lineTo(210, 150);
+    ctx.lineTo(260, 150);
+    ctx.lineTo(290, 130);
+    ctx.lineTo(310, 200);
+    ctx.lineTo(340, 80);
+    ctx.lineTo(370, 175);
+    ctx.lineTo(390, 150);
+    ctx.lineTo(480, 150);
+
+    ctx.strokeStyle = "#00f5ff";
+    ctx.lineWidth = 3;
+    ctx.shadowColor = "#00f5ff";
+    ctx.shadowBlur = 12;
+    ctx.stroke();
+
+    // Bottom telemetry bar
+    ctx.fillStyle = "rgba(56, 189, 248, 0.3)";
+    ctx.roundRect(28, 210, 450, 14, 6);
+    ctx.fill();
+    ctx.fillStyle = "#00f5ff";
+    ctx.roundRect(28, 210, 360, 14, 6);
+    ctx.fill();
+  } else {
+    // Metrics
+    ctx.font = "bold 22px 'Inter', sans-serif";
+    ctx.fillStyle = "#a855f7";
+    ctx.fillText("AI NEURAL DIAGNOSTIC", 28, 44);
+
+    ctx.font = "16px 'Inter', sans-serif";
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillText("CLINICAL RAG: ACTIVE (100%)", 28, 72);
+
+    // Progress Bars
+    const items = [
+      { label: "Symptom Accuracy", val: 380, color: "#00f5ff" },
+      { label: "Safety Triaging", val: 420, color: "#a855f7" },
+      { label: "Biometric Sync", val: 340, color: "#38bdf8" },
+    ];
+
+    items.forEach((item, idx) => {
+      const y = 110 + idx * 40;
+      ctx.font = "14px 'Inter', sans-serif";
+      ctx.fillStyle = "#e2e8f0";
+      ctx.fillText(item.label, 28, y);
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+      ctx.roundRect(210, y - 12, 260, 14, 6);
+      ctx.fill();
+
+      ctx.fillStyle = item.color;
+      ctx.shadowColor = item.color;
+      ctx.shadowBlur = 8;
+      ctx.roundRect(210, y - 12, item.val - 210, 14, 6);
+      ctx.fill();
+    });
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
 export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMotionActive, setIsMotionActive] = useState(true);
   const isTrackingRef = useRef(true);
 
-  // Keep ref synchronized with state
   useEffect(() => {
     isTrackingRef.current = isMotionActive;
   }, [isMotionActive]);
@@ -19,15 +351,15 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const container = containerRef.current;
     if (!container) return;
 
-    // 1. Scene & Camera
+    // 1. Scene & Elevated Camera (~20 deg top-down angle)
     const width = container.clientWidth || 260;
     const height = container.clientHeight || 290;
 
     const scene = new THREE.Scene();
     
-    // Perspective camera with elevated position looking down (~18-20 deg below eye level)
+    // Elevated camera looking slightly down to clearly reveal the rich circular platform
     const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-    camera.position.set(0, 0.75, 6.2);
+    camera.position.set(0, 0.85, 6.2);
     camera.lookAt(0, 0.05, 0);
 
     // 2. WebGL Renderer
@@ -41,7 +373,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.25;
+    renderer.toneMappingExposure = 1.30;
     container.appendChild(renderer.domElement);
 
     // 3. Materials
@@ -78,34 +410,26 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       color: 0xa855f7,
     });
 
-    // Hologram Ring Materials (Additive & Glowing)
+    // Hologram Additive Glowing Materials
     const holoCyanMat = new THREE.MeshBasicMaterial({
       color: 0x00f5ff,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.95,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
     });
 
-    const holoPurpleMat = new THREE.MeshBasicMaterial({
-      color: 0xa855f7,
+    const holoMagentaMat = new THREE.MeshBasicMaterial({
+      color: 0xd946ef,
       transparent: true,
-      opacity: 0.85,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-    });
-
-    const holoBlueMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.65,
+      opacity: 0.90,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
     });
 
     // 4. Hierarchical Bot Construction
     const botRoot = new THREE.Group();
-    // Lowered slightly to provide ample headroom for the top horns/antennae
+    // Positioned with ample headroom for top horns
     botRoot.position.set(0, -0.15, 0);
     scene.add(botRoot);
 
@@ -211,7 +535,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const smileMesh = new THREE.Mesh(smileGeo, cyanGlowMat);
     botHeadGroup.add(smileMesh);
 
-    // Ear Sensor Hubs (Left & Right cylinders with neon rings)
+    // Ear Sensor Hubs
     const earGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.15, 24);
     earGeo.rotateZ(Math.PI / 2);
 
@@ -233,7 +557,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     earRingR.rotation.y = Math.PI / 2;
     botHeadGroup.add(earRingR);
 
-    // Antennae / Horns (Dual angled stalks with glowing purple bulbs - fully within camera view)
+    // Antennae / Horns (Dual angled stalks with glowing purple bulbs - 100% visible inside frame)
     const antStalkGeo = new THREE.CylinderGeometry(0.024, 0.024, 0.38, 12);
     const antBulbGeo = new THREE.SphereGeometry(0.12, 20, 20);
 
@@ -260,7 +584,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     // --- Floating Arms ---
     const armGeo = new THREE.CapsuleGeometry(0.13, 0.34, 12, 16);
 
-    // Left Resting Arm
+    // Left Arm
     const armL = new THREE.Mesh(armGeo, whiteCeramicMat);
     armL.position.set(-0.92, -0.30, 0.12);
     armL.rotation.z = 0.35;
@@ -282,96 +606,127 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     armRGroup.add(palmGlow);
 
     // =========================================================================
-    // 5. Multi-Layer Concentric Hologram Pedestal Platform (Reference Image 1)
-    // Placed on the floor below the floating robot with clean clearance gap
+    // 5. HIGH-TECH HOLOGRAPHIC CYBER-MEDICAL HUD PEDESTAL (Reference Image 2)
     // =========================================================================
     const holoBaseGroup = new THREE.Group();
     holoBaseGroup.position.set(0, -1.35, 0);
-    holoBaseGroup.rotation.x = Math.PI / 2.85; // ~20 deg below eye level perspective tilt
+    holoBaseGroup.rotation.x = Math.PI / 2.75; // ~22 deg top-down angle revealing complete HUD surface
     botRoot.add(holoBaseGroup);
 
-    // Layer 1: Outermost Cyan Glowing Perimeter Ring
-    const outerRingGeo = new THREE.TorusGeometry(1.68, 0.032, 16, 80);
+    // High-Resolution Procedural HUD Texture Disc (Plane geometry)
+    const hudTexture = createCyberHudCanvasTexture();
+    const hudPlaneGeo = new THREE.PlaneGeometry(3.6, 3.6);
+    const hudPlaneMat = new THREE.MeshBasicMaterial({
+      map: hudTexture,
+      transparent: true,
+      opacity: 0.98,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const hudPlaneMesh = new THREE.Mesh(hudPlaneGeo, hudPlaneMat);
+    holoBaseGroup.add(hudPlaneMesh);
+
+    // Secondary Counter-Rotating HUD Texture Disc
+    const hudPlaneGeo2 = new THREE.PlaneGeometry(2.4, 2.4);
+    const hudPlaneMesh2 = new THREE.Mesh(hudPlaneGeo2, hudPlaneMat);
+    hudPlaneMesh2.position.z = 0.01;
+    holoBaseGroup.add(hudPlaneMesh2);
+
+    // Layer 1: Outermost 3D Glowing Neon Cyan Perimeter Ring
+    const outerRingGeo = new THREE.TorusGeometry(1.72, 0.024, 16, 90);
     const outerRingMesh = new THREE.Mesh(outerRingGeo, holoCyanMat);
     holoBaseGroup.add(outerRingMesh);
 
-    // Layer 2: Outer Dashed / Segmented Purple Cyber Ring
+    // Layer 2: Fast Counter-Rotating Segmented Magenta Arc Ring
     const segmentGroup = new THREE.Group();
-    const segCount = 16;
+    const segCount = 12;
     for (let i = 0; i < segCount; i++) {
       if (i % 2 === 0) {
-        const segGeo = new THREE.TorusGeometry(1.52, 0.022, 12, 16, Math.PI / 10);
-        const segMesh = new THREE.Mesh(segGeo, holoPurpleMat);
+        const segGeo = new THREE.TorusGeometry(1.42, 0.020, 12, 20, Math.PI / 7);
+        const segMesh = new THREE.Mesh(segGeo, holoMagentaMat);
         segMesh.rotation.z = (i * Math.PI * 2) / segCount;
         segmentGroup.add(segMesh);
       }
     }
     holoBaseGroup.add(segmentGroup);
 
-    // Layer 3: Middle Rotating Electric Purple Track Ring
-    const midRingGeo = new THREE.TorusGeometry(1.24, 0.028, 16, 64);
-    const midRingMesh = new THREE.Mesh(midRingGeo, holoPurpleMat);
+    // Layer 3: Orbiting Middle Track with 4 Glowing Energy Beacons
+    const midRingGeo = new THREE.TorusGeometry(1.15, 0.022, 16, 64);
+    const midRingMesh = new THREE.Mesh(midRingGeo, holoCyanMat);
     holoBaseGroup.add(midRingMesh);
 
-    // 4 Orbiting Neon Nodes on Middle Ring
     const nodeGroup = new THREE.Group();
-    const nodeGeo = new THREE.SphereGeometry(0.055, 12, 12);
+    const nodeGeo = new THREE.SphereGeometry(0.048, 12, 12);
     for (let i = 0; i < 4; i++) {
       const angle = (i * Math.PI) / 2;
       const node = new THREE.Mesh(nodeGeo, cyanGlowMat);
-      node.position.set(Math.cos(angle) * 1.24, Math.sin(angle) * 1.24, 0);
+      node.position.set(Math.cos(angle) * 1.15, Math.sin(angle) * 1.15, 0.02);
       nodeGroup.add(node);
     }
     holoBaseGroup.add(nodeGroup);
 
-    // Layer 4: Inner Cyan Fast Ring with Medical Ticks
-    const innerRingGeo = new THREE.TorusGeometry(0.82, 0.026, 16, 48);
-    const innerRingMesh = new THREE.Mesh(innerRingGeo, holoCyanMat);
-    holoBaseGroup.add(innerRingMesh);
-
-    // Layer 5: Concentric Glowing Holographic Disk Rings (Flat planar glow rings)
-    const disk1Geo = new THREE.RingGeometry(0.35, 0.75, 48);
-    const disk1Mat = new THREE.MeshBasicMaterial({
-      color: 0x0284c7,
-      transparent: true,
-      opacity: 0.22,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-    });
-    const disk1Mesh = new THREE.Mesh(disk1Geo, disk1Mat);
-    holoBaseGroup.add(disk1Mesh);
-
-    const disk2Geo = new THREE.RingGeometry(0.95, 1.15, 48);
-    const disk2Mat = new THREE.MeshBasicMaterial({
-      color: 0x7c3aed,
-      transparent: true,
-      opacity: 0.16,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-    });
-    const disk2Mesh = new THREE.Mesh(disk2Geo, disk2Mat);
-    holoBaseGroup.add(disk2Mesh);
-
-    // Layer 6: Center Radiant Medical Pulse Core Ring
-    const coreRingGeo = new THREE.TorusGeometry(0.42, 0.030, 16, 36);
-    const coreRingMesh = new THREE.Mesh(coreRingGeo, holoCyanMat);
+    // Layer 4: Inner High-Intensity Neon Core Ring
+    const coreRingGeo = new THREE.TorusGeometry(0.65, 0.026, 16, 48);
+    const coreRingMesh = new THREE.Mesh(coreRingGeo, holoMagentaMat);
+    coreRingMesh.position.z = 0.02;
     holoBaseGroup.add(coreRingMesh);
 
-    // Layer 7: Radiant Upward Levitation Sparkles / Energy Particles
-    const particleCount = 55;
+    // =========================================================================
+    // 6. Floating Holographic Telemetry Panels (Left & Right - As in Image 2)
+    // =========================================================================
+    const hudCardsGroup = new THREE.Group();
+    botRoot.add(hudCardsGroup);
+
+    // Left Floating Live Vital Panel
+    const leftCardTex = createFloatingHudPanelTexture("ecg");
+    const leftCardGeo = new THREE.PlaneGeometry(0.92, 0.46);
+    const leftCardMat = new THREE.MeshBasicMaterial({
+      map: leftCardTex,
+      transparent: true,
+      opacity: 0.90,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const leftCardMesh = new THREE.Mesh(leftCardGeo, leftCardMat);
+    leftCardMesh.position.set(-1.18, -0.72, 0.38);
+    leftCardMesh.rotation.y = 0.28;
+    leftCardMesh.rotation.x = -0.10;
+    hudCardsGroup.add(leftCardMesh);
+
+    // Right Floating Diagnostics Panel
+    const rightCardTex = createFloatingHudPanelTexture("metrics");
+    const rightCardGeo = new THREE.PlaneGeometry(0.92, 0.46);
+    const rightCardMat = new THREE.MeshBasicMaterial({
+      map: rightCardTex,
+      transparent: true,
+      opacity: 0.90,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const rightCardMesh = new THREE.Mesh(rightCardGeo, rightCardMat);
+    rightCardMesh.position.set(1.18, -0.72, 0.38);
+    rightCardMesh.rotation.y = -0.28;
+    rightCardMesh.rotation.x = -0.10;
+    hudCardsGroup.add(rightCardMesh);
+
+    // Layer 7: Upward-Floating Levitation Energy Embers
+    const particleCount = 65;
     const particleGeo = new THREE.BufferGeometry();
     const particlePos = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const radius = 0.35 + Math.random() * 1.25;
+      const radius = 0.30 + Math.random() * 1.35;
       particlePos[i * 3] = Math.cos(angle) * radius;
       particlePos[i * 3 + 1] = Math.sin(angle) * radius;
-      particlePos[i * 3 + 2] = Math.random() * 0.9; // Floating upwards
+      particlePos[i * 3 + 2] = Math.random() * 0.95; // Floating upwards
     }
     particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePos, 3));
     const particleMat = new THREE.PointsMaterial({
       color: 0x00f5ff,
-      size: 0.055,
+      size: 0.052,
       transparent: true,
       opacity: 0.95,
       blending: THREE.AdditiveBlending,
@@ -379,19 +734,19 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const particlePoints = new THREE.Points(particleGeo, particleMat);
     holoBaseGroup.add(particlePoints);
 
-    // 6. Cyber Medical Stage Lighting
-    const ambientLight = new THREE.AmbientLight(0x0f172a, 2.2);
+    // 7. Cyber Lighting
+    const ambientLight = new THREE.AmbientLight(0x0f172a, 2.4);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 3.0);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
     keyLight.position.set(3, 4, 5);
     scene.add(keyLight);
 
-    const cyanFloorLight = new THREE.PointLight(0x00f5ff, 4.2, 7);
+    const cyanFloorLight = new THREE.PointLight(0x00f5ff, 4.8, 7);
     cyanFloorLight.position.set(0, -1.2, 1.2);
     scene.add(cyanFloorLight);
 
-    const purpleSideLight = new THREE.PointLight(0xc084fc, 3.8, 8);
+    const purpleSideLight = new THREE.PointLight(0xc084fc, 4.0, 8);
     purpleSideLight.position.set(2.8, 1.8, 1.5);
     scene.add(purpleSideLight);
 
@@ -399,7 +754,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     chestPointLight.position.set(0, 0.2, 1.0);
     scene.add(chestPointLight);
 
-    // 7. Interactive Mouse / Touch Tracking
+    // 8. Interactive Mouse / Touch Tracking
     let targetRotY = 0;
     let targetRotX = 0;
     let currentRotY = 0;
@@ -431,7 +786,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
     window.addEventListener("touchmove", handleTouchMove, { passive: true });
 
-    // 8. Animation Loop
+    // 9. Animation Loop
     let animationFrameId: number;
     let clock = new THREE.Clock();
 
@@ -442,7 +797,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       // Smooth Levitation Floating in Mid-Air
       botBodyGroup.position.y = 0.45 + Math.sin(time * 2.2) * 0.08;
 
-      // Friendly Waving Right Arm
+      // Gentle wave on right arm
       armRGroup.rotation.z = Math.sin(time * 3.2) * 0.16 - 0.10;
 
       // Pulsing Heartbeat on Chest
@@ -450,14 +805,19 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       heartMesh.scale.set(0.85 * heartbeat, 0.85 * heartbeat, 0.85);
       chestPointLight.intensity = 1.8 * heartbeat;
 
-      // Concentric Cyber Hologram Platform Rotations
+      // High-Tech Concentric HUD Rotations
+      hudPlaneMesh.rotation.z = time * 0.25;
+      hudPlaneMesh2.rotation.z = -time * 0.40;
       outerRingMesh.rotation.z = time * 0.45;
-      segmentGroup.rotation.z = -time * 0.35;
+      segmentGroup.rotation.z = -time * 0.65;
       midRingMesh.rotation.z = time * 0.80;
       nodeGroup.rotation.z = time * 0.80;
-      innerRingMesh.rotation.z = -time * 1.10;
-      coreRingMesh.rotation.z = time * 1.40;
+      coreRingMesh.rotation.z = -time * 1.20;
       particlePoints.rotation.z = time * 0.25;
+
+      // Floating HUD cards hover bobbing
+      leftCardMesh.position.y = -0.72 + Math.sin(time * 2.0 + 1) * 0.03;
+      rightCardMesh.position.y = -0.72 + Math.sin(time * 2.0 + 2) * 0.03;
 
       // Pulsing Antenna Bulbs ("Horns")
       const bulbGlow = 0.88 + Math.sin(time * 3.2) * 0.22;
@@ -479,7 +839,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
 
     animate();
 
-    // 9. Resize Observer
+    // 10. Resize Observer
     const updateSize = () => {
       if (!container) return;
       const newW = container.clientWidth || 260;
@@ -503,6 +863,9 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
         container.removeChild(renderer.domElement);
       }
       renderer.dispose();
+      hudTexture.dispose();
+      leftCardTex.dispose();
+      rightCardTex.dispose();
     };
   }, []);
 
