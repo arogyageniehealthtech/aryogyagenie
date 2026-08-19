@@ -418,29 +418,29 @@ export function BlinkitDeliveryTracker({
           </svg>
 
           {/* Floating Origin & Destination Pins */}
-          <div className="flex items-center justify-between z-10">
+          <div className="flex items-center justify-between gap-2 z-10">
             {/* Origin: Pharmacy Node */}
-            <div className="bg-slate-900/90 backdrop-blur-md p-3 rounded-2xl border border-emerald-500/40 shadow-xl max-w-[220px]">
-              <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-1">
-                <Store className="w-3.5 h-3.5" />
-                <span>Pharmacy Hub</span>
+            <div className="bg-slate-900/90 backdrop-blur-md p-2 sm:p-3 rounded-2xl border border-emerald-500/40 shadow-xl max-w-[135px] sm:max-w-[220px]">
+              <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">
+                <Store className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <span className="truncate">Pharmacy Hub</span>
               </div>
-              <p className="text-sm font-bold text-white truncate">{pharmacyName}</p>
-              <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                {data?.order?.pharmacyAddress || "Verified Medical Store"}
+              <p className="text-xs sm:text-sm font-bold text-white truncate">{pharmacyName}</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate mt-0.5">
+                {data?.order?.pharmacyAddress || "Verified Store"}
               </p>
             </div>
 
             {/* Destination: Patient Doorstep Node */}
-            <div className="bg-slate-900/90 backdrop-blur-md p-3 rounded-2xl border border-blue-500/40 shadow-xl max-w-[220px] text-right">
-              <div className="flex items-center justify-end gap-2 text-blue-400 text-xs font-bold uppercase tracking-wider mb-1">
-                <span>Your Doorstep</span>
-                <Home className="w-3.5 h-3.5" />
+            <div className="bg-slate-900/90 backdrop-blur-md p-2 sm:p-3 rounded-2xl border border-blue-500/40 shadow-xl max-w-[135px] sm:max-w-[220px] text-right">
+              <div className="flex items-center justify-end gap-1.5 text-blue-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">
+                <span className="truncate">Your Doorstep</span>
+                <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
               </div>
-              <p className="text-sm font-bold text-white truncate">
-                {data?.order?.patientName || "Delivery Location"}
+              <p className="text-xs sm:text-sm font-bold text-white truncate">
+                {data?.order?.patientName || "Doorstep"}
               </p>
-              <p className="text-[11px] text-slate-400 truncate mt-0.5">{patientAddress}</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate mt-0.5">{patientAddress}</p>
             </div>
           </div>
 

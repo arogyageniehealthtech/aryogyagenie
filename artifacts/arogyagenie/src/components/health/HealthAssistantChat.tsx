@@ -721,7 +721,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
               </div>
 
               {/* 1-Click Helpline Numbers */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <a
                   href="tel:108"
                   className="p-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white flex items-center justify-between shadow-lg shadow-red-950/50 transition-transform active:scale-95"

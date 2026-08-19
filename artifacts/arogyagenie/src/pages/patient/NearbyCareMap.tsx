@@ -545,11 +545,11 @@ export function NearbyCareMap() {
         </div>
 
         {/* ── Main Discovery Area (List + Map) ─────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-280px)] min-h-[500px]">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[560px] lg:h-[calc(100vh-280px)]">
           {/* Provider List Column */}
           <div
             ref={cardListRef}
-            className="lg:col-span-5 h-full overflow-y-auto pr-1 space-y-3"
+            className="lg:col-span-5 max-h-[380px] lg:max-h-full overflow-y-auto pr-1 space-y-3"
           >
             {loading ? (
               <div className="space-y-3">
@@ -719,7 +719,7 @@ export function NearbyCareMap() {
           </div>
 
           {/* Interactive Google Map Column */}
-          <div className="lg:col-span-7 h-full">
+          <div className="lg:col-span-7 h-[360px] sm:h-[450px] lg:h-full">
             <GoogleMapView
               userLoc={userLoc}
               radiusKm={radiusKm}
@@ -727,7 +727,7 @@ export function NearbyCareMap() {
               selectedId={selectedId}
               onSelectProvider={handleSelectProvider}
               onMapClick={handleMapClick}
-              className="w-full h-full min-h-[450px]"
+              className="w-full h-full min-h-[360px] sm:min-h-[450px] lg:min-h-[450px]"
             />
           </div>
         </div>

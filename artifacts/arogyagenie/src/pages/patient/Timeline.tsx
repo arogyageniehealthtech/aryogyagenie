@@ -126,7 +126,7 @@ export function PatientTimeline() {
           </div>
         ) : (
           <div 
-            className="relative border-l-2 ml-4 md:ml-6 space-y-6 pb-8 mt-6"
+            className="relative border-l-2 ml-3.5 sm:ml-4 md:ml-6 space-y-6 pb-8 mt-6"
             style={{ borderColor: "hsl(243,75%,92%)" }}
           >
             {timelineEvents?.map((event) => {
@@ -141,7 +141,7 @@ export function PatientTimeline() {
                 : "";
 
               return (
-                <div key={event.id} className="relative pl-8 md:pl-10 group">
+                <div key={event.id} className="relative pl-6 sm:pl-8 md:pl-10 group">
                   {/* Timeline Circle Icon Node */}
                   <div
                     className="absolute -left-[19px] top-1.5 h-9 w-9 rounded-2xl flex items-center justify-center text-white shadow-xs border-2 border-white shrink-0 group-hover:scale-105 transition-transform"

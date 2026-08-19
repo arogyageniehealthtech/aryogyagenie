@@ -267,19 +267,19 @@ export function Onboarding() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 py-12">
       <div className="w-full max-w-2xl bg-card rounded-2xl shadow-xl border border-blue-100 overflow-hidden">
-        <div className="bg-primary p-8 text-white text-center">
+        <div className="bg-primary p-6 sm:p-8 text-white text-center">
           <img
             src={`${basePath}/logo.png`}
             alt="ArogyaGenie Logo"
-            className="h-16 w-16 mx-auto mb-4 bg-white rounded-full p-2"
+            className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-3 sm:mb-4 bg-white rounded-full p-2"
           />
-          <h1 className="text-2xl font-bold mb-2">Welcome to ArogyaGenie</h1>
-          <p className="text-primary-foreground/80">Select your role to register your account.</p>
+          <h1 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">Welcome to ArogyaGenie</h1>
+          <p className="text-xs sm:text-sm text-primary-foreground/80">Select your role to register your account.</p>
         </div>
 
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
           {submittedMessage ? (
-            <div className="py-8 px-4 text-center space-y-6">
+            <div className="py-8 px-2 sm:px-4 text-center space-y-6">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 border border-amber-200">
                 <Clock className="h-10 w-10 text-amber-500 animate-pulse" />
               </div>
@@ -295,7 +295,7 @@ export function Onboarding() {
               </div>
               <div className="pt-4">
                 <Button
-                  className="bg-primary text-white px-8 h-11"
+                  className="bg-primary text-white px-8 h-11 w-full sm:w-auto"
                   onClick={() => setLocation("/provider-status")}
                 >
                   View Application Status
@@ -304,7 +304,7 @@ export function Onboarding() {
             </div>
           ) : (
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
                 {/* Role selector */}
                 <FormField
                   control={form.control}
@@ -316,15 +316,15 @@ export function Onboarding() {
                         <RadioGroup
                           onValueChange={field.onChange}
                           defaultValue={field.value}
-                          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                          className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"
                         >
                           <FormItem>
                             <FormControl>
                               <RadioGroupItem value="patient" className="peer sr-only" />
                             </FormControl>
-                            <FormLabel className="flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer hover:bg-slate-50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-blue-50/50 transition-all">
-                              <User className="h-8 w-8 mb-2 text-slate-500 peer-data-[state=checked]:text-primary" />
-                              <span className="font-semibold text-foreground">Patient</span>
+                            <FormLabel className="flex flex-col items-center justify-center p-4 sm:p-6 border-2 rounded-xl cursor-pointer hover:bg-slate-50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-blue-50/50 transition-all">
+                              <User className="h-7 w-7 sm:h-8 sm:w-8 mb-2 text-slate-500 peer-data-[state=checked]:text-primary" />
+                              <span className="font-semibold text-foreground text-sm sm:text-base">Patient</span>
                             </FormLabel>
                           </FormItem>
 
@@ -332,9 +332,9 @@ export function Onboarding() {
                             <FormControl>
                               <RadioGroupItem value="doctor" className="peer sr-only" />
                             </FormControl>
-                            <FormLabel className="flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer hover:bg-slate-50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-blue-50/50 transition-all">
-                              <Stethoscope className="h-8 w-8 mb-2 text-slate-500 peer-data-[state=checked]:text-primary" />
-                              <span className="font-semibold text-foreground">Doctor</span>
+                            <FormLabel className="flex flex-col items-center justify-center p-4 sm:p-6 border-2 rounded-xl cursor-pointer hover:bg-slate-50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-blue-50/50 transition-all">
+                              <Stethoscope className="h-7 w-7 sm:h-8 sm:w-8 mb-2 text-slate-500 peer-data-[state=checked]:text-primary" />
+                              <span className="font-semibold text-foreground text-sm sm:text-base">Doctor</span>
                             </FormLabel>
                           </FormItem>
 
@@ -342,9 +342,9 @@ export function Onboarding() {
                             <FormControl>
                               <RadioGroupItem value="diagnostic_center" className="peer sr-only" />
                             </FormControl>
-                            <FormLabel className="flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer hover:bg-slate-50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-blue-50/50 transition-all">
-                              <TestTube className="h-8 w-8 mb-2 text-slate-500 peer-data-[state=checked]:text-primary" />
-                              <span className="font-semibold text-foreground text-center">Diagnostic Center</span>
+                            <FormLabel className="flex flex-col items-center justify-center p-4 sm:p-6 border-2 rounded-xl cursor-pointer hover:bg-slate-50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-blue-50/50 transition-all">
+                              <TestTube className="h-7 w-7 sm:h-8 sm:w-8 mb-2 text-slate-500 peer-data-[state=checked]:text-primary" />
+                              <span className="font-semibold text-foreground text-sm sm:text-base text-center">Diagnostic Center</span>
                             </FormLabel>
                           </FormItem>
 
@@ -352,9 +352,9 @@ export function Onboarding() {
                             <FormControl>
                               <RadioGroupItem value="pharmacy" className="peer sr-only" />
                             </FormControl>
-                            <FormLabel className="flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer hover:bg-slate-50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-blue-50/50 transition-all">
-                              <Pill className="h-8 w-8 mb-2 text-slate-500 peer-data-[state=checked]:text-primary" />
-                              <span className="font-semibold text-foreground">Pharmacy</span>
+                            <FormLabel className="flex flex-col items-center justify-center p-4 sm:p-6 border-2 rounded-xl cursor-pointer hover:bg-slate-50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-blue-50/50 transition-all">
+                              <Pill className="h-7 w-7 sm:h-8 sm:w-8 mb-2 text-slate-500 peer-data-[state=checked]:text-primary" />
+                              <span className="font-semibold text-foreground text-sm sm:text-base">Pharmacy</span>
                             </FormLabel>
                           </FormItem>
                         </RadioGroup>

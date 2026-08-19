@@ -244,7 +244,7 @@ export function PatientAppointments() {
                       )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <FormField
                         control={form.control}
                         name="appointmentDate"
@@ -315,11 +315,11 @@ export function PatientAppointments() {
                       )}
                     />
 
-                    <div className="pt-3 flex justify-end gap-3">
+                    <div className="pt-3 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
                       <Button
                         type="button"
                         variant="outline"
-                        className="rounded-xl h-11 px-5 font-semibold"
+                        className="rounded-xl h-11 px-5 font-semibold w-full sm:w-auto"
                         onClick={() => setIsOpen(false)}
                       >
                         Cancel
@@ -327,7 +327,7 @@ export function PatientAppointments() {
                       <Button
                         type="submit"
                         disabled={createAppointment.isPending}
-                        className="rounded-xl h-11 px-6 font-bold shadow-md"
+                        className="rounded-xl h-11 px-6 font-bold shadow-md w-full sm:w-auto"
                         style={{
                           background: "linear-gradient(135deg, #6C63FF 0%, #4D44DB 100%)",
                           color: "white",

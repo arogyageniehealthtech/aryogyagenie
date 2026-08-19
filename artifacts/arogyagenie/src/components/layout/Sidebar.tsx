@@ -22,7 +22,12 @@ function getRoleLabel(role?: string | null): string {
   return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void;
+  className?: string;
+}
+
+export function Sidebar({ onNavigate, className = "" }: SidebarProps = {}) {
   const [location] = useLocation();
   const { signOut } = useClerk();
   const { data: user } = useGetMe();
@@ -95,7 +100,7 @@ export function Sidebar() {
 
   return (
     <div
-      className="w-64 flex flex-col h-full shrink-0 overflow-hidden"
+      className={`w-64 flex flex-col h-full shrink-0 overflow-hidden ${className}`}
       style={{
         background: "linear-gradient(180deg, #18103A 0%, #120A2D 50%, #0E0724 100%)",
         borderRight: "1px solid rgba(255,255,255,0.06)",
@@ -142,6 +147,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => onNavigate?.()}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
               style={
                 isActive

@@ -106,9 +106,9 @@ export function AdminUsersPage() {
                     <div className="h-10 w-10 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center font-bold text-sm">
                       {u.firstName ? u.firstName[0] : u.email[0].toUpperCase()}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-900">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="font-bold text-slate-900 truncate">
                           {u.firstName || u.lastName ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : u.email}
                         </h4>
                         <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold uppercase">
@@ -126,13 +126,13 @@ export function AdminUsersPage() {
                           {u.status}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5 break-all">
                         ID: #{u.id} • Email: {u.email} • Joined: {new Date(u.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     {u.status !== "active" && (
                       <Button
                         size="sm"

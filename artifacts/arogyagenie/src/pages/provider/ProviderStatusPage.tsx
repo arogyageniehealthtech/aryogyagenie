@@ -47,12 +47,12 @@ export function ProviderStatusPage() {
         </div>
 
         <Card className="border-blue-100 shadow-xl overflow-hidden">
-          <CardHeader className={`p-8 text-center ${isRejected ? "bg-red-50 text-red-900 border-b border-red-100" : "bg-blue-50/70 text-blue-900 border-b border-blue-100"}`}>
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+          <CardHeader className={`p-6 sm:p-8 text-center ${isRejected ? "bg-red-50 text-red-900 border-b border-red-100" : "bg-blue-50/70 text-blue-900 border-b border-blue-100"}`}>
+            <div className="mx-auto mb-3 sm:mb-4 flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-white shadow-sm">
               {isRejected ? (
-                <AlertCircle className="h-10 w-10 text-red-600" />
+                <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 text-red-600" />
               ) : (
-                <Clock className="h-10 w-10 text-amber-500 animate-pulse" />
+                <Clock className="h-8 w-8 sm:h-10 sm:w-10 text-amber-500 animate-pulse" />
               )}
             </div>
             <div className="flex justify-center mb-2">
@@ -60,21 +60,21 @@ export function ProviderStatusPage() {
                 {isRejected ? "Application Rejected" : "Application Pending Approval"}
               </Badge>
             </div>
-            <CardTitle className="text-2xl font-bold">
+            <CardTitle className="text-xl sm:text-2xl font-bold">
               {isRejected ? "Application Not Approved" : "Approval Pending"}
             </CardTitle>
-            <CardDescription className="text-sm mt-2 font-medium max-w-md mx-auto">
+            <CardDescription className="text-xs sm:text-sm mt-2 font-medium max-w-md mx-auto">
               {isRejected
                 ? "Your application to join ArogyaGenie as a provider was not approved at this time."
                 : "Application submitted successfully. Our team will review your details and contact you shortly. Portal access will be provided after approval."}
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="p-8 space-y-6">
+          <CardContent className="p-4 sm:p-8 space-y-4 sm:space-y-6">
             {/* Application Summary Box */}
-            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200/80 space-y-3">
-              <h4 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Application Summary</h4>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200/80 space-y-3">
+              <h4 className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">Application Summary</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs sm:text-sm">
                 <div>
                   <span className="text-slate-500 block text-xs">Provider Type</span>
                   <span className="font-semibold text-slate-800">{typeDisplay}</span>

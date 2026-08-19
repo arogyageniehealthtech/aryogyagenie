@@ -21,21 +21,21 @@ export function AdminSettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-3 text-sm text-slate-700">
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 border-b gap-1 sm:gap-0">
               <span className="text-slate-500">Primary Provider:</span>
               <span className="font-semibold text-slate-900">Local Ollama REST API (llama3:8b)</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 border-b gap-1 sm:gap-0">
               <span className="text-slate-500">Timeout Limit:</span>
               <span className="font-mono text-slate-900">15,000 ms</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 border-b gap-1 sm:gap-0">
               <span className="text-slate-500">Emergency Redirection Bypasses:</span>
-              <Badge variant="default" className="bg-green-600">Active</Badge>
+              <Badge variant="default" className="bg-green-600 self-start sm:self-auto">Active</Badge>
             </div>
-            <div className="flex justify-between items-center py-2">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 gap-1 sm:gap-0">
               <span className="text-slate-500">Heuristic Engine Fallback:</span>
-              <Badge variant="default" className="bg-blue-600">Enabled</Badge>
+              <Badge variant="default" className="bg-blue-600 self-start sm:self-auto">Enabled</Badge>
             </div>
           </CardContent>
         </Card>
@@ -49,15 +49,15 @@ export function AdminSettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-3 text-sm text-slate-700">
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 border-b gap-1 sm:gap-0">
               <span className="text-slate-500">Authentication Provider:</span>
               <span className="font-semibold text-slate-900">Clerk Auth (JIT Sync Middleware)</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 border-b gap-1 sm:gap-0">
               <span className="text-slate-500">Database Engine:</span>
               <span className="font-semibold text-slate-900">PostgreSQL (Drizzle ORM)</span>
             </div>
-            <div className="flex justify-between items-center py-2">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 gap-1 sm:gap-0">
               <span className="text-slate-500">API Standard:</span>
               <span className="font-semibold text-slate-900">OpenAPI 3.0 + Zod + Orval</span>
             </div>

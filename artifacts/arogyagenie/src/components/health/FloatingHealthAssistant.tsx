@@ -57,7 +57,7 @@ export function FloatingHealthAssistant() {
               damping: 28,
               mass: 0.9,
             }}
-            className="fixed bottom-20 sm:bottom-24 right-2 sm:right-6 z-50 w-[720px] max-w-[calc(100vw-1rem)] h-[640px] max-h-[calc(100vh-6.5rem)] bg-[#07091d] rounded-3xl overflow-hidden flex flex-col border border-indigo-500/30"
+            className="fixed bottom-16 sm:bottom-24 right-2 sm:right-6 left-2 sm:left-auto z-50 w-auto sm:w-[500px] md:w-[680px] lg:w-[720px] max-w-[calc(100vw-1rem)] h-[580px] sm:h-[640px] max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-6.5rem)] bg-[#07091d] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col border border-indigo-500/30"
             style={{
               boxShadow:
                 "0 30px 90px -15px rgba(59, 63, 191, 0.45), 0 10px 30px -10px rgba(15, 23, 42, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.25)",

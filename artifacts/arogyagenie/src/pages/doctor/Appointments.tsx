@@ -97,11 +97,11 @@ export function DoctorAppointments() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 w-full md:w-auto">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-2 flex-1 sm:flex-initial">
                   <Filter className="h-4 w-4 text-slate-400 shrink-0" />
                   <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-full sm:w-[150px]">
                       <SelectValue placeholder="All Statuses" />
                     </SelectTrigger>
                     <SelectContent>
@@ -114,13 +114,13 @@ export function DoctorAppointments() {
                   </Select>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-1 sm:flex-initial">
                   <CalendarIcon className="h-4 w-4 text-slate-400 shrink-0" />
                   <Input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-[160px]"
+                    className="w-full sm:w-[160px]"
                   />
                   {selectedDate && (
                     <Button variant="ghost" size="sm" onClick={() => setSelectedDate("")} className="text-xs">

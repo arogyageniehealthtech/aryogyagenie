@@ -53,8 +53,8 @@ export function AdminAppointmentsPage() {
             {appointments?.map((apt) => (
               <Card key={apt.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 text-lg">Appointment #{apt.id}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-slate-900 text-base sm:text-lg">Appointment #{apt.id}</span>
                     <span
                       className={`text-xs px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
                         apt.status === "confirmed"

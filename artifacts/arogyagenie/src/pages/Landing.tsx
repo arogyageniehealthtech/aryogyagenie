@@ -8,47 +8,47 @@ export function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
       {/* Navigation */}
-      <nav className="flex items-center justify-between px-6 lg:px-12 py-6 border-b border-border/40 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <img src={`${basePath}/logo.png`} alt="ArogyaGenie Logo" className="h-10 w-10 object-contain" />
-          <span className="font-bold text-2xl tracking-tight text-primary">ArogyaGenie</span>
+      <nav className="flex items-center justify-between px-4 sm:px-6 lg:px-12 py-4 sm:py-6 border-b border-border/40 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <img src={`${basePath}/logo.png`} alt="ArogyaGenie Logo" className="h-8 w-8 sm:h-10 sm:w-10 object-contain" />
+          <span className="font-bold text-xl sm:text-2xl tracking-tight text-primary">ArogyaGenie</span>
         </div>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
           <a href="#features" className="hover:text-primary transition-colors">Features</a>
           <a href="#roles" className="hover:text-primary transition-colors">Who is it for?</a>
           <a href="#security" className="hover:text-primary transition-colors">Security</a>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link href="/sign-in">
-            <Button variant="ghost" className="text-slate-600 hover:text-primary">Sign In</Button>
+            <Button variant="ghost" size="sm" className="text-slate-600 hover:text-primary text-xs sm:text-sm px-2.5 sm:px-4">Sign In</Button>
           </Link>
           <Link href="/sign-up">
-            <Button className="bg-primary hover:bg-primary-dark text-white rounded-full px-6">Get Started</Button>
+            <Button size="sm" className="bg-primary hover:bg-primary-dark text-white rounded-full px-3.5 sm:px-6 text-xs sm:text-sm">Get Started</Button>
           </Link>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="px-6 lg:px-12 py-20 lg:py-32 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        <div className="space-y-8 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-primary text-sm font-medium">
+      <section className="px-4 sm:px-6 lg:px-12 py-10 sm:py-20 lg:py-32 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
+        <div className="space-y-6 sm:space-y-8 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-primary text-xs sm:text-sm font-medium">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
             </span>
             India's AI-Powered Health Companion
           </div>
-          <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.1]">
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.15] sm:leading-[1.1]">
             Healthcare, <br />
             <span className="text-primary">intelligently connected.</span>
           </h1>
-          <p className="text-lg text-slate-600 leading-relaxed">
+          <p className="text-sm sm:text-lg text-slate-600 leading-relaxed">
             ArogyaGenie brings patients, doctors, diagnostic centers, and pharmacies together on one unified, AI-driven platform. Trustworthy, secure, and designed for you.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row gap-4 pt-2 sm:pt-4">
             <Link href="/sign-up">
-              <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white rounded-full h-14 px-8 text-lg">
-                Join ArogyaGenie <ArrowRight className="ml-2 h-5 w-5" />
+              <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white rounded-full h-12 sm:h-14 px-6 sm:px-8 text-sm sm:text-lg">
+                Join ArogyaGenie <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
             </Link>
           </div>
@@ -64,8 +64,8 @@ export function Landing() {
       </section>
 
       {/* Stats / Trust */}
-      <section className="bg-primary text-primary-foreground py-16 px-6 lg:px-12">
-        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      <section className="bg-primary text-primary-foreground py-12 sm:py-16 px-4 sm:px-6 lg:px-12">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center">
           <div className="space-y-2">
             <h3 className="text-4xl font-bold">1M+</h3>
             <p className="text-blue-100 font-medium">Patients</p>

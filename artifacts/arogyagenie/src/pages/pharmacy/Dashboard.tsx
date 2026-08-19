@@ -445,7 +445,7 @@ export function PharmacyDashboard() {
           <button
             type="button"
             onClick={() => setActiveTab("inquiries")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               activeTab === "inquiries"
                 ? "bg-amber-500 text-slate-950 shadow-xs"
                 : "text-slate-600 hover:text-slate-950 hover:bg-slate-200/50"
@@ -458,7 +458,7 @@ export function PharmacyDashboard() {
           <button
             type="button"
             onClick={() => setActiveTab("deliveries")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               activeTab === "deliveries"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-950 hover:bg-slate-200/50"
@@ -471,7 +471,7 @@ export function PharmacyDashboard() {
           <button
             type="button"
             onClick={() => setActiveTab("inventory")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               activeTab === "inventory"
                 ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-950 hover:bg-slate-200/50"
@@ -484,7 +484,7 @@ export function PharmacyDashboard() {
           <button
             type="button"
             onClick={() => setActiveTab("prescriptions")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               activeTab === "prescriptions"
                 ? "bg-purple-600 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-950 hover:bg-slate-200/50"

@@ -206,7 +206,7 @@ export function PatientDashboard() {
 
         {/* ── Welcome Hero & Health Score Banner ─────────────────────────────── */}
         <div
-          className="relative rounded-3xl overflow-hidden p-6 lg:p-8 text-white"
+          className="relative rounded-3xl overflow-hidden p-4 sm:p-6 lg:p-8 text-white"
           style={{
             background: "linear-gradient(135deg, #18103A 0%, #20144F 50%, #2A1768 100%)",
             boxShadow: "0 10px 30px rgba(24, 16, 58, 0.4)",
@@ -219,30 +219,30 @@ export function PatientDashboard() {
           <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
             
             {/* Left Col: Greeting & Quick Actions */}
-            <div className="lg:col-span-7 space-y-4">
+            <div className="lg:col-span-7 space-y-3 sm:space-y-4">
               <p className="text-xs font-semibold tracking-wider uppercase text-violet-300/70">
                 {dateStr}
               </p>
-              <h1 className="text-3xl font-extrabold tracking-tight text-white">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                 Good Morning, {firstName} 👋
               </h1>
-              <p className="text-sm text-violet-200/80 leading-relaxed max-w-xl">
+              <p className="text-xs sm:text-sm text-violet-200/80 leading-relaxed max-w-xl">
                 Here is your health overview, live vitals tracking, and longitudinal AI medical insights.
               </p>
 
               {/* Quick Actions */}
-              <div className="flex flex-wrap gap-2.5 pt-2">
+              <div className="flex flex-wrap gap-2 sm:gap-2.5 pt-1 sm:pt-2">
                 <QuickAction label="Book Visit" icon={Calendar} href="/patient/appointments" color="purple" />
                 <QuickAction label="Find Doctor" icon={Stethoscope} href="/patient/doctors" color="blue" />
                 <QuickAction label="Book Test" icon={TestTube} href="/patient/diagnostic-bookings" color="orange" />
               </div>
             </div>
 
-            {/* Right Col: Health Score Ring Widget (Matching reference screenshot) */}
-            <div className="lg:col-span-5 flex justify-center lg:justify-end">
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/15 flex items-center gap-5 shadow-xl w-full max-w-xs">
+            {/* Right Col: Health Score Ring Widget */}
+            <div className="lg:col-span-5 flex justify-center lg:justify-end w-full">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 flex items-center gap-4 sm:gap-5 shadow-xl w-full max-w-xs">
                 {/* Gauge Ring SVG */}
-                <div className="relative h-24 w-24 shrink-0 flex items-center justify-center">
+                <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 flex items-center justify-center">
                   <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                     <path
                       className="text-white/10"
@@ -327,7 +327,7 @@ export function PatientDashboard() {
                 type="button"
                 id="explore-arogyagenie-ai-btn"
                 onClick={() => window.dispatchEvent(new CustomEvent("open-ai-assistant"))}
-                className="group/btn relative inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white shrink-0 cursor-pointer overflow-hidden transition-all duration-200 ease-out hover:-translate-y-0.5 hover:translate-x-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 shadow-md hover:shadow-[0_6px_20px_rgba(6,182,212,0.4)]"
+                className="group/btn relative inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white w-full sm:w-auto shrink-0 cursor-pointer overflow-hidden transition-all duration-200 ease-out hover:-translate-y-0.5 hover:translate-x-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 shadow-md hover:shadow-[0_6px_20px_rgba(6,182,212,0.4)]"
                 style={{
                   background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 50%, #06B6D4 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.35)",
@@ -343,8 +343,8 @@ export function PatientDashboard() {
             </div>
           </div>
 
-          {/* Bottom Vitals Strip (Matching reference screenshot) */}
-          <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Bottom Vitals Strip */}
+          <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg bg-red-500/20 border border-red-400/30 flex items-center justify-center text-red-400 shrink-0">
                 <Activity className="h-4 w-4" />
@@ -399,7 +399,7 @@ export function PatientDashboard() {
         {/* ── Stat Cards ───────────────────────────────────────────────────── */}
         <div>
           <SectionHeading title="Health Overview" subtitle="Your key health metrics at a glance" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
 
             {statCards.map((card) => (
               <StatCard key={card.label} {...card} />

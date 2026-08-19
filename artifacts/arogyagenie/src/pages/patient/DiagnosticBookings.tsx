@@ -319,7 +319,7 @@ export function PatientDiagnosticBookings() {
           </div>
 
           {/* Quick Metrics */}
-          <div className="grid grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/10">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mt-6 pt-6 border-t border-white/10">
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 text-center">
               <div className="text-2xl font-bold">{totalCount}</div>
               <div className="text-[11px] font-medium text-violet-200/80 uppercase tracking-wider">Total Tests</div>

@@ -468,10 +468,10 @@ export function PatientDoctors() {
             </div>
 
             {/* Split List & Google Map View */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[560px]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[560px] lg:h-[560px]">
               {/* Doctor / Lab List Column */}
-              <div className="lg:col-span-5 h-full overflow-y-auto pr-1 space-y-3">
-                <div className="p-3 border-b border-slate-100 bg-white rounded-xl flex items-center justify-between shadow-2xs">
+              <div className="lg:col-span-5 max-h-[380px] lg:max-h-full overflow-y-auto pr-1 space-y-3">
+                <div className="p-3 border-b border-slate-100 bg-white rounded-xl flex items-center justify-between shadow-2xs sticky top-0 z-10">
                   <p className="text-xs font-bold text-slate-700">
                     Providers within {radiusKm} km ({nearbyDocs.length})
                   </p>
@@ -613,7 +613,7 @@ export function PatientDoctors() {
               </div>
 
               {/* Google Map Column */}
-              <div className="lg:col-span-7 h-full">
+              <div className="lg:col-span-7 h-[360px] sm:h-[450px] lg:h-full">
                 <GoogleMapView
                   userLoc={userLoc}
                   radiusKm={radiusKm}
@@ -621,7 +621,7 @@ export function PatientDoctors() {
                   selectedId={selectedDocId}
                   onSelectProvider={handleSelectDoctor}
                   onMapClick={handleMapClick}
-                  className="w-full h-full min-h-[500px]"
+                  className="w-full h-full min-h-[360px] sm:min-h-[450px] lg:min-h-[500px]"
                 />
               </div>
             </div>

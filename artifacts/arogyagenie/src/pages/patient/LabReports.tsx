@@ -199,11 +199,11 @@ export function PatientLabReports() {
                       </FormItem>
                     )}
                   />
-                  <div className="pt-2 flex justify-end gap-3">
+                  <div className="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
                     <Button
                       type="button"
                       variant="outline"
-                      className="rounded-xl"
+                      className="rounded-xl w-full sm:w-auto"
                       onClick={() => setIsOpen(false)}
                     >
                       Cancel
@@ -211,7 +211,7 @@ export function PatientLabReports() {
                     <Button
                       type="submit"
                       disabled={createReport.isPending}
-                      className="rounded-xl gap-2"
+                      className="rounded-xl gap-2 w-full sm:w-auto"
                       style={{
                         background: "linear-gradient(135deg, hsl(243,75%,59%), hsl(260,70%,58%))",
                         border: "none",

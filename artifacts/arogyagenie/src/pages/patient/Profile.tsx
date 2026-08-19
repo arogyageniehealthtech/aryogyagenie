@@ -137,15 +137,15 @@ export function PatientProfile() {
             >
               {initials}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-slate-900">{fullName}</h2>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 truncate">{fullName}</h2>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-200">
                   <ShieldCheck className="h-3 w-3 text-violet-600" /> Premium Member
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5 text-slate-400" />
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 break-all">
+                <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 {user?.email || "patient@arogyagenie.com"}
               </p>
             </div>
