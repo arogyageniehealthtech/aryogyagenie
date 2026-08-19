@@ -357,10 +357,10 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
 
     const scene = new THREE.Scene();
     
-    // Elevated camera looking slightly down to clearly reveal the rich circular platform
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-    camera.position.set(0, 0.85, 6.2);
-    camera.lookAt(0, 0.05, 0);
+    // 40-degree top-down elevated perspective camera
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+    camera.position.set(0, 2.8, 5.2);
+    camera.lookAt(0, -0.2, 0);
 
     // 2. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
@@ -610,7 +610,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     // =========================================================================
     const holoBaseGroup = new THREE.Group();
     holoBaseGroup.position.set(0, -1.35, 0);
-    holoBaseGroup.rotation.x = Math.PI / 2.75; // ~22 deg top-down angle revealing complete HUD surface
+    holoBaseGroup.rotation.x = Math.PI / 2.35; // 40-deg top-down angle revealing complete HUD surface
     botRoot.add(holoBaseGroup);
 
     // High-Resolution Procedural HUD Texture Disc (Plane geometry)
@@ -692,7 +692,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const leftCardMesh = new THREE.Mesh(leftCardGeo, leftCardMat);
     leftCardMesh.position.set(-1.18, -0.72, 0.38);
     leftCardMesh.rotation.y = 0.28;
-    leftCardMesh.rotation.x = -0.10;
+    leftCardMesh.rotation.x = -0.42; // Tilted toward 40 deg camera
     hudCardsGroup.add(leftCardMesh);
 
     // Right Floating Diagnostics Panel
@@ -709,7 +709,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const rightCardMesh = new THREE.Mesh(rightCardGeo, rightCardMat);
     rightCardMesh.position.set(1.18, -0.72, 0.38);
     rightCardMesh.rotation.y = -0.28;
-    rightCardMesh.rotation.x = -0.10;
+    rightCardMesh.rotation.x = -0.42; // Tilted toward 40 deg camera
     hudCardsGroup.add(rightCardMesh);
 
     // Layer 7: Upward-Floating Levitation Energy Embers
