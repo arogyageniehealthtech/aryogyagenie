@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { useGetDoctorProfile, useUpdateDoctorProfile, getGetDoctorProfileQueryKey } from "@workspace/api-client-react";
+import {
+  useGetDoctorProfile,
+  useUpdateDoctorProfile,
+  getGetDoctorProfileQueryKey,
+  getListDoctorsQueryKey,
+} from "@workspace/api-client-react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -184,6 +189,8 @@ export function DoctorProfile() {
             description: "Doctor profile settings and consultation availability updated successfully.",
           });
           queryClient.invalidateQueries({ queryKey: getGetDoctorProfileQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListDoctorsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["/api/doctors"] });
         },
         onError: (err) => {
           toast({
