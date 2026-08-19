@@ -342,49 +342,6 @@ export function PatientDashboard() {
 
             </div>
           </div>
-
-          {/* Bottom Vitals Strip */}
-          <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-red-500/20 border border-red-400/30 flex items-center justify-center text-red-400 shrink-0">
-                <Activity className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-[10px] text-violet-200/60 uppercase font-semibold">Heart Rate</p>
-                <p className="text-sm font-bold text-white">72 <span className="text-[10px] font-normal text-violet-200/60">bpm</span></p>
-              </div>
-            </div>
-
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
-                <Clock className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-[10px] text-violet-200/60 uppercase font-semibold">Sleep</p>
-                <p className="text-sm font-bold text-white">7h 30m</p>
-              </div>
-            </div>
-
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-300 shrink-0">
-                <Activity className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-[10px] text-violet-200/60 uppercase font-semibold">Steps</p>
-                <p className="text-sm font-bold text-white">7,842</p>
-              </div>
-            </div>
-
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-orange-500/20 border border-orange-400/30 flex items-center justify-center text-orange-300 shrink-0">
-                <FileText className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-[10px] text-violet-200/60 uppercase font-semibold">Calories</p>
-                <p className="text-sm font-bold text-white">1,650 <span className="text-[10px] font-normal text-violet-200/60">kcal</span></p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* ── Active 1-Click Medicine Deliveries & Pharmacy Acceptance Prompts ── */}
