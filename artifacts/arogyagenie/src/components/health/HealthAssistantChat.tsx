@@ -650,7 +650,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
           />
 
           {/* Real 3D Interactive WebGL Mascot Model with Hologram Platform */}
-          <div className="relative w-56 h-60 xl:w-60 xl:h-64 flex items-center justify-center mb-1">
+          <div className="relative w-60 h-64 xl:w-64 xl:h-72 flex items-center justify-center mb-1">
             <AarogyaBot3D className="w-full h-full" />
           </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 interface AarogyaBot3DProps {
@@ -7,6 +7,13 @@ interface AarogyaBot3DProps {
 
 export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isMotionActive, setIsMotionActive] = useState(true);
+  const isTrackingRef = useRef(true);
+
+  // Keep ref synchronized with state
+  useEffect(() => {
+    isTrackingRef.current = isMotionActive;
+  }, [isMotionActive]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -14,11 +21,12 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
 
     // 1. Scene & Camera
     const width = container.clientWidth || 240;
-    const height = container.clientHeight || 240;
+    const height = container.clientHeight || 260;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-    camera.position.set(0, 0.4, 4.8);
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
+    // Adjusted camera distance and position so the circular holographic base is prominently visible
+    camera.position.set(0, 0.05, 5.6);
 
     // 2. WebGL Renderer with Alpha & Antialiasing
     const renderer = new THREE.WebGLRenderer({
@@ -73,25 +81,21 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const holoCyanMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.85,
       side: THREE.DoubleSide,
     });
 
     const holoPurpleMat = new THREE.MeshBasicMaterial({
       color: 0xa855f7,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.75,
       side: THREE.DoubleSide,
-    });
-
-    const holoRingLineMat = new THREE.LineBasicMaterial({
-      color: 0x818cf8,
-      transparent: true,
-      opacity: 0.8,
     });
 
     // 4. Hierarchical Bot Construction
     const botRoot = new THREE.Group();
+    // Shift botRoot slightly upwards so the entire holographic base is in frame
+    botRoot.position.set(0, 0.22, 0);
     scene.add(botRoot);
 
     // --- Floating Body Group ---
@@ -259,22 +263,22 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
 
     // --- 5. Holographic Floor Platform (Concentric Glowing Rings) ---
     const holoBaseGroup = new THREE.Group();
-    holoBaseGroup.position.set(0, -1.55, 0);
-    holoBaseGroup.rotation.x = Math.PI / 2.35;
+    holoBaseGroup.position.set(0, -1.42, 0);
+    holoBaseGroup.rotation.x = Math.PI / 2.3;
     botRoot.add(holoBaseGroup);
 
     // Ring 1 (Outer Cyan Cyber Ring)
-    const ring1Geo = new THREE.TorusGeometry(1.65, 0.035, 16, 64);
+    const ring1Geo = new THREE.TorusGeometry(1.65, 0.038, 16, 64);
     const ring1Mesh = new THREE.Mesh(ring1Geo, holoCyanMat);
     holoBaseGroup.add(ring1Mesh);
 
     // Ring 2 (Middle Purple Ring)
-    const ring2Geo = new THREE.TorusGeometry(1.25, 0.03, 16, 64);
+    const ring2Geo = new THREE.TorusGeometry(1.25, 0.032, 16, 64);
     const ring2Mesh = new THREE.Mesh(ring2Geo, holoPurpleMat);
     holoBaseGroup.add(ring2Mesh);
 
     // Ring 3 (Inner Core Cyan Ring)
-    const ring3Geo = new THREE.TorusGeometry(0.8, 0.032, 16, 48);
+    const ring3Geo = new THREE.TorusGeometry(0.8, 0.035, 16, 48);
     const ring3Mesh = new THREE.Mesh(ring3Geo, holoCyanMat);
     holoBaseGroup.add(ring3Mesh);
 
@@ -283,7 +287,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const diskMat = new THREE.MeshBasicMaterial({
       color: 0x0ea5e9,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.18,
       side: THREE.DoubleSide,
     });
     const diskMesh = new THREE.Mesh(diskGeo, diskMat);
@@ -294,13 +298,13 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const holoBeamMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
-      opacity: 0.06,
+      opacity: 0.08,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
     });
     const holoBeam = new THREE.Mesh(holoBeamGeo, holoBeamMat);
     holoBeam.position.y = 0.9;
-    holoBeam.rotation.x = -Math.PI / 2.35;
+    holoBeam.rotation.x = -Math.PI / 2.3;
     holoBaseGroup.add(holoBeam);
 
     // Floating Hologram Particles around the base
@@ -317,9 +321,9 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePos, 3));
     const particleMat = new THREE.PointsMaterial({
       color: 0x38bdf8,
-      size: 0.05,
+      size: 0.055,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       blending: THREE.AdditiveBlending,
     });
     const particlePoints = new THREE.Points(particleGeo, particleMat);
@@ -352,6 +356,12 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     let currentRotX = 0;
 
     const handleMouseMove = (e: MouseEvent) => {
+      // Only track cursor if motion tracking is active
+      if (!isTrackingRef.current) {
+        targetRotY = 0;
+        targetRotX = 0;
+        return;
+      }
       const rect = container.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width - 0.5;
       const y = (e.clientY - rect.top) / rect.height - 0.5;
@@ -370,7 +380,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       const time = clock.getElapsedTime();
 
       // Smooth Hovering on Y Axis
-      botBodyGroup.position.y = Math.sin(time * 2.2) * 0.12;
+      botBodyGroup.position.y = Math.sin(time * 2.2) * 0.10;
 
       // Gentle wave animation on right arm
       armRGroup.rotation.z = Math.sin(time * 3.5) * 0.18 - 0.1;
@@ -390,7 +400,11 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       const bulbGlow = 0.85 + Math.sin(time * 3.0) * 0.25;
       purpleGlowMat.color.setRGB(0.75 * bulbGlow, 0.52 * bulbGlow, 0.98 * bulbGlow);
 
-      // Smooth Head Tracking towards cursor
+      // Smooth Head Tracking towards cursor (or return to center if paused)
+      if (!isTrackingRef.current) {
+        targetRotY = 0;
+        targetRotX = 0;
+      }
       currentRotY += (targetRotY - currentRotY) * 0.08;
       currentRotX += (targetRotX - currentRotX) * 0.08;
       botHeadGroup.rotation.y = currentRotY;
@@ -406,7 +420,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const handleResize = () => {
       if (!container) return;
       const newW = container.clientWidth || 240;
-      const newH = container.clientHeight || 240;
+      const newH = container.clientHeight || 260;
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
@@ -425,10 +439,24 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     };
   }, []);
 
+  const handleToggleMotion = () => {
+    setIsMotionActive((prev) => !prev);
+  };
+
   return (
     <div
-      ref={containerRef}
-      className={`w-full h-full flex items-center justify-center relative select-none pointer-events-auto cursor-grab active:cursor-grabbing ${className}`}
-    />
+      onClick={handleToggleMotion}
+      title={isMotionActive ? "Click to lock / pause cursor tracking" : "Click to resume cursor tracking"}
+      className="relative w-full h-full flex flex-col items-center justify-center cursor-pointer group select-none"
+    >
+      <div
+        ref={containerRef}
+        className={`w-full h-full flex items-center justify-center relative pointer-events-auto ${className}`}
+      />
+      {/* Subtle Interaction Pill Indicator below bot */}
+      <div className="absolute bottom-0 px-2.5 py-0.5 rounded-full bg-slate-900/80 border border-indigo-500/30 text-[10px] text-slate-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md shadow-lg pointer-events-none">
+        {isMotionActive ? "Click to lock gaze 🔒" : "Click to follow cursor 👀"}
+      </div>
+    </div>
   );
 }
