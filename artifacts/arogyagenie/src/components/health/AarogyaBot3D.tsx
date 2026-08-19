@@ -25,9 +25,10 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
 
     const scene = new THREE.Scene();
     
-    // Perspective camera with ideal FOV & distance so both top antennae and floor platform are 100% visible
-    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 1000);
-    camera.position.set(0, 0.15, 6.4);
+    // Perspective camera with elevated position looking down (~18-20 deg below eye level)
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
+    camera.position.set(0, 0.75, 6.2);
+    camera.lookAt(0, 0.05, 0);
 
     // 2. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
@@ -104,8 +105,8 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
 
     // 4. Hierarchical Bot Construction
     const botRoot = new THREE.Group();
-    // Centered cleanly in frame
-    botRoot.position.set(0, 0.08, 0);
+    // Lowered slightly to provide ample headroom for the top horns/antennae
+    botRoot.position.set(0, -0.15, 0);
     scene.add(botRoot);
 
     // --- Floating Robot Body Group ---
@@ -286,7 +287,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     // =========================================================================
     const holoBaseGroup = new THREE.Group();
     holoBaseGroup.position.set(0, -1.35, 0);
-    holoBaseGroup.rotation.x = Math.PI / 2.4; // Realistic isometric perspective tilt
+    holoBaseGroup.rotation.x = Math.PI / 2.85; // ~20 deg below eye level perspective tilt
     botRoot.add(holoBaseGroup);
 
     // Layer 1: Outermost Cyan Glowing Perimeter Ring
