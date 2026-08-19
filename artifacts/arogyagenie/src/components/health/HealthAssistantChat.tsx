@@ -245,6 +245,8 @@ function CyberMedicalChatBackground() {
   );
 }
 
+import { AarogyaBot3D } from "./AarogyaBot3D";
+
 // Glowing Isolated Vector Robot Head Icon for header and message bubbles
 function GlowingBotAvatar({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   const dim = size === "sm" ? "w-7 h-7" : size === "lg" ? "w-11 h-11" : "w-8 h-8";
@@ -640,34 +642,16 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
       {/* ── MAIN WORKSPACE BODY (2 Columns: Left AI Mascot / Right Chat) ──── */}
       <div className="flex-1 flex min-h-0 overflow-hidden relative z-10">
         {/* ── Left AI Companion Brand Pane (Desktop view) ────────────────── */}
-        <aside className="hidden lg:flex flex-col items-center justify-center w-64 xl:w-72 shrink-0 p-5 border-r border-indigo-950/60 bg-[#06081a]/40 backdrop-blur-md relative overflow-hidden">
-          {/* Ambient Cyber-Medical Glow behind mascot */}
+        <aside className="hidden lg:flex flex-col items-center justify-center w-64 xl:w-72 shrink-0 p-5 border-r border-indigo-950/60 bg-[#06081a]/50 backdrop-blur-md relative overflow-hidden">
+          {/* Cyber-Medical DNA & Neural Vital Background Atmosphere */}
           <div
-            className="absolute top-1/4 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full blur-[40px] pointer-events-none"
+            className="absolute top-1/4 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full blur-[50px] pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(56,189,248,0.25) 0%, rgba(168,85,247,0.20) 60%, transparent 85%)" }}
           />
 
-          {/* 3D Mascot Image seamlessly blended without any background box */}
-          <div className="relative w-52 h-52 xl:w-56 xl:h-56 flex items-center justify-center mb-3">
-            <motion.img
-              src="/assets/arogyagenie-ai-robot.png"
-              alt="AarogyaGenie AI Robot"
-              animate={{
-                y: [-5, 5, -5],
-              }}
-              transition={{
-                duration: 3.8,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              style={{
-                mixBlendMode: "screen",
-                WebkitMaskImage: "radial-gradient(circle at 50% 50%, black 75%, transparent 98%)",
-                maskImage: "radial-gradient(circle at 50% 50%, black 75%, transparent 98%)",
-                filter: "drop-shadow(0 0 25px rgba(56,189,248,0.45)) drop-shadow(0 15px 35px rgba(168,85,247,0.4))",
-              }}
-              className="w-full h-full object-contain select-none pointer-events-none"
-            />
+          {/* Real 3D Interactive WebGL Mascot Model with Hologram Platform */}
+          <div className="relative w-56 h-60 xl:w-60 xl:h-64 flex items-center justify-center mb-1">
+            <AarogyaBot3D className="w-full h-full" />
           </div>
 
           {/* Mascot Label */}
@@ -1041,23 +1025,12 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                 </form>
               </div>
 
-              {/* ── FOOTER: MEDICAL DISCLAIMER & EMERGENCY SOS ──────────────── */}
-              <footer className="px-4 sm:px-6 py-2.5 border-t border-indigo-950/70 bg-[#040614]/95 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-[11px] text-slate-400 shrink-0">
-                <div className="flex items-center gap-2 text-center sm:text-left">
-                  <ShieldAlert className="h-4 w-4 text-purple-400 shrink-0 hidden sm:block" />
-                  <p className="leading-tight">
-                    Arogyagenie AI provides health information and guidance, not a diagnosis. For emergencies, contact emergency services or visit the nearest hospital.
-                  </p>
-                </div>
-
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setActiveNavTab("emergency")}
-                  className="h-7 px-3 rounded-full bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold text-xs shadow-md shrink-0 gap-1.5 border border-red-400/40 cursor-pointer"
-                >
-                  <Phone className="h-3 w-3" /> Emergency (SOS)
-                </Button>
+              {/* ── FOOTER: MEDICAL DISCLAIMER (Emergency SOS kept in sidebar) ── */}
+              <footer className="px-4 sm:px-6 py-2.5 border-t border-indigo-950/70 bg-[#040614]/95 flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center shrink-0">
+                <ShieldAlert className="h-4 w-4 text-purple-400 shrink-0" />
+                <p className="leading-tight">
+                  Arogyagenie AI provides health information and guidance, not a diagnosis. For emergencies, contact emergency services or visit the nearest hospital.
+                </p>
               </footer>
             </div>
           )}
