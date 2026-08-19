@@ -681,7 +681,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
           />
 
           {/* Real 3D Interactive WebGL Mascot Model with Hologram Platform */}
-          <div className="relative w-60 h-64 xl:w-64 xl:h-72 flex items-center justify-center mb-1">
+          <div className="relative w-64 h-72 xl:w-72 xl:h-80 flex items-center justify-center mb-1">
             <AarogyaBot3D className="w-full h-full" />
           </div>
 
@@ -763,7 +763,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                   {/* Mobile-Only Interactive 3D Bot Mascot Card */}
                   <div className="lg:hidden flex flex-col items-center justify-center p-2 rounded-3xl bg-[#080b26]/70 border border-indigo-500/30 relative overflow-hidden backdrop-blur-md shadow-lg">
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full blur-2xl bg-cyan-500/15 pointer-events-none" />
-                    <div className="relative w-48 h-52 sm:w-52 sm:h-56 flex items-center justify-center">
+                    <div className="relative w-56 h-64 sm:w-64 sm:h-72 flex items-center justify-center">
                       <AarogyaBot3D className="w-full h-full" />
                     </div>
                     <div className="text-center pb-1">
