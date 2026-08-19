@@ -349,27 +349,37 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     chestPointLight.position.set(0, 0, 1.2);
     scene.add(chestPointLight);
 
-    // 7. Interactive Mouse Tracking
+    // 7. Interactive Mouse / Touch Tracking
     let targetRotY = 0;
     let targetRotX = 0;
     let currentRotY = 0;
     let currentRotX = 0;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      // Only track cursor if motion tracking is active
-      if (!isTrackingRef.current) {
+    const handlePointerMove = (clientX: number, clientY: number) => {
+      if (!isTrackingRef.current || !container) {
         targetRotY = 0;
         targetRotX = 0;
         return;
       }
       const rect = container.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      const x = (clientX - rect.left) / (rect.width || 240) - 0.5;
+      const y = (clientY - rect.top) / (rect.height || 260) - 0.5;
       targetRotY = x * 0.65;
       targetRotX = y * 0.45;
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    const handleMouseMove = (e: MouseEvent) => {
+      handlePointerMove(e.clientX, e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
 
     // 8. Animation Render Loop
     let animationFrameId: number;
@@ -416,8 +426,8 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
 
     animate();
 
-    // 9. Resize Handling
-    const handleResize = () => {
+    // 9. Resize Handling via ResizeObserver & Window Resize
+    const updateSize = () => {
       if (!container) return;
       const newW = container.clientWidth || 240;
       const newH = container.clientHeight || 260;
@@ -426,11 +436,15 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       renderer.setSize(newW, newH);
     };
 
-    window.addEventListener("resize", handleResize);
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(container);
+    window.addEventListener("resize", updateSize);
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("resize", updateSize);
+      resizeObserver.disconnect();
       cancelAnimationFrame(animationFrameId);
       if (container && renderer.domElement) {
         container.removeChild(renderer.domElement);
@@ -446,16 +460,16 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
   return (
     <div
       onClick={handleToggleMotion}
-      title={isMotionActive ? "Click to lock / pause cursor tracking" : "Click to resume cursor tracking"}
-      className="relative w-full h-full flex flex-col items-center justify-center cursor-pointer group select-none"
+      title={isMotionActive ? "Click to lock / pause tracking" : "Click to resume tracking"}
+      className="relative w-full h-full flex flex-col items-center justify-center cursor-pointer group select-none min-h-[180px]"
     >
       <div
         ref={containerRef}
         className={`w-full h-full flex items-center justify-center relative pointer-events-auto ${className}`}
       />
-      {/* Subtle Interaction Pill Indicator below bot */}
+      {/* Interaction Pill Indicator below bot */}
       <div className="absolute bottom-0 px-2.5 py-0.5 rounded-full bg-slate-900/80 border border-indigo-500/30 text-[10px] text-slate-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md shadow-lg pointer-events-none">
-        {isMotionActive ? "Click to lock gaze 🔒" : "Click to follow cursor 👀"}
+        {isMotionActive ? "Tap to lock gaze 🔒" : "Tap to follow cursor 👀"}
       </div>
     </div>
   );

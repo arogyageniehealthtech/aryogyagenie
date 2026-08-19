@@ -599,13 +599,44 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                 <button
                   type="button"
                   onClick={() => {
+                    setActiveNavTab("symptoms");
+                    setOptionsMenuOpen(false);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-left text-slate-300 hover:text-white hover:bg-indigo-900/50 flex items-center gap-2"
+                >
+                  <Activity className="h-3.5 w-3.5 text-cyan-400" /> Symptom Checker
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveNavTab("health_tips");
+                    setOptionsMenuOpen(false);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-left text-slate-300 hover:text-white hover:bg-indigo-900/50 flex items-center gap-2"
+                >
+                  <Lightbulb className="h-3.5 w-3.5 text-amber-400" /> Health Insights
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveNavTab("emergency");
+                    setOptionsMenuOpen(false);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-left text-red-300 hover:text-red-200 hover:bg-red-950/50 flex items-center gap-2"
+                >
+                  <HeartPulse className="h-3.5 w-3.5 text-red-400" /> Emergency (SOS)
+                </button>
+                <div className="border-t border-indigo-950/80 my-1" />
+                <button
+                  type="button"
+                  onClick={() => {
                     setOptionsMenuOpen(false);
                     if (onClose) onClose();
                     setLocation("/patient/timeline");
                   }}
                   className="w-full px-3 py-2 rounded-xl text-left text-slate-300 hover:text-white hover:bg-indigo-900/50 flex items-center gap-2"
                 >
-                  <Activity className="h-3.5 w-3.5 text-cyan-400" /> Health Timeline
+                  <Activity className="h-3.5 w-3.5 text-indigo-400" /> Health Timeline
                 </button>
                 <button
                   type="button"
@@ -726,11 +757,27 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
           {activeNavTab === "chat" && (
             <div className="flex-1 flex flex-col min-h-0 relative">
               {/* Message Thread */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 scrollbar-thin scrollbar-thumb-indigo-900/60">
+              <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 sm:space-y-5 scrollbar-thin scrollbar-thumb-indigo-900/60">
                 {/* 1. Welcome Message & Quick Actions (Rendered as first item in thread) */}
                 <div className="space-y-4">
+                  {/* Mobile-Only Interactive 3D Bot Mascot Card */}
+                  <div className="lg:hidden flex flex-col items-center justify-center p-2 rounded-3xl bg-[#080b26]/70 border border-indigo-500/30 relative overflow-hidden backdrop-blur-md shadow-lg">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full blur-2xl bg-cyan-500/15 pointer-events-none" />
+                    <div className="relative w-48 h-52 sm:w-52 sm:h-56 flex items-center justify-center">
+                      <AarogyaBot3D className="w-full h-full" />
+                    </div>
+                    <div className="text-center pb-1">
+                      <h3 className="text-sm font-extrabold tracking-tight bg-gradient-to-r from-purple-300 via-indigo-200 to-cyan-300 bg-clip-text text-transparent">
+                        Arogyagenie <span className="text-purple-400">AI</span>
+                      </h3>
+                      <p className="text-[11px] text-slate-400 font-medium">
+                        Always here to help you with your health 💜
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Welcome Message Card (Reference Image 2) */}
-                  <div className="flex gap-3.5 max-w-[92%] sm:max-w-[85%]">
+                  <div className="flex gap-3.5 max-w-[95%] sm:max-w-[85%]">
                     <GlowingBotAvatar size="md" />
 
                     {/* Card Content */}
