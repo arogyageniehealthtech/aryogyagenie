@@ -25,7 +25,7 @@ import { inArray } from "drizzle-orm";
 import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
 
 import { parseCoordinates, clampRadiusKm, searchNearbyDoctors, resolveProviderCoordinates } from "../lib/locationService";
-import { getDoctorAvailableSlots, formatDateToYYYYMMDD, parseDoctorSchedule } from "../services/schedulingService";
+import { getDoctorAvailableSlots, formatDateToYYYYMMDD, parseDoctorSchedule, getDateNDaysAgo } from "../services/schedulingService";
 
 // GET /doctors - list approved doctors (with optional location-based radius filtering)
 router.get("/doctors", async (req, res): Promise<void> => {
@@ -288,6 +288,8 @@ router.get("/doctors/me/dashboard", requireAuth, requireRole(["doctor"]), async 
   if (!doctorRow) { res.status(404).json({ error: "Doctor not found" }); return; }
 
   const today = formatDateToYYYYMMDD(new Date());
+  const date90DaysAgo = getDateNDaysAgo(90);
+  const date1YearAgo = getDateNDaysAgo(365);
 
   const [allAppts, patients, prescriptions, user] = await Promise.all([
     db.select().from(appointmentsTable).where(eq(appointmentsTable.doctorId, doctorRow.id)),
@@ -304,49 +306,76 @@ router.get("/doctors/me/dashboard", requireAuth, requireRole(["doctor"]), async 
   const todayRemainingCount = todayScheduledAppts.filter((a) => a.status !== "completed").length;
 
   // 3. Pending Appointments: Unconfirmed requests waiting for doctor acceptance (all dates)
-  const pendingCount = allAppts.filter((a) => a.status === "pending").length;
+  const pendingList = allAppts
+    .filter((a) => a.status === "pending")
+    .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate) || a.appointmentTime.localeCompare(b.appointmentTime));
+  const pendingCount = pendingList.length;
 
   // 4. Completed Appointments: Total consultations completed
   const completedCount = allAppts.filter((a) => a.status === "completed").length;
 
-  // 5. Upcoming Appointments: Future date + confirmed by doctor
+  // 5. Upcoming Appointments: All future appointments confirmed by doctor (date > today && status === 'confirmed')
   const upcomingList = allAppts
     .filter((a) => a.appointmentDate > today && a.status === "confirmed")
     .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate) || a.appointmentTime.localeCompare(b.appointmentTime));
   const upcomingCount = upcomingList.length;
 
-  // 6. Total Prescriptions Issued: Direct from prescriptions table
+  // 6. Prescriptions Issued: Real prescription records calculation & intervals
+  const todayPrescriptionsCount = prescriptions.filter((p) => p.prescribedDate === today).length;
+  const last90DaysPrescriptionsCount = prescriptions.filter((p) => p.prescribedDate >= date90DaysAgo).length;
+  const last1YearPrescriptionsCount = prescriptions.filter((p) => p.prescribedDate >= date1YearAgo).length;
   const totalPrescriptionsCount = prescriptions.length;
 
-  // Consultations for dashboard display (today's active/pending/confirmed + upcoming)
-  const displayAppts = allAppts
-    .filter((a) => (a.appointmentDate === today || a.appointmentDate > today) && a.status !== "cancelled")
-    .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate) || a.appointmentTime.localeCompare(b.appointmentTime))
-    .slice(0, 10);
+  const prescriptionsSummary = {
+    today: todayPrescriptionsCount,
+    last90Days: last90DaysPrescriptionsCount,
+    last1Year: last1YearPrescriptionsCount,
+    total: totalPrescriptionsCount,
+  };
 
-  // Batch fetch patient details for display appointments and recent patients
+  // Batch fetch patient details for all displayed appointments and recent patients
   const neededPatientIds = Array.from(new Set([
-    ...displayAppts.map((a) => a.patientId),
+    ...todayScheduledAppts.map((a) => a.patientId),
+    ...upcomingList.map((a) => a.patientId),
+    ...pendingList.map((a) => a.patientId),
     ...allAppts.map((a) => a.patientId),
-  ])).slice(0, 20);
+  ])).slice(0, 50);
 
   const patientUsers = neededPatientIds.length > 0
     ? await db.select().from(usersTable).where(inArray(usersTable.id, neededPatientIds))
     : [];
   const patientUserMap = new Map(patientUsers.map((u) => [u.id, u]));
 
-  const enrichedDisplayAppts = displayAppts.map((a) => {
+  const enrichAppointment = (a: typeof allAppts[0]) => {
     const patient = patientUserMap.get(a.patientId);
     const pName = patient ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() : null;
     return {
       ...a,
       patientName: pName || (patient?.email ? patient.email : null),
+      patientEmail: patient?.email ?? null,
+      patientAvatarUrl: patient?.avatarUrl ?? null,
       doctorName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
       doctorSpecialty: doctorRow.specialty,
       consultationFee: a.consultationFee ?? null,
       createdAt: a.createdAt.toISOString(),
     };
-  });
+  };
+
+  // Distinct Lists
+  const todayAppointmentsList = todayScheduledAppts
+    .sort((a, b) => a.appointmentTime.localeCompare(b.appointmentTime))
+    .map(enrichAppointment);
+
+  const upcomingAppointmentsList = upcomingList.map(enrichAppointment);
+
+  const pendingAppointmentsList = pendingList.map(enrichAppointment);
+
+  // Backward compatibility display appointments (combined subset)
+  const displayAppts = allAppts
+    .filter((a) => (a.appointmentDate === today || a.appointmentDate > today) && a.status !== "cancelled")
+    .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate) || a.appointmentTime.localeCompare(b.appointmentTime))
+    .slice(0, 10)
+    .map(enrichAppointment);
 
   // Recent patients
   const recentPatientIds = [...new Set(allAppts.map((a) => a.patientId))].slice(0, 5);
@@ -382,7 +411,14 @@ router.get("/doctors/me/dashboard", requireAuth, requireRole(["doctor"]), async 
     upcomingAppointmentsCount: upcomingCount,
     completedAppointments: completedCount,
     totalPrescriptions: totalPrescriptionsCount,
-    upcomingAppointments: enrichedDisplayAppts,
+    todayPrescriptions: todayPrescriptionsCount,
+    last90DaysPrescriptions: last90DaysPrescriptionsCount,
+    last1YearPrescriptions: last1YearPrescriptionsCount,
+    prescriptionsSummary,
+    todayAppointmentsList,
+    upcomingAppointmentsList,
+    pendingAppointmentsList,
+    upcomingAppointments: displayAppts,
     recentPatients: recentPatientData,
   });
 });

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   useAskHealthAssistant,
   useListSymptomAssessments,
@@ -24,10 +24,20 @@ import {
   Phone,
   ArrowRight,
   ShieldAlert,
-  MapPin,
-  Flame,
-  Stethoscope,
+  ShieldCheck,
   Building2,
+  Paperclip,
+  Mic,
+  MicOff,
+  UploadCloud,
+  Check,
+  CheckCheck,
+  Bell,
+  Plus,
+  MoreVertical,
+  Pill,
+  Stethoscope,
+  Trash2,
   ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -52,80 +62,57 @@ interface ChatMessage {
   };
   disclaimer?: string;
   timestamp: string;
+  attachmentName?: string;
 }
 
 const HEALTH_FALLING_ELEMENTS = [
-  { id: "pill-1", type: "pill", left: "10%", delay: 0, duration: 10, colorA: "#38bdf8", colorB: "#a855f7" },
-  { id: "cross-1", type: "cross", left: "24%", delay: 2, duration: 13, color: "#818cf8" },
-  { id: "sparkle-1", type: "sparkle", left: "38%", delay: 0.5, duration: 8, color: "#c084fc" },
-  { id: "dna-1", type: "dna", left: "54%", delay: 3.5, duration: 14, color: "#34d399" },
-  { id: "pulse-1", type: "pulse", left: "70%", delay: 1.2, duration: 11, color: "#f43f5e" },
-  { id: "pill-2", type: "pill", left: "84%", delay: 4.5, duration: 9, colorA: "#c084fc", colorB: "#38bdf8" },
-  { id: "sparkle-2", type: "sparkle", left: "16%", delay: 5.5, duration: 12, color: "#38bdf8" },
-  { id: "cross-2", type: "cross", left: "46%", delay: 6.8, duration: 12, color: "#34d399" },
-  { id: "sparkle-3", type: "sparkle", left: "64%", delay: 3.0, duration: 7, color: "#fbbf24" },
-  { id: "pill-3", type: "pill", left: "30%", delay: 7.5, duration: 13, colorA: "#34d399", colorB: "#818cf8" },
-  { id: "cross-3", type: "cross", left: "78%", delay: 2.8, duration: 11, color: "#38bdf8" },
-  { id: "dna-2", type: "dna", left: "5%", delay: 6.0, duration: 15, color: "#a855f7" },
-  { id: "sparkle-4", type: "sparkle", left: "92%", delay: 1.5, duration: 9, color: "#ffffff" },
+  { id: "pill-1", type: "pill", left: "8%", delay: 0, duration: 12, colorA: "#38bdf8", colorB: "#a855f7" },
+  { id: "cross-1", type: "cross", left: "22%", delay: 2, duration: 14, color: "#818cf8" },
+  { id: "sparkle-1", type: "sparkle", left: "36%", delay: 0.5, duration: 9, color: "#c084fc" },
+  { id: "dna-1", type: "dna", left: "52%", delay: 3.5, duration: 15, color: "#34d399" },
+  { id: "pulse-1", type: "pulse", left: "68%", delay: 1.2, duration: 11, color: "#f43f5e" },
+  { id: "pill-2", type: "pill", left: "82%", delay: 4.5, duration: 10, colorA: "#c084fc", colorB: "#38bdf8" },
+  { id: "sparkle-2", type: "sparkle", left: "15%", delay: 5.5, duration: 13, color: "#38bdf8" },
+  { id: "cross-2", type: "cross", left: "44%", delay: 6.8, duration: 13, color: "#34d399" },
+  { id: "sparkle-3", type: "sparkle", left: "62%", delay: 3.0, duration: 8, color: "#fbbf24" },
+  { id: "pill-3", type: "pill", left: "28%", delay: 7.5, duration: 14, colorA: "#34d399", colorB: "#818cf8" },
+  { id: "cross-3", type: "cross", left: "76%", delay: 2.8, duration: 12, color: "#38bdf8" },
+  { id: "dna-2", type: "dna", left: "4%", delay: 6.0, duration: 16, color: "#a855f7" },
+  { id: "sparkle-4", type: "sparkle", left: "90%", delay: 1.5, duration: 10, color: "#ffffff" },
 ];
 
-function HealthcareFallingParticles() {
+function HealthcareParticles() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 select-none">
       <style>{`
-        @keyframes healthFallAnim {
+        @keyframes healthFloatAnim {
           0% {
-            transform: translateY(-40px) translateX(0px) rotate(0deg);
-            opacity: 0.3;
+            transform: translateY(-30px) translateX(0px) rotate(0deg);
+            opacity: 0.2;
           }
-          15% {
-            opacity: 0.95;
+          20% {
+            opacity: 0.85;
           }
           50% {
-            transform: translateY(280px) translateX(14px) rotate(180deg);
-            opacity: 1;
-          }
-          85% {
+            transform: translateY(320px) translateX(12px) rotate(180deg);
             opacity: 0.9;
           }
+          80% {
+            opacity: 0.75;
+          }
           100% {
-            transform: translateY(620px) translateX(-10px) rotate(360deg);
-            opacity: 0.2;
+            transform: translateY(680px) translateX(-8px) rotate(360deg);
+            opacity: 0.1;
           }
         }
       `}</style>
 
       {/* Ambient background glow nebulas */}
-      <div className="absolute top-10 right-10 w-72 h-72 bg-indigo-500/30 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/3 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-6 right-10 w-80 h-80 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 left-10 w-72 h-72 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-1/3 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Shooting Star Arc & Star Cluster (Image 2 style) */}
-      <div className="absolute top-2 right-4 sm:right-8 w-60 h-32 pointer-events-none opacity-95">
-        <svg viewBox="0 0 200 100" className="w-full h-full">
-          <path
-            d="M 10 90 Q 95 25 185 10"
-            fill="none"
-            stroke="url(#shooting-star-gradient)"
-            strokeWidth="2.2"
-            strokeDasharray="4 6"
-          />
-          <circle cx="185" cy="10" r="3.5" fill="#c084fc" className="animate-ping" />
-          <circle cx="185" cy="10" r="2.5" fill="#ffffff" />
-          <circle cx="140" cy="24" r="2.2" fill="#38bdf8" />
-          <circle cx="75" cy="52" r="1.8" fill="#818cf8" />
-          <defs>
-            <linearGradient id="shooting-star-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.1" />
-              <stop offset="60%" stopColor="#818cf8" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#c084fc" stopOpacity="1" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </div>
-
-      {/* Floating & Falling Healthcare Particles */}
+      {/* Floating Healthcare Particles */}
       {HEALTH_FALLING_ELEMENTS.map((el) => (
         <div
           key={el.id}
@@ -133,13 +120,13 @@ function HealthcareFallingParticles() {
             position: "absolute",
             left: el.left,
             top: 0,
-            animation: `healthFallAnim ${el.duration}s linear infinite`,
+            animation: `healthFloatAnim ${el.duration}s linear infinite`,
             animationDelay: `${el.delay}s`,
             willChange: "transform, opacity",
           }}
         >
           {el.type === "pill" && (
-            <svg viewBox="0 0 24 12" className="w-6 h-3 drop-shadow-[0_0_10px_rgba(56,189,248,1)]">
+            <svg viewBox="0 0 24 12" className="w-5 h-2.5 drop-shadow-[0_0_8px_rgba(56,189,248,0.9)]">
               <rect x="1" y="1" width="11" height="10" rx="5" fill={el.colorA} />
               <rect x="12" y="1" width="11" height="10" rx="5" fill={el.colorB} />
               <line x1="12" y1="1" x2="12" y2="11" stroke="#050716" strokeWidth="1" />
@@ -147,7 +134,7 @@ function HealthcareFallingParticles() {
           )}
 
           {el.type === "cross" && (
-            <svg viewBox="0 0 20 20" className="w-4 h-4 drop-shadow-[0_0_10px_rgba(129,140,248,1)]">
+            <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 drop-shadow-[0_0_8px_rgba(129,140,248,0.9)]">
               <path
                 d="M 7 2 L 13 2 L 13 7 L 18 7 L 18 13 L 13 13 L 13 18 L 7 18 L 7 13 L 2 13 L 2 7 L 7 7 Z"
                 fill={el.color}
@@ -156,7 +143,7 @@ function HealthcareFallingParticles() {
           )}
 
           {el.type === "sparkle" && (
-            <svg viewBox="0 0 24 24" className="w-4 h-4 drop-shadow-[0_0_12px_rgba(192,132,252,1)]">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 drop-shadow-[0_0_10px_rgba(192,132,252,0.9)]">
               <path
                 d="M 12 0 Q 12 12 24 12 Q 12 12 12 24 Q 12 12 0 12 Q 12 12 12 0 Z"
                 fill={el.color}
@@ -165,15 +152,15 @@ function HealthcareFallingParticles() {
           )}
 
           {el.type === "dna" && (
-            <svg viewBox="0 0 24 24" className="w-5 h-5 drop-shadow-[0_0_10px_rgba(52,211,153,1)]">
-              <circle cx="6" cy="6" r="3.5" fill="#34d399" />
-              <circle cx="18" cy="18" r="3.5" fill="#38bdf8" />
+            <svg viewBox="0 0 24 24" className="w-4 h-4 drop-shadow-[0_0_8px_rgba(52,211,153,0.9)]">
+              <circle cx="6" cy="6" r="3" fill="#34d399" />
+              <circle cx="18" cy="18" r="3" fill="#38bdf8" />
               <line x1="6" y1="6" x2="18" y2="18" stroke="#818cf8" strokeWidth="2" strokeDasharray="3 3" />
             </svg>
           )}
 
           {el.type === "pulse" && (
-            <svg viewBox="0 0 28 14" className="w-7 h-3.5 drop-shadow-[0_0_10px_rgba(244,63,94,1)]">
+            <svg viewBox="0 0 28 14" className="w-6 h-3 drop-shadow-[0_0_8px_rgba(244,63,94,0.9)]">
               <path
                 d="M 1 7 L 7 7 L 10 2 L 14 12 L 18 4 L 21 8 L 27 7"
                 fill="none"
@@ -190,48 +177,54 @@ function HealthcareFallingParticles() {
   );
 }
 
-const SAMPLE_PROMPTS = [
-  "I have severe headaches and mild fever for 2 days.",
-  "What does my low hemoglobin mean?",
-  "What are common warning signs of iron-deficiency anemia?",
-  "Did I ever face any health issue in my records?",
+const QUICK_ACTIONS = [
+  {
+    id: "symptoms",
+    title: "Check Symptoms",
+    desc: "Describe your symptoms and get AI insights",
+    icon: Stethoscope,
+    color: "from-purple-500/20 to-indigo-500/10 border-purple-500/40 text-purple-300",
+    iconColor: "text-purple-400",
+    arrowColor: "group-hover:border-purple-400 text-purple-400",
+    query: "I'd like to evaluate some symptoms I've been experiencing. Can you ask me guiding questions to assess them?",
+  },
+  {
+    id: "medicine",
+    title: "Understand Medicine",
+    desc: "Know uses, side effects and precautions",
+    icon: Pill,
+    color: "from-cyan-500/20 to-blue-500/10 border-cyan-500/40 text-cyan-300",
+    iconColor: "text-cyan-400",
+    arrowColor: "group-hover:border-cyan-400 text-cyan-400",
+    query: "Can you help me understand a medication? What are its uses, dosage considerations, side effects, and precautions?",
+  },
+  {
+    id: "report",
+    title: "Explain Report",
+    desc: "Upload your reports and get explanation",
+    icon: FileText,
+    color: "from-emerald-500/20 to-teal-500/10 border-emerald-500/40 text-emerald-300",
+    iconColor: "text-emerald-400",
+    arrowColor: "group-hover:border-emerald-400 text-emerald-400",
+    query: "Can you help explain the key clinical metrics, abnormal ranges, and findings in a lab or diagnostic test report?",
+  },
+  {
+    id: "doctor",
+    title: "Find Doctor",
+    desc: "Find specialists near you and book appointment",
+    icon: User,
+    color: "from-rose-500/20 to-pink-500/10 border-rose-500/40 text-rose-300",
+    iconColor: "text-rose-400",
+    arrowColor: "group-hover:border-rose-400 text-rose-400",
+    query: "I would like to find verified medical specialists and doctors for a consultation. What specialty should I look for?",
+    actionUrl: "/patient/doctors",
+  },
 ];
 
-const QUICK_SYMPTOM_CATEGORIES = [
-  { label: "Headache & Migraine", query: "I have a pulsating headache and sensitivity to light. What could be the causes?" },
-  { label: "Fever & Chills", query: "I have a high fever with chills and body ache. What are the recommended next steps?" },
-  { label: "Chest Discomfort", query: "I feel chest tightness and mild breathlessness. What should I check immediately?" },
-  { label: "Cough & Throat", query: "I have a persistent dry cough and sore throat for 3 days." },
-  { label: "Stomach Ache & Nausea", query: "I have sharp abdominal pain and nausea after eating." },
-  { label: "Joint & Muscle Pain", query: "I have stiffness and pain in my knee joints in the morning." },
-];
-
-const HEALTH_TIPS = [
-  {
-    title: "Cardiovascular & Aerobic Fitness",
-    category: "Vitals & Heart",
-    desc: "Aim for 30 minutes of moderate aerobic activity 5 days a week to maintain endothelial flexibility and blood pressure regulation.",
-    prompt: "What are the clinically proven benefits of 30-minute daily cardio on cardiovascular health?",
-  },
-  {
-    title: "Hydration & Renal Filtration",
-    category: "Kidney & Metabolism",
-    desc: "Maintaining 2.5–3L of daily hydration optimizes glomerular filtration rate and prevents kidney stone formation.",
-    prompt: "How does optimal daily water intake protect renal function and metabolic efficiency?",
-  },
-  {
-    title: "Sleep Architecture & Immune Recovery",
-    category: "Immunity & Brain",
-    desc: "7–8 hours of consistent slow-wave sleep regulates natural killer cell activity and suppresses systemic inflammatory cytokines.",
-    prompt: "Explain how deep restorative sleep strengthens immune resilience against infections.",
-  },
-  {
-    title: "Iron & Vitamin C Absorption",
-    category: "Nutrition",
-    desc: "Pair non-heme plant-based iron sources (spinach, lentils) with Vitamin C (citrus, amla) for up to 3x higher bio-absorption.",
-    prompt: "What dietary pairings maximize iron absorption to prevent nutritional anemia?",
-  },
-];
+const INITIAL_WELCOME_TEXT = `Hello! 👋
+I'm AarogyaGenie AI, your health assistant.
+You can ask me about symptoms, medications, treatments, reports or any health related doubts.
+How can I help you today?`;
 
 export interface HealthAssistantChatProps {
   className?: string;
@@ -242,11 +235,20 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
   const [activeNavTab, setActiveNavTab] = useState<"chat" | "symptoms" | "health_tips" | "emergency">("chat");
   const [inputQuery, setInputQuery] = useState("");
   const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const speechRecognitionRef = useRef<any>(null);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       sender: "assistant",
-      text: "Hello! 👋\nI'm your ArogyaGenie AI Health Assistant.\nHow can I help you today? Ask me medical questions, clinical guidelines, or questions about your personal health records.",
+      text: INITIAL_WELCOME_TEXT,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
@@ -257,24 +259,137 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const handleSend = (queryText?: string) => {
-    const textToSend = queryText || inputQuery;
-    if (!textToSend.trim() || askAssistant.isPending) return;
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, askAssistant.isPending]);
 
-    // Switch to chat tab if sent from another tab
+  // Handle Speech Recognition setup
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0].transcript)
+          .join("");
+        setInputQuery(transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn("Speech recognition error:", event.error);
+        setIsListening(false);
+        toast({
+          title: "Voice Input",
+          description: "Microphone access stopped or was not heard. Please try again.",
+        });
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      speechRecognitionRef.current = recognition;
+    }
+
+    return () => {
+      if (speechRecognitionRef.current) {
+        try {
+          speechRecognitionRef.current.stop();
+        } catch {}
+      }
+    };
+  }, [toast]);
+
+  const toggleVoiceInput = () => {
+    if (!speechRecognitionRef.current) {
+      toast({
+        title: "Voice Input Not Supported",
+        description: "Your browser does not support Speech Recognition. Please type your query.",
+      });
+      return;
+    }
+
+    if (isListening) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch {}
+      setIsListening(false);
+    } else {
+      try {
+        speechRecognitionRef.current.start();
+        setIsListening(true);
+        toast({
+          title: "Listening...",
+          description: "Speak your health query clearly into your microphone.",
+        });
+      } catch (err) {
+        console.error("Failed to start speech recognition:", err);
+      }
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAttachedFile(file);
+      toast({
+        title: "File Attached",
+        description: `${file.name} ready to send with your question.`,
+      });
+    }
+  };
+
+  const handleNewChat = () => {
+    setMessages([
+      {
+        id: `welcome-${Date.now()}`,
+        sender: "assistant",
+        text: INITIAL_WELCOME_TEXT,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      },
+    ]);
+    setInputQuery("");
+    setAttachedFile(null);
+    setHasInteracted(false);
+    setOptionsMenuOpen(false);
+    toast({
+      title: "New Conversation Started",
+      description: "Ask any health, symptom, or medication question.",
+    });
+  };
+
+  const handleSend = (queryText?: string, specificAttachmentName?: string) => {
+    let textToSend = queryText || inputQuery;
+    if (!textToSend.trim() && !attachedFile) return;
+
+    if (attachedFile && !queryText) {
+      textToSend = `[Attached Document: ${attachedFile.name}]\n${textToSend || "Please analyze and explain this medical document."}`;
+    }
+
     if (activeNavTab !== "chat") {
       setActiveNavTab("chat");
     }
+
+    setHasInteracted(true);
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "patient",
       text: textToSend,
+      attachmentName: specificAttachmentName || attachedFile?.name,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
     setMessages((prev) => [...prev, userMessage]);
     if (!queryText) setInputQuery("");
+    setAttachedFile(null);
 
     askAssistant.mutate(
       { data: { query: textToSend } },
@@ -287,7 +402,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
             usedRag: data.usedRag ?? false,
             sources: (data.sources as any[]) ?? [],
             retrieval: (data.retrieval as any) ?? undefined,
-            disclaimer: data.disclaimer ?? "⚠️ Informational clinical reference only.",
+            disclaimer: data.disclaimer ?? "AarogyaGenie AI provides health guidance, not a diagnosis.",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           };
 
@@ -300,7 +415,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
             variant: "destructive",
           });
         },
-      },
+      }
     );
   };
 
@@ -310,192 +425,374 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col md:flex-row overflow-hidden select-none ${className}`}
+      className={`relative w-full h-full flex flex-col overflow-hidden select-none ${className}`}
       style={{
-        background: "linear-gradient(145deg, #0b0e26 0%, #080a1c 50%, #050612 100%)",
+        background: "linear-gradient(155deg, #070919 0%, #050713 50%, #03040d 100%)",
+        color: "#ffffff",
       }}
     >
-      {/* ── Background Atmospheric Light Effects ───────────────────────────── */}
-      <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute bottom-0 left-20 w-60 h-60 bg-purple-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* ── Background Atmospheric Particle Effects ───────────────────────────── */}
+      <HealthcareParticles />
 
-      {/* ── LEFT SIDEBAR (Matching Image 2) ────────────────────────────────── */}
-      <aside className="w-full md:w-20 lg:w-[88px] shrink-0 bg-[#070918]/90 border-b md:border-b-0 md:border-r border-indigo-950/80 p-2 md:py-4 flex md:flex-col items-center justify-between md:justify-start gap-1.5 md:gap-3.5 z-20 backdrop-blur-xl">
-        {/* Top AI Avatar (Image 2 style) */}
-        <div className="hidden md:flex flex-col items-center mb-1 group">
-          <div className="relative w-11 h-11 rounded-2xl flex items-center justify-center">
-            {/* Ambient Aura */}
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-500 to-cyan-400 blur-[4px] opacity-70 group-hover:opacity-90 transition-opacity" />
-            
-            {/* Inner Bot Visor Pod */}
-            <div className="relative w-full h-full rounded-2xl bg-gradient-to-b from-[#1e1b4b] to-[#0d0f28] border border-cyan-400/50 flex items-center justify-center shadow-inner overflow-hidden">
-              <svg viewBox="0 0 48 48" className="w-7 h-7 drop-shadow-[0_0_6px_rgba(56,189,248,0.8)]">
-                <rect x="8" y="10" width="32" height="28" rx="12" fill="#1e1b4b" stroke="#818cf8" strokeWidth="1.5" />
-                <rect x="4" y="18" width="4" height="12" rx="2" fill="#38bdf8" />
-                <rect x="40" y="18" width="4" height="12" rx="2" fill="#38bdf8" />
-                <rect x="12" y="15" width="24" height="16" rx="7" fill="#070919" stroke="#38bdf8" strokeWidth="1.2" />
-                <circle cx="18" cy="23" r="2.8" fill="#38bdf8" className={askAssistant.isPending ? "animate-ping" : ""} />
-                <circle cx="30" cy="23" r="2.8" fill="#38bdf8" className={askAssistant.isPending ? "animate-ping" : ""} />
-                <ellipse cx="24" cy="13" rx="8" ry="2" fill="rgba(255,255,255,0.4)" />
-                <path d="M 21 27 Q 24 29 27 27" fill="none" stroke="#38bdf8" strokeWidth="1" strokeLinecap="round" />
-              </svg>
+      {/* ── HEADER (Matching Reference Image 2) ────────────────────────────── */}
+      <header className="relative z-20 px-4 sm:px-6 py-3.5 border-b border-indigo-950/80 flex items-center justify-between bg-[#07091b]/90 backdrop-blur-xl shrink-0">
+        {/* Left: AI Avatar & Title */}
+        <div className="flex items-center gap-3">
+          <div className="relative w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 p-[1.5px] shadow-[0_0_15px_rgba(168,85,247,0.4)] shrink-0">
+            <div className="w-full h-full rounded-[14px] bg-[#0d0f28] flex items-center justify-center overflow-hidden">
+              <img
+                src="/assets/arogyagenie-ai-robot.png"
+                alt="AarogyaGenie AI"
+                className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = "none";
+                }}
+              />
+              <Sparkles className="w-5 h-5 text-cyan-300" />
             </div>
           </div>
-        </div>
 
-        {/* 4 Required Sidebar Navigation Items */}
-        <div className="flex md:flex-col items-center justify-around w-full gap-1.5 md:gap-2.5">
-          {/* 1. Chat */}
-          <button
-            type="button"
-            onClick={() => setActiveNavTab("chat")}
-            className={`group w-14 h-12 md:w-16 md:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-              activeNavTab === "chat"
-                ? "bg-gradient-to-b from-purple-600 via-indigo-600 to-indigo-700 border border-purple-400/50 text-white shadow-[0_4px_20px_rgba(168,85,247,0.45)] scale-105"
-                : "bg-transparent hover:bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent"
-            }`}
-          >
-            <MessageSquareText className={`h-4 w-4 md:h-5 md:w-5 ${activeNavTab === "chat" ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : ""}`} />
-            <span className="text-[10px] font-semibold tracking-tight">Chat</span>
-          </button>
-
-          {/* 2. Symptoms */}
-          <button
-            type="button"
-            onClick={() => setActiveNavTab("symptoms")}
-            className={`group w-14 h-12 md:w-16 md:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-              activeNavTab === "symptoms"
-                ? "bg-gradient-to-b from-purple-600 via-indigo-600 to-indigo-700 border border-purple-400/50 text-white shadow-[0_4px_20px_rgba(168,85,247,0.45)] scale-105"
-                : "bg-transparent hover:bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent"
-            }`}
-          >
-            <Activity className={`h-4 w-4 md:h-5 md:w-5 ${activeNavTab === "symptoms" ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : ""}`} />
-            <span className="text-[10px] font-semibold tracking-tight">Symptoms</span>
-          </button>
-
-          {/* 3. Health Tips */}
-          <button
-            type="button"
-            onClick={() => setActiveNavTab("health_tips")}
-            className={`group w-14 h-12 md:w-16 md:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-              activeNavTab === "health_tips"
-                ? "bg-gradient-to-b from-purple-600 via-indigo-600 to-indigo-700 border border-purple-400/50 text-white shadow-[0_4px_20px_rgba(168,85,247,0.45)] scale-105"
-                : "bg-transparent hover:bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent"
-            }`}
-          >
-            <Lightbulb className={`h-4 w-4 md:h-5 md:w-5 ${activeNavTab === "health_tips" ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : ""}`} />
-            <span className="text-[10px] font-semibold tracking-tight whitespace-nowrap">Tips</span>
-          </button>
-
-          {/* 4. Emergency */}
-          <button
-            type="button"
-            onClick={() => setActiveNavTab("emergency")}
-            className={`group w-14 h-12 md:w-16 md:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-              activeNavTab === "emergency"
-                ? "bg-gradient-to-b from-red-600 via-rose-600 to-red-700 border border-red-400/60 text-white shadow-[0_4px_20px_rgba(239,68,68,0.45)] scale-105"
-                : "bg-transparent hover:bg-red-950/30 text-red-400 hover:text-red-300 border border-transparent"
-            }`}
-          >
-            <HeartPulse className={`h-4 w-4 md:h-5 md:w-5 ${activeNavTab === "emergency" ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : "animate-pulse"}`} />
-            <span className="text-[10px] font-semibold tracking-tight">SOS</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* ── MAIN CONTENT CONTAINER ─────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-        {/* ── Falling Healthcare & AI Particles Background ────────────────────── */}
-        <HealthcareFallingParticles />
-
-        {/* Header (Matching Image 2) */}
-        <header className="relative z-10 px-5 py-3.5 border-b border-indigo-950/80 flex items-center justify-between bg-[#080b20]/80 backdrop-blur-md shrink-0">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg sm:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-100 to-cyan-200 bg-clip-text text-transparent">
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-base sm:text-lg font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-100 to-cyan-200 bg-clip-text text-transparent">
                 Arogyagenie AI
               </h2>
-              {/* Dynamic RAG / Thinking Status */}
-              {askAssistant.isPending ? (
-                <Badge className="bg-amber-950/80 text-amber-300 border border-amber-500/50 text-[10px] font-bold flex items-center gap-1 animate-pulse">
-                  <Sparkles className="w-3 h-3 text-amber-400 animate-spin" /> Neural Grounding...
-                </Badge>
-              ) : (
-                <Badge className="bg-indigo-950/80 text-cyan-300 border border-cyan-500/40 text-[10px] font-semibold flex items-center gap-1 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
-                  <Sparkles className="w-3 h-3 text-cyan-400 animate-pulse" /> Verified Clinical RAG
-                </Badge>
-              )}
+              <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
             </div>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Your smart health companion</p>
+            <p className="text-[11px] text-slate-400 font-medium">Your Smart Health Companion</p>
+          </div>
+        </div>
+
+        {/* Center: Clinical AI Status Badge (Reference Image 2) */}
+        <div className="hidden md:flex items-center">
+          {askAssistant.isPending ? (
+            <Badge className="bg-cyan-950/90 text-cyan-300 border border-cyan-400/60 text-xs px-3 py-1 font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse rounded-full">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-300 animate-spin" /> Neural Grounding & Retrieval...
+            </Badge>
+          ) : (
+            <Badge className="bg-[#0c142b]/90 text-emerald-300 border border-emerald-500/50 text-xs px-3 py-1 font-semibold flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.2)] rounded-full">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Clinical AI • Evidence Guided
+            </Badge>
+          )}
+        </div>
+
+        {/* Right: Controls (AI Online, Notifications, New Chat, Options, Close) */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* AI Online Indicator */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0d142b]/80 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="text-[11px]">AI Online</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {onClose && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="h-8 w-8 rounded-full text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
-                title="Close Assistant"
-                aria-label="Close Assistant"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+          {/* New Chat Button */}
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleNewChat}
+            className="h-8 px-3 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white font-bold text-xs shadow-[0_0_15px_rgba(168,85,247,0.35)] border border-purple-400/40 gap-1 transition-all"
+          >
+            <span>New Chat</span>
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+
+          {/* Options Menu Toggle */}
+          <div className="relative">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}
+              className="h-8 w-8 rounded-full text-slate-400 hover:text-white hover:bg-slate-800/80"
+              title="More Options"
+              aria-label="More Options"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+
+            {optionsMenuOpen && (
+              <div className="absolute right-0 top-10 w-48 rounded-2xl bg-[#0d102d] border border-indigo-500/40 shadow-2xl p-1.5 z-50 text-xs space-y-1 backdrop-blur-xl">
+                <button
+                  type="button"
+                  onClick={handleNewChat}
+                  className="w-full px-3 py-2 rounded-xl text-left text-slate-300 hover:text-white hover:bg-indigo-900/50 flex items-center gap-2"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-purple-400" /> Clear & Reset Chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOptionsMenuOpen(false);
+                    if (onClose) onClose();
+                    setLocation("/patient/timeline");
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-left text-slate-300 hover:text-white hover:bg-indigo-900/50 flex items-center gap-2"
+                >
+                  <Activity className="h-3.5 w-3.5 text-cyan-400" /> Health Timeline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOptionsMenuOpen(false);
+                    if (onClose) onClose();
+                    setLocation("/patient/lab-reports");
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-left text-slate-300 hover:text-white hover:bg-indigo-900/50 flex items-center gap-2"
+                >
+                  <FileText className="h-3.5 w-3.5 text-emerald-400" /> Lab Test Reports
+                </button>
+              </div>
             )}
           </div>
-        </header>
 
-        {/* ── Active Tab View ──────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10">
-          {/* TAB 1: CHAT (Image 2 Main Chat Experience) */}
+          {/* Close Button */}
+          {onClose && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-8 w-8 rounded-full text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
+              title="Close Assistant"
+              aria-label="Close Assistant"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </header>
+
+      {/* ── MAIN WORKSPACE BODY (2 Columns: Left AI Mascot / Right Chat) ──── */}
+      <div className="flex-1 flex min-h-0 overflow-hidden relative z-10">
+        {/* ── Left AI Companion Brand Pane (Desktop only) ────────────────── */}
+        <aside className="hidden lg:flex flex-col items-center justify-center w-64 xl:w-72 shrink-0 p-5 border-r border-indigo-950/80 bg-[#060817]/60 backdrop-blur-md relative overflow-hidden">
+          <div className="absolute -top-10 -left-10 w-48 h-48 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-cyan-600/20 rounded-full blur-3xl pointer-events-none" />
+
+          {/* 3D Mascot Image with subtle hover/breathe animation */}
+          <div className="relative w-48 h-48 xl:w-56 xl:h-56 flex items-center justify-center mb-4">
+            <motion.img
+              src="/assets/arogyagenie-ai-robot.png"
+              alt="AarogyaGenie AI Robot"
+              animate={{
+                y: [-6, 6, -6],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="w-full h-full object-contain drop-shadow-[0_15px_35px_rgba(147,51,234,0.4)] select-none pointer-events-none"
+            />
+          </div>
+
+          {/* Mascot Label */}
+          <div className="text-center space-y-1">
+            <h3 className="text-base font-extrabold tracking-tight bg-gradient-to-r from-purple-300 via-indigo-200 to-cyan-300 bg-clip-text text-transparent">
+              Arogyagenie <span className="text-purple-400">AI</span>
+            </h3>
+            <p className="text-xs text-slate-400 font-medium">
+              Always here to help you with your health 💜
+            </p>
+          </div>
+
+          {/* Navigation Pill Shortcuts */}
+          <div className="mt-6 w-full space-y-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveNavTab("chat")}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+                activeNavTab === "chat"
+                  ? "bg-purple-950/60 border border-purple-500/50 text-purple-200 shadow-md"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900/50 border border-transparent"
+              }`}
+            >
+              <MessageSquareText className="h-4 w-4 text-purple-400" />
+              <span>AI Chat Assistant</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveNavTab("symptoms")}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+                activeNavTab === "symptoms"
+                  ? "bg-purple-950/60 border border-purple-500/50 text-purple-200 shadow-md"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900/50 border border-transparent"
+              }`}
+            >
+              <Activity className="h-4 w-4 text-cyan-400" />
+              <span>Symptom Checker</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveNavTab("health_tips")}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+                activeNavTab === "health_tips"
+                  ? "bg-purple-950/60 border border-purple-500/50 text-purple-200 shadow-md"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900/50 border border-transparent"
+              }`}
+            >
+              <Lightbulb className="h-4 w-4 text-amber-400" />
+              <span>Health Insights</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveNavTab("emergency")}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+                activeNavTab === "emergency"
+                  ? "bg-red-950/60 border border-red-500/50 text-red-200 shadow-md"
+                  : "text-red-400 hover:text-red-300 hover:bg-red-950/30 border border-transparent"
+              }`}
+            >
+              <HeartPulse className="h-4 w-4 text-red-400 animate-pulse" />
+              <span>Emergency (SOS)</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* ── Main Chat & Content Area ────────────────────────────────────── */}
+        <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+          {/* TAB 1: CHAT EXPERIENCE (Reference Image 2) */}
           {activeNavTab === "chat" && (
             <div className="flex-1 flex flex-col min-h-0 relative">
               {/* Message Thread */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 scrollbar-thin scrollbar-thumb-indigo-900/60 relative">
-                {messages.map((msg) => (
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 scrollbar-thin scrollbar-thumb-indigo-900/60">
+                {/* 1. Welcome Message & Quick Actions (Rendered as first item in thread) */}
+                <div className="space-y-4">
+                  {/* Welcome Message Card (Reference Image 2) */}
+                  <div className="flex gap-3.5 max-w-[92%] sm:max-w-[85%]">
+                    {/* Bot Avatar */}
+                    <div className="relative w-9 h-9 rounded-2xl bg-gradient-to-tr from-purple-600 to-cyan-400 p-[1.5px] shrink-0 shadow-[0_0_12px_rgba(56,189,248,0.5)]">
+                      <div className="w-full h-full rounded-[14px] bg-[#0c0f2b] flex items-center justify-center overflow-hidden">
+                        <img
+                          src="/assets/arogyagenie-ai-robot.png"
+                          alt="AI Bot"
+                          className="w-7 h-7 object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                        <Sparkles className="w-4 h-4 text-cyan-300" />
+                      </div>
+                    </div>
+
+                    {/* Card Content */}
+                    <div className="space-y-1 flex-1">
+                      <div className="p-4 sm:p-5 rounded-3xl rounded-tl-sm bg-[#0e1233]/90 border border-indigo-500/35 text-slate-100 shadow-[0_10px_30px_rgba(10,14,40,0.5)] backdrop-blur-xl">
+                        <div className="space-y-2 text-sm sm:text-[15px] leading-relaxed">
+                          <p className="font-bold text-white text-base">Hello! 👋</p>
+                          <p>
+                            I'm <strong className="text-white font-bold">Arogyagenie AI</strong>, your health assistant.
+                          </p>
+                          <p className="text-slate-300">
+                            You can ask me about symptoms, medications, treatments, reports or any health related doubts.
+                          </p>
+                          <p className="text-purple-300 font-bold pt-1">How can I help you today?</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium px-2 block">
+                        {messages[0]?.timestamp || "10:30 AM"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 2. Four Interactive Quick Action Cards (Reference Image 2) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-1">
+                    {QUICK_ACTIONS.map((action) => {
+                      const Icon = action.icon;
+                      return (
+                        <div
+                          key={action.id}
+                          onClick={() => {
+                            if (action.actionUrl) {
+                              if (onClose) onClose();
+                              setLocation(action.actionUrl);
+                            } else {
+                              handleSend(action.query);
+                            }
+                          }}
+                          className={`group p-4 rounded-2xl bg-gradient-to-br ${action.color} border hover:border-purple-400/80 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-purple-950/40 hover:-translate-y-0.5 flex flex-col justify-between space-y-3`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Icon className={`h-4 w-4 ${action.iconColor}`} />
+                                <span className="font-bold text-sm text-white group-hover:text-purple-200 transition-colors">
+                                  {action.title}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-300 leading-relaxed font-normal">{action.desc}</p>
+                          </div>
+
+                          <div className="flex justify-end pt-1">
+                            <div className="w-6 h-6 rounded-full border border-slate-700 group-hover:border-purple-400 group-hover:bg-purple-600/30 flex items-center justify-center transition-all">
+                              <ArrowRight className="h-3 w-3 text-slate-400 group-hover:text-purple-300 group-hover:translate-x-0.5 transition-transform" />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Message Stream (Skipping the 1st welcome message since shown above) */}
+                {messages.slice(1).map((msg) => (
                   <div
                     key={msg.id}
-                    className={`flex gap-3 max-w-[88%] ${
+                    className={`flex gap-3 max-w-[88%] sm:max-w-[80%] ${
                       msg.sender === "patient" ? "ml-auto flex-row-reverse" : "mr-auto flex-row"
                     }`}
                   >
-                    {/* Avatar */}
+                    {/* User / Bot Avatar */}
                     {msg.sender === "patient" ? (
-                      <div className="h-7 w-7 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                        <User className="h-3.5 w-3.5" />
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                        <User className="h-4 w-4" />
                       </div>
                     ) : (
-                      <div className="h-7 w-7 rounded-full bg-indigo-950 border border-cyan-400/50 text-cyan-300 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(56,189,248,0.4)]">
-                        <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                      <div className="h-8 w-8 rounded-2xl bg-gradient-to-tr from-purple-600 to-cyan-400 p-[1.5px] shrink-0 shadow-[0_0_10px_rgba(56,189,248,0.5)]">
+                        <div className="w-full h-full rounded-[14px] bg-[#0c0f2b] flex items-center justify-center">
+                          <Sparkles className="h-4 w-4 text-cyan-300" />
+                        </div>
                       </div>
                     )}
 
-                    {/* Bubble */}
+                    {/* Bubble Content */}
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <div
-                        className={`p-3.5 sm:p-4 rounded-2xl text-sm leading-relaxed ${
+                        className={`p-4 rounded-3xl text-sm leading-relaxed ${
                           msg.sender === "patient"
-                            ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 text-white rounded-tr-xs shadow-lg shadow-purple-950/40 font-medium"
+                            ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 text-white rounded-tr-sm shadow-lg shadow-purple-950/40 font-medium"
                             : msg.text.startsWith("🚨 EMERGENCY ALERT")
-                            ? "bg-red-950/80 border-2 border-red-500/80 text-red-100 rounded-tl-xs shadow-xl"
-                            : "bg-[#121636]/90 border border-indigo-900/60 text-slate-100 rounded-tl-xs shadow-md backdrop-blur-md"
+                            ? "bg-red-950/90 border-2 border-red-500/80 text-red-100 rounded-tl-sm shadow-xl"
+                            : "bg-[#0e1233]/95 border border-indigo-500/30 text-slate-100 rounded-tl-sm shadow-md backdrop-blur-md"
                         }`}
                       >
+                        {msg.attachmentName && (
+                          <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/30 border border-white/20 text-xs font-mono text-cyan-200">
+                            <Paperclip className="h-3 w-3" />
+                            <span>{msg.attachmentName}</span>
+                          </div>
+                        )}
+
                         <p className="whitespace-pre-wrap">{msg.text}</p>
 
-                        {/* RAG Evidence Drawer */}
-                        {msg.sender === "assistant" && msg.id !== "welcome" && (
-                          <div className="mt-3 pt-2.5 border-t border-indigo-900/50 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        {/* RAG Verification & Sources Drawer */}
+                        {msg.sender === "assistant" && (
+                          <div className="mt-3 pt-2.5 border-t border-indigo-900/60 flex flex-wrap items-center justify-between gap-2 text-xs">
                             <div className="flex items-center gap-1.5">
                               {msg.usedRag ? (
-                                <Badge className="bg-emerald-950/70 text-emerald-300 border-emerald-500/40 text-[10px] gap-1 font-semibold">
+                                <Badge className="bg-emerald-950/80 text-emerald-300 border-emerald-500/50 text-[10px] gap-1 font-semibold">
                                   <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                                  RAG Verified {msg.retrieval ? `(${msg.retrieval.resultsUsed}/${msg.retrieval.topK} Chunks)` : ""}
+                                  RAG Verified {msg.retrieval ? `(${msg.retrieval.resultsUsed}/${msg.retrieval.topK} Guidelines)` : ""}
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="text-[10px] text-slate-400 border-slate-700">
-                                  Patient Context Grounded
+                                  Patient Health Context Grounded
                                 </Badge>
                               )}
                             </div>
@@ -504,7 +801,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 px-2 text-[11px] text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40 gap-1 font-semibold"
+                                className="h-6 px-2 text-[11px] text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40 gap-1 font-semibold cursor-pointer"
                                 onClick={() => toggleEvidence(msg.id)}
                               >
                                 <BookOpen className="h-3 w-3" />
@@ -518,14 +815,14 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
 
                       {/* Expandable Source Drawer */}
                       {msg.sender === "assistant" && expandedMessageId === msg.id && msg.sources && msg.sources.length > 0 && (
-                        <div className="bg-[#0b0e24]/90 border border-indigo-500/30 p-3 rounded-xl text-xs space-y-2 animate-in fade-in-50 duration-200">
+                        <div className="bg-[#0b0e24]/95 border border-indigo-500/40 p-3 rounded-2xl text-xs space-y-2 animate-in fade-in-50 duration-200">
                           <span className="font-bold text-cyan-300 flex items-center gap-1.5 pb-1 border-b border-indigo-900/60">
                             <FileText className="h-3.5 w-3.5 text-cyan-400" />
                             Retrieved Clinical Guidelines & Attributed Sources
                           </span>
                           <div className="space-y-1.5">
                             {msg.sources.map((src, idx) => (
-                              <div key={idx} className="bg-[#14183d] p-2.5 rounded-lg border border-indigo-500/20 text-slate-200 space-y-0.5">
+                              <div key={idx} className="bg-[#14183d] p-2.5 rounded-xl border border-indigo-500/20 text-slate-200 space-y-0.5">
                                 <div className="font-bold text-white flex items-center justify-between">
                                   <span>{src.title || "Clinical Protocol"}</span>
                                   {src.documentId && <span className="font-mono text-[9px] text-cyan-300">{src.documentId}</span>}
@@ -542,80 +839,209 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                         </div>
                       )}
 
-                      {/* Timestamp & Disclaimer */}
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                      {/* Timestamp & Status Icon */}
+                      <div className={`flex items-center gap-1.5 text-[10px] text-slate-400 px-2 ${msg.sender === "patient" ? "justify-end" : "justify-start"}`}>
                         <span>{msg.timestamp}</span>
-                        {msg.disclaimer && <span className="italic text-slate-400">{msg.disclaimer}</span>}
+                        {msg.sender === "patient" && (
+                          <CheckCheck className="h-3.5 w-3.5 text-purple-300" />
+                        )}
+                        {msg.disclaimer && <span className="italic text-slate-500 ml-2">{msg.disclaimer}</span>}
                       </div>
                     </div>
                   </div>
                 ))}
 
-                {/* Thinking Indicator */}
+                {/* Thinking / Typing State (Reference Image 2) */}
                 {askAssistant.isPending && (
-                  <div className="flex items-center gap-3 mr-auto">
-                    <div className="h-7 w-7 rounded-full bg-indigo-950 border border-cyan-400/50 text-cyan-300 flex items-center justify-center shrink-0">
-                      <Sparkles className="h-3.5 w-3.5 text-cyan-400 animate-spin" />
+                  <div className="flex gap-3 mr-auto max-w-[85%]">
+                    <div className="h-8 w-8 rounded-2xl bg-gradient-to-tr from-purple-600 to-cyan-400 p-[1.5px] shrink-0 shadow-[0_0_10px_rgba(56,189,248,0.5)]">
+                      <div className="w-full h-full rounded-[14px] bg-[#0c0f2b] flex items-center justify-center">
+                        <Sparkles className="h-4 w-4 text-cyan-300 animate-spin" />
+                      </div>
                     </div>
-                    <div className="bg-[#121636]/90 border border-indigo-900/60 p-3 rounded-2xl rounded-tl-xs text-xs text-cyan-300 flex items-center gap-2 shadow-md">
-                      <Sparkles className="h-4 w-4 text-cyan-400 animate-spin" />
-                      Retrieving medical guidelines & patient health records...
+                    <div className="bg-[#0e1233]/95 border border-indigo-500/35 p-3.5 rounded-3xl rounded-tl-sm text-xs text-cyan-300 flex items-center gap-2 shadow-lg backdrop-blur-md">
+                      <span>Let me understand and analyze your question. Thinking...</span>
+                      <span className="flex gap-1 items-center">
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </span>
                     </div>
                   </div>
                 )}
+
+                <div ref={messagesEndRef} />
               </div>
 
-              {/* Input Form (Image 2 style) */}
-              <div className="p-3.5 border-t border-indigo-950/80 bg-[#070919]/90 relative z-10">
+              {/* ── INPUT COMPOSER (Reference Image 2) ──────────────────────── */}
+              <div className="p-3 sm:p-5 border-t border-indigo-950/80 bg-[#060818]/95 relative z-20">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleSend();
                   }}
-                  className="bg-[#0c0f2a]/95 border border-indigo-500/35 focus-within:border-cyan-400/80 focus-within:ring-2 focus-within:ring-cyan-400/20 rounded-full p-1 pl-4 flex items-center gap-2 shadow-inner transition-all"
+                  className="bg-[#0b0e29]/95 border border-indigo-500/40 focus-within:border-purple-400/80 focus-within:ring-2 focus-within:ring-purple-500/20 rounded-3xl p-3 sm:p-4 space-y-2 shadow-2xl transition-all"
                 >
-                  <input
+                  {/* File Attachment Pill if selected */}
+                  {attachedFile && (
+                    <div className="flex items-center justify-between bg-purple-950/60 border border-purple-500/50 rounded-xl px-3 py-1.5 text-xs text-purple-200">
+                      <div className="flex items-center gap-2 truncate">
+                        <Paperclip className="h-3.5 w-3.5 text-purple-400" />
+                        <span className="truncate">{attachedFile.name} ({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAttachedFile(null)}
+                        className="text-purple-300 hover:text-white p-0.5"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Main Input Textarea/Field */}
+                  <textarea
+                    rows={1}
                     value={inputQuery}
                     onChange={(e) => setInputQuery(e.target.value)}
-                    placeholder="Type your message..."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="Type your health question..."
                     disabled={askAssistant.isPending}
-                    className="bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none focus:ring-0 text-xs sm:text-sm flex-1"
+                    className="w-full bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none focus:ring-0 text-sm sm:text-[15px] resize-none max-h-24 min-h-[36px]"
                   />
-                  <button
-                    type="submit"
-                    disabled={askAssistant.isPending || !inputQuery.trim()}
-                    aria-label="Send message"
-                    className="h-9 w-9 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-950/60 shrink-0 transition-transform active:scale-95 disabled:opacity-40 cursor-pointer"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
+
+                  {/* Bottom Actions Toolbar: Attach, Voice, Report Upload, and Send */}
+                  <div className="flex items-center justify-between pt-1 border-t border-indigo-950/60">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      {/* 1. Attach File */}
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        accept="image/*,.pdf,.txt"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-2.5 py-1.5 rounded-xl bg-[#11163b]/80 hover:bg-indigo-900/60 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-indigo-500/25 transition-all cursor-pointer"
+                      >
+                        <Paperclip className="h-3.5 w-3.5 text-purple-400" />
+                        <span className="hidden sm:inline">Attach File</span>
+                      </button>
+
+                      {/* 2. Voice Input */}
+                      <button
+                        type="button"
+                        onClick={toggleVoiceInput}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                          isListening
+                            ? "bg-red-950/80 text-red-200 border-red-500 animate-pulse"
+                            : "bg-[#11163b]/80 hover:bg-indigo-900/60 text-slate-300 hover:text-white border-indigo-500/25"
+                        }`}
+                      >
+                        {isListening ? (
+                          <MicOff className="h-3.5 w-3.5 text-red-400" />
+                        ) : (
+                          <Mic className="h-3.5 w-3.5 text-cyan-400" />
+                        )}
+                        <span className="hidden sm:inline">{isListening ? "Listening..." : "Voice Input"}</span>
+                      </button>
+
+                      {/* 3. Upload Report */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onClose) onClose();
+                          setLocation("/patient/lab-reports");
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-[#11163b]/80 hover:bg-indigo-900/60 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-indigo-500/25 transition-all cursor-pointer"
+                      >
+                        <UploadCloud className="h-3.5 w-3.5 text-emerald-400" />
+                        <span className="hidden sm:inline">Upload Report</span>
+                      </button>
+                    </div>
+
+                    {/* Circular Glowing Send Button (Reference Image 2) */}
+                    <button
+                      type="submit"
+                      disabled={askAssistant.isPending || (!inputQuery.trim() && !attachedFile)}
+                      aria-label="Send health question"
+                      className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.5)] shrink-0 transition-transform active:scale-95 disabled:opacity-30 cursor-pointer border border-purple-300/40"
+                    >
+                      <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </button>
+                  </div>
                 </form>
               </div>
+
+              {/* ── FOOTER: MEDICAL DISCLAIMER & EMERGENCY SOS ──────────────── */}
+              <footer className="px-4 sm:px-6 py-2.5 border-t border-indigo-950/80 bg-[#040612]/95 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-[11px] text-slate-400 shrink-0">
+                <div className="flex items-center gap-2 text-center sm:text-left">
+                  <ShieldAlert className="h-4 w-4 text-purple-400 shrink-0 hidden sm:block" />
+                  <p className="leading-tight">
+                    Arogyagenie AI provides health information and guidance, not a diagnosis. For emergencies, contact emergency services or visit the nearest hospital.
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setActiveNavTab("emergency")}
+                  className="h-7 px-3 rounded-full bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold text-xs shadow-md shrink-0 gap-1.5 border border-red-400/40 cursor-pointer"
+                >
+                  <Phone className="h-3 w-3" /> Emergency (SOS)
+                </Button>
+              </footer>
             </div>
           )}
 
           {/* TAB 2: SYMPTOMS (Quick AI Symptom Assessment) */}
           {activeNavTab === "symptoms" && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-              <div className="bg-[#121638]/80 border border-indigo-500/30 rounded-2xl p-4 space-y-2">
-                <h3 className="font-bold text-base text-white flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-cyan-400" /> AI Symptom Intelligence
-                </h3>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-indigo-900/60">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-cyan-400" />
+                  <h3 className="font-bold text-base text-white">AI Symptom Intelligence</h3>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveNavTab("chat")}
+                  className="text-xs text-purple-300 hover:text-white"
+                >
+                  Back to Chat
+                </Button>
+              </div>
+
+              <div className="bg-[#0e1233]/90 border border-indigo-500/30 rounded-2xl p-4 space-y-2">
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Select a common symptom category to quickly consult the AI, or open the full 2-stage clinical symptom assessment.
+                  Select a common symptom category to quickly consult the AI, or open the interactive 2-stage clinical symptom assessment.
                 </p>
               </div>
 
               {/* Symptom Quick Launch Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {QUICK_SYMPTOM_CATEGORIES.map((cat, idx) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { label: "Headache & Migraine", query: "I have a pulsating headache and sensitivity to light. What could be the causes and clinical remedies?" },
+                  { label: "Fever & Chills", query: "I have a high fever with chills and body ache. What are the recommended diagnostic next steps?" },
+                  { label: "Chest Discomfort", query: "I feel chest tightness and mild breathlessness. What should I check immediately?" },
+                  { label: "Cough & Throat", query: "I have a persistent dry cough and sore throat for 3 days. What are the clinical guidelines?" },
+                  { label: "Stomach Ache & Nausea", query: "I have sharp abdominal pain and nausea after eating." },
+                  { label: "Joint & Muscle Pain", query: "I have stiffness and pain in my knee joints in the morning." },
+                ].map((cat, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => handleSend(cat.query)}
-                    className="p-3 rounded-xl bg-[#101438]/90 hover:bg-indigo-900/50 border border-indigo-500/30 hover:border-cyan-400 text-left transition-all group cursor-pointer"
+                    className="p-3.5 rounded-2xl bg-[#0f143a]/90 hover:bg-indigo-900/50 border border-indigo-500/30 hover:border-cyan-400 text-left transition-all group cursor-pointer space-y-1"
                   >
-                    <span className="font-bold text-xs text-white group-hover:text-cyan-300 block mb-1">
+                    <span className="font-bold text-xs text-white group-hover:text-cyan-300 block">
                       {cat.label}
                     </span>
                     <p className="text-[11px] text-slate-400 line-clamp-1">{cat.query}</p>
@@ -624,7 +1050,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
               </div>
 
               {/* Shortcut to full symptom check page */}
-              <div className="p-3.5 rounded-xl bg-gradient-to-r from-purple-950/50 to-indigo-950/50 border border-purple-500/40 flex items-center justify-between gap-3">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/60 to-indigo-950/60 border border-purple-500/40 flex items-center justify-between gap-3">
                 <div>
                   <h4 className="font-bold text-xs text-white">Need a comprehensive assessment?</h4>
                   <p className="text-[11px] text-slate-400">Launch the 2-stage interactive body area symptom checker</p>
@@ -641,7 +1067,6 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                 </Button>
               </div>
 
-              {/* Recent assessments summary if available */}
               {assessments && assessments.length > 0 && (
                 <div className="space-y-2 pt-2">
                   <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
@@ -649,7 +1074,7 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                   </span>
                   <div className="space-y-2">
                     {assessments.slice(0, 3).map((a: any) => (
-                      <div key={a.id} className="p-2.5 rounded-xl bg-[#0f1230] border border-indigo-900/50 flex items-center justify-between text-xs">
+                      <div key={a.id} className="p-3 rounded-xl bg-[#0e1233] border border-indigo-900/50 flex items-center justify-between text-xs">
                         <div>
                           <p className="font-semibold text-slate-200">{a.symptoms}</p>
                           <span className="text-[10px] text-slate-400">{a.assessmentDate}</span>
@@ -667,24 +1092,55 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
 
           {/* TAB 3: HEALTH TIPS (AI Daily Clinical Insights) */}
           {activeNavTab === "health_tips" && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
-              <div className="bg-[#121638]/80 border border-indigo-500/30 rounded-2xl p-4 space-y-1">
-                <h3 className="font-bold text-base text-white flex items-center gap-2">
-                  <Lightbulb className="h-4 w-4 text-amber-400" /> AI Daily Health & Wellness Insights
-                </h3>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Personalized evidence-based health guidance grounded in verified medical literature.
-                </p>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-indigo-900/60">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5 text-amber-400" />
+                  <h3 className="font-bold text-base text-white">Daily Health & Wellness Insights</h3>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveNavTab("chat")}
+                  className="text-xs text-purple-300 hover:text-white"
+                >
+                  Back to Chat
+                </Button>
               </div>
 
               <div className="space-y-3">
-                {HEALTH_TIPS.map((tip, idx) => (
+                {[
+                  {
+                    title: "Cardiovascular & Aerobic Fitness",
+                    category: "Vitals & Heart",
+                    desc: "Aim for 30 minutes of moderate aerobic activity 5 days a week to maintain endothelial flexibility and blood pressure regulation.",
+                    prompt: "What are the clinically proven benefits of 30-minute daily cardio on cardiovascular health?",
+                  },
+                  {
+                    title: "Hydration & Renal Filtration",
+                    category: "Kidney & Metabolism",
+                    desc: "Maintaining 2.5–3L of daily hydration optimizes glomerular filtration rate and prevents kidney stone formation.",
+                    prompt: "How does optimal daily water intake protect renal function and metabolic efficiency?",
+                  },
+                  {
+                    title: "Sleep Architecture & Immune Recovery",
+                    category: "Immunity & Brain",
+                    desc: "7–8 hours of consistent slow-wave sleep regulates natural killer cell activity and suppresses systemic inflammatory cytokines.",
+                    prompt: "Explain how deep restorative sleep strengthens immune resilience against infections.",
+                  },
+                  {
+                    title: "Iron & Vitamin C Absorption",
+                    category: "Nutrition",
+                    desc: "Pair non-heme plant-based iron sources (spinach, lentils) with Vitamin C (citrus, amla) for up to 3x higher bio-absorption.",
+                    prompt: "What dietary pairings maximize iron absorption to prevent nutritional anemia?",
+                  },
+                ].map((tip, idx) => (
                   <div
                     key={idx}
-                    className="p-3.5 rounded-2xl bg-[#0e1233]/90 border border-indigo-500/30 hover:border-indigo-400 transition-all space-y-2"
+                    className="p-4 rounded-2xl bg-[#0e1233]/90 border border-indigo-500/30 hover:border-indigo-400 transition-all space-y-2"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-xs text-white">{tip.title}</span>
+                      <span className="font-bold text-xs sm:text-sm text-white">{tip.title}</span>
                       <Badge className="bg-indigo-950 text-indigo-300 border-indigo-700 text-[9px]">
                         {tip.category}
                       </Badge>
@@ -706,17 +1162,32 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
             </div>
           )}
 
-          {/* TAB 4: EMERGENCY (Emergency SOS & Safety Hub) */}
+          {/* TAB 4: EMERGENCY SOS */}
           {activeNavTab === "emergency" && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-indigo-900/60">
+                <div className="flex items-center gap-2">
+                  <HeartPulse className="h-5 w-5 text-red-400 animate-pulse" />
+                  <h3 className="font-bold text-base text-red-300">Emergency Medical Assistance</h3>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveNavTab("chat")}
+                  className="text-xs text-purple-300 hover:text-white"
+                >
+                  Back to Chat
+                </Button>
+              </div>
+
               {/* Emergency Banner */}
               <div className="bg-red-950/80 border-2 border-red-500/80 rounded-2xl p-4 space-y-2">
                 <div className="flex items-center gap-2 text-red-300 font-bold text-sm">
                   <ShieldAlert className="h-5 w-5 text-red-400 animate-bounce" />
-                  EMERGENCY MEDICAL ASSISTANCE
+                  CRITICAL HEALTH EMERGENCY
                 </div>
                 <p className="text-xs text-red-200 leading-relaxed">
-                  If you or someone nearby is experiencing acute chest pain, severe breathing difficulty, sudden speech/facial paralysis, or uncontrollable bleeding, call emergency services immediately.
+                  If you or someone nearby is experiencing acute chest pain, severe breathing difficulty, sudden paralysis, or uncontrollable bleeding, call emergency services immediately.
                 </p>
               </div>
 
@@ -724,44 +1195,42 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <a
                   href="tel:108"
-                  className="p-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white flex items-center justify-between shadow-lg shadow-red-950/50 transition-transform active:scale-95"
+                  className="p-4 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white flex items-center justify-between shadow-lg shadow-red-950/50 transition-transform active:scale-95"
                 >
                   <div>
                     <span className="text-[10px] uppercase font-bold text-red-200 block">Ambulance</span>
-                    <span className="text-xl font-black">108</span>
+                    <span className="text-2xl font-black">108</span>
                   </div>
-                  <Phone className="h-5 w-5" />
+                  <Phone className="h-6 w-6" />
                 </a>
 
                 <a
                   href="tel:112"
-                  className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 text-white flex items-center justify-between shadow-lg transition-transform active:scale-95"
+                  className="p-4 rounded-2xl bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 text-white flex items-center justify-between shadow-lg transition-transform active:scale-95"
                 >
                   <div>
                     <span className="text-[10px] uppercase font-bold text-indigo-200 block">National SOS</span>
-                    <span className="text-xl font-black">112</span>
+                    <span className="text-2xl font-black">112</span>
                   </div>
-                  <Phone className="h-5 w-5" />
+                  <Phone className="h-6 w-6" />
                 </a>
               </div>
 
-              {/* Patient Emergency Contact */}
               {user?.emergencyContact && (
-                <div className="p-3.5 rounded-2xl bg-[#121638] border border-indigo-500/30 flex items-center justify-between text-xs">
+                <div className="p-3.5 rounded-2xl bg-[#0e1233] border border-indigo-500/30 flex items-center justify-between text-xs">
                   <div>
                     <span className="text-[10px] font-bold uppercase text-slate-400 block">Your Emergency Contact</span>
                     <span className="font-bold text-white text-sm">{user.emergencyContact}</span>
                   </div>
                   <a
                     href={`tel:${user.emergencyContact}`}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5"
                   >
-                    <Phone className="h-3.5 w-3.5" /> Call
+                    <Phone className="h-3.5 w-3.5" /> Call Contact
                   </a>
                 </div>
               )}
 
-              {/* Nearest Emergency Care Shortcut */}
               <Button
                 type="button"
                 onClick={() => {
@@ -770,13 +1239,12 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                 }}
                 className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-xs h-11 rounded-2xl gap-2 shadow-md cursor-pointer"
               >
-                <Building2 className="h-4 w-4 text-emerald-400" /> Open Partner Hospital Discovery Map
+                <Building2 className="h-4 w-4 text-emerald-400" /> Open Emergency Hospital Discovery Map
               </Button>
             </div>
           )}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
-

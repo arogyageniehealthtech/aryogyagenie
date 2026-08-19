@@ -257,6 +257,15 @@ export function formatDateToYYYYMMDD(d: Date): string {
 }
 
 /**
+ * Calculates a YYYY-MM-DD date string N days before the given reference date (defaults to today).
+ */
+export function getDateNDaysAgo(days: number, fromDate: Date = new Date()): string {
+  const d = new Date(fromDate);
+  d.setDate(d.getDate() - days);
+  return formatDateToYYYYMMDD(d);
+}
+
+/**
  * Generates all time slots for a doctor on a specific date, cross-referencing with existing bookings.
  */
 export async function getDoctorAvailableSlots(

@@ -241,6 +241,18 @@ export interface DoctorDashboard {
   upcomingAppointmentsCount?: number;
   completedAppointments: number;
   totalPrescriptions: number;
+  todayPrescriptions?: number;
+  last90DaysPrescriptions?: number;
+  last1YearPrescriptions?: number;
+  prescriptionsSummary?: {
+    today: number;
+    last90Days: number;
+    last1Year: number;
+    total: number;
+  };
+  todayAppointmentsList?: Appointment[];
+  upcomingAppointmentsList?: Appointment[];
+  pendingAppointmentsList?: Appointment[];
   upcomingAppointments: Appointment[];
   recentPatients: PatientSummary[];
 }

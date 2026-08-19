@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { eq, inArray, desc, or, isNull } from "drizzle-orm";
+import { eq, inArray, desc, or, isNull, and, gte, lte, type SQL } from "drizzle-orm";
 import { db, prescriptionsTable, usersTable, doctorsTable, pharmaciesTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parsePaginationParams, setPaginationHeaders } from "../lib/pagination";
+import { formatDateToYYYYMMDD, getDateNDaysAgo } from "../services/schedulingService";
 
 const router = Router();
 
@@ -10,21 +11,42 @@ const router = Router();
 router.get("/prescriptions", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, req.userId!) });
   const pagination = parsePaginationParams(req);
+  const { interval, startDate, endDate } = req.query as { interval?: string; startDate?: string; endDate?: string };
 
-  let whereClause;
+  const conditions: SQL[] = [];
+
   if (user?.role === "doctor") {
     const doctor = await db.query.doctorsTable.findFirst({ where: eq(doctorsTable.userId, req.userId!) });
     if (!doctor) { res.json([]); return; }
-    whereClause = eq(prescriptionsTable.doctorId, doctor.id);
+    conditions.push(eq(prescriptionsTable.doctorId, doctor.id));
   } else if (user?.role === "pharmacy") {
     const pharmacy = await db.query.pharmaciesTable.findFirst({ where: eq(pharmaciesTable.userId, req.userId!) });
     if (!pharmacy) { res.json([]); return; }
-    whereClause = or(eq(prescriptionsTable.pharmacyId, pharmacy.id), isNull(prescriptionsTable.pharmacyId));
+    conditions.push(or(eq(prescriptionsTable.pharmacyId, pharmacy.id), isNull(prescriptionsTable.pharmacyId))!);
   } else if (user?.role === "admin") {
-    whereClause = undefined;
+    // Admin sees all
   } else {
-    whereClause = eq(prescriptionsTable.patientId, req.userId!);
+    conditions.push(eq(prescriptionsTable.patientId, req.userId!));
   }
+
+  // Interval & Date Filtering
+  const today = formatDateToYYYYMMDD(new Date());
+  if (interval === "today" || interval === "1day") {
+    conditions.push(eq(prescriptionsTable.prescribedDate, today));
+  } else if (interval === "90days" || interval === "90_days" || interval === "last_90_days") {
+    conditions.push(gte(prescriptionsTable.prescribedDate, getDateNDaysAgo(90)));
+  } else if (interval === "1year" || interval === "1_year" || interval === "last_1_year") {
+    conditions.push(gte(prescriptionsTable.prescribedDate, getDateNDaysAgo(365)));
+  }
+
+  if (startDate) {
+    conditions.push(gte(prescriptionsTable.prescribedDate, startDate));
+  }
+  if (endDate) {
+    conditions.push(lte(prescriptionsTable.prescribedDate, endDate));
+  }
+
+  const whereClause = conditions.length === 0 ? undefined : conditions.length === 1 ? conditions[0] : and(...conditions);
 
   const [totalCountResult] = await db
     .select({ count: db.$count(prescriptionsTable, whereClause) })

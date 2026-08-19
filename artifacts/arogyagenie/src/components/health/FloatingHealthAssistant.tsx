@@ -57,10 +57,10 @@ export function FloatingHealthAssistant() {
               damping: 28,
               mass: 0.9,
             }}
-            className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 sm:left-auto z-50 w-full sm:w-[500px] md:w-[680px] lg:w-[720px] max-w-none sm:max-w-[calc(100vw-1rem)] h-[100dvh] sm:h-[640px] max-h-none sm:max-h-[calc(100vh-6.5rem)] bg-[#07091d] rounded-none sm:rounded-3xl overflow-hidden flex flex-col border-0 sm:border sm:border-indigo-500/30"
+            className="fixed inset-0 sm:inset-auto sm:bottom-16 sm:right-6 sm:left-auto z-50 w-full sm:w-[620px] md:w-[820px] lg:w-[990px] xl:w-[1080px] max-w-none sm:max-w-[calc(100vw-2rem)] h-[100dvh] sm:h-[680px] lg:h-[740px] max-h-none sm:max-h-[calc(100vh-5rem)] bg-[#060819] rounded-none sm:rounded-[32px] overflow-hidden flex flex-col border-0 sm:border sm:border-indigo-500/40"
             style={{
               boxShadow:
-                "0 30px 90px -15px rgba(59, 63, 191, 0.45), 0 10px 30px -10px rgba(15, 23, 42, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.25)",
+                "0 30px 100px -10px rgba(88, 28, 135, 0.5), 0 20px 50px -10px rgba(30, 27, 75, 0.7), 0 0 0 1px rgba(129, 140, 248, 0.3)",
             }}
           >
             {/* Top ambient accent beam */}
