@@ -230,114 +230,6 @@ function createCyberHudCanvasTexture(): THREE.CanvasTexture {
   return texture;
 }
 
-/**
- * Generates floating mini holographic HUD data panels (left & right widgets)
- */
-function createFloatingHudPanelTexture(type: "ecg" | "metrics"): THREE.CanvasTexture {
-  const w = 512;
-  const h = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-
-  if (!ctx) return new THREE.CanvasTexture(canvas);
-
-  ctx.clearRect(0, 0, w, h);
-
-  // Semi-transparent glowing card background
-  ctx.fillStyle = "rgba(6, 12, 38, 0.75)";
-  ctx.roundRect(8, 8, w - 16, h - 16, 16);
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(56, 189, 248, 0.7)";
-  ctx.lineWidth = 2.5;
-  ctx.shadowColor = "#00f5ff";
-  ctx.shadowBlur = 10;
-  ctx.roundRect(8, 8, w - 16, h - 16, 16);
-  ctx.stroke();
-
-  if (type === "ecg") {
-    // Header
-    ctx.font = "bold 22px 'Inter', sans-serif";
-    ctx.fillStyle = "#00f5ff";
-    ctx.fillText("LIVE VITAL STATUS", 28, 44);
-
-    ctx.font = "16px 'Inter', sans-serif";
-    ctx.fillStyle = "#a855f7";
-    ctx.fillText("HEART PULSE: 72 BPM • OPTIMAL", 28, 72);
-
-    // EKG Graph
-    ctx.beginPath();
-    ctx.moveTo(28, 150);
-    ctx.lineTo(80, 150);
-    ctx.lineTo(110, 140);
-    ctx.lineTo(130, 190);
-    ctx.lineTo(160, 90);
-    ctx.lineTo(190, 180);
-    ctx.lineTo(210, 150);
-    ctx.lineTo(260, 150);
-    ctx.lineTo(290, 130);
-    ctx.lineTo(310, 200);
-    ctx.lineTo(340, 80);
-    ctx.lineTo(370, 175);
-    ctx.lineTo(390, 150);
-    ctx.lineTo(480, 150);
-
-    ctx.strokeStyle = "#00f5ff";
-    ctx.lineWidth = 3;
-    ctx.shadowColor = "#00f5ff";
-    ctx.shadowBlur = 12;
-    ctx.stroke();
-
-    // Bottom telemetry bar
-    ctx.fillStyle = "rgba(56, 189, 248, 0.3)";
-    ctx.roundRect(28, 210, 450, 14, 6);
-    ctx.fill();
-    ctx.fillStyle = "#00f5ff";
-    ctx.roundRect(28, 210, 360, 14, 6);
-    ctx.fill();
-  } else {
-    // Metrics
-    ctx.font = "bold 22px 'Inter', sans-serif";
-    ctx.fillStyle = "#a855f7";
-    ctx.fillText("AI NEURAL DIAGNOSTIC", 28, 44);
-
-    ctx.font = "16px 'Inter', sans-serif";
-    ctx.fillStyle = "#38bdf8";
-    ctx.fillText("CLINICAL RAG: ACTIVE (100%)", 28, 72);
-
-    // Progress Bars
-    const items = [
-      { label: "Symptom Accuracy", val: 380, color: "#00f5ff" },
-      { label: "Safety Triaging", val: 420, color: "#a855f7" },
-      { label: "Biometric Sync", val: 340, color: "#38bdf8" },
-    ];
-
-    items.forEach((item, idx) => {
-      const y = 110 + idx * 40;
-      ctx.font = "14px 'Inter', sans-serif";
-      ctx.fillStyle = "#e2e8f0";
-      ctx.fillText(item.label, 28, y);
-
-      ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
-      ctx.roundRect(210, y - 12, 260, 14, 6);
-      ctx.fill();
-
-      ctx.fillStyle = item.color;
-      ctx.shadowColor = item.color;
-      ctx.shadowBlur = 8;
-      ctx.roundRect(210, y - 12, item.val - 210, 14, 6);
-      ctx.fill();
-    });
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  return texture;
-}
-
 export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMotionActive, setIsMotionActive] = useState(true);
@@ -351,16 +243,16 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     const container = containerRef.current;
     if (!container) return;
 
-    // 1. Scene & Elevated Camera (~20 deg top-down angle)
+    // 1. Scene & Elevated Camera
     const width = container.clientWidth || 260;
     const height = container.clientHeight || 290;
 
     const scene = new THREE.Scene();
     
-    // 40-degree top-down elevated perspective camera
+    // Positioned and aimed so both top antennae/horns and the circular HUD base are 100% visible with ample margin
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-    camera.position.set(0, 2.8, 5.2);
-    camera.lookAt(0, -0.2, 0);
+    camera.position.set(0, 2.0, 5.8);
+    camera.lookAt(0, 0.05, 0);
 
     // 2. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
@@ -429,13 +321,13 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
 
     // 4. Hierarchical Bot Construction
     const botRoot = new THREE.Group();
-    // Positioned with ample headroom for top horns
-    botRoot.position.set(0, -0.15, 0);
+    // Lowered to provide generous headroom for the top horns/antennae
+    botRoot.position.set(0, -0.42, 0);
     scene.add(botRoot);
 
     // --- Floating Robot Body Group ---
     const botBodyGroup = new THREE.Group();
-    botBodyGroup.position.set(0, 0.45, 0);
+    botBodyGroup.position.set(0, 0.38, 0);
     botRoot.add(botBodyGroup);
 
     // Main Torso (Curved egg/capsule shape)
@@ -672,46 +564,6 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
     coreRingMesh.position.z = 0.02;
     holoBaseGroup.add(coreRingMesh);
 
-    // =========================================================================
-    // 6. Floating Holographic Telemetry Panels (Left & Right - As in Image 2)
-    // =========================================================================
-    const hudCardsGroup = new THREE.Group();
-    botRoot.add(hudCardsGroup);
-
-    // Left Floating Live Vital Panel
-    const leftCardTex = createFloatingHudPanelTexture("ecg");
-    const leftCardGeo = new THREE.PlaneGeometry(0.92, 0.46);
-    const leftCardMat = new THREE.MeshBasicMaterial({
-      map: leftCardTex,
-      transparent: true,
-      opacity: 0.90,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const leftCardMesh = new THREE.Mesh(leftCardGeo, leftCardMat);
-    leftCardMesh.position.set(-1.18, -0.72, 0.38);
-    leftCardMesh.rotation.y = 0.28;
-    leftCardMesh.rotation.x = -0.42; // Tilted toward 40 deg camera
-    hudCardsGroup.add(leftCardMesh);
-
-    // Right Floating Diagnostics Panel
-    const rightCardTex = createFloatingHudPanelTexture("metrics");
-    const rightCardGeo = new THREE.PlaneGeometry(0.92, 0.46);
-    const rightCardMat = new THREE.MeshBasicMaterial({
-      map: rightCardTex,
-      transparent: true,
-      opacity: 0.90,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const rightCardMesh = new THREE.Mesh(rightCardGeo, rightCardMat);
-    rightCardMesh.position.set(1.18, -0.72, 0.38);
-    rightCardMesh.rotation.y = -0.28;
-    rightCardMesh.rotation.x = -0.42; // Tilted toward 40 deg camera
-    hudCardsGroup.add(rightCardMesh);
-
     // Layer 7: Upward-Floating Levitation Energy Embers
     const particleCount = 65;
     const particleGeo = new THREE.BufferGeometry();
@@ -795,7 +647,7 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       const time = clock.getElapsedTime();
 
       // Smooth Levitation Floating in Mid-Air
-      botBodyGroup.position.y = 0.45 + Math.sin(time * 2.2) * 0.08;
+      botBodyGroup.position.y = 0.38 + Math.sin(time * 2.2) * 0.08;
 
       // Gentle wave on right arm
       armRGroup.rotation.z = Math.sin(time * 3.2) * 0.16 - 0.10;
@@ -814,10 +666,6 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       nodeGroup.rotation.z = time * 0.80;
       coreRingMesh.rotation.z = -time * 1.20;
       particlePoints.rotation.z = time * 0.25;
-
-      // Floating HUD cards hover bobbing
-      leftCardMesh.position.y = -0.72 + Math.sin(time * 2.0 + 1) * 0.03;
-      rightCardMesh.position.y = -0.72 + Math.sin(time * 2.0 + 2) * 0.03;
 
       // Pulsing Antenna Bulbs ("Horns")
       const bulbGlow = 0.88 + Math.sin(time * 3.2) * 0.22;
@@ -864,8 +712,6 @@ export function AarogyaBot3D({ className = "" }: AarogyaBot3DProps) {
       }
       renderer.dispose();
       hudTexture.dispose();
-      leftCardTex.dispose();
-      rightCardTex.dispose();
     };
   }, []);
 
