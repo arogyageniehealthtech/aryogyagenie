@@ -606,6 +606,30 @@ export interface NearbyPharmacyResult {
   } | null;
 }
 
+export interface NearbyHospitalResult {
+  id: number;
+  type: "hospital";
+  name: string;
+  phone?: string | null;
+  emergencyHelpline?: string | null;
+  address?: string | null;
+  city?: string | null;
+  openingHours?: string | null;
+  rating?: number | null;
+  availableBeds?: number;
+  totalBeds?: number;
+  departments?: string[];
+  specialties?: Array<{
+    name: string;
+    availableBeds: number;
+    totalBeds?: number;
+  }>;
+  latitude: number;
+  longitude: number;
+  distanceKm: number;
+  distanceType: "straight_line_geographic";
+}
+
 // ─── PostGIS Query Implementations ────────────────────────────────────────────
 
 /**
@@ -805,7 +829,15 @@ export async function searchNearbyDoctors(options: {
     bio: r.bio,
     rating: r.rating,
     reviewCount: r.reviewCount ?? 0,
-    availableDays: r.availableDays ? (Array.isArray(r.availableDays) ? r.availableDays : JSON.parse(r.availableDays || "[]")) : null,
+    availableDays: r.availableDays
+      ? Array.isArray(r.availableDays)
+        ? r.availableDays
+        : typeof r.availableDays === "string"
+        ? r.availableDays.trim().startsWith("[")
+          ? (() => { try { return JSON.parse(r.availableDays); } catch { return [r.availableDays]; } })()
+          : r.availableDays.split(",").map((s: string) => s.trim())
+        : null
+      : null,
     availableHours: r.availableHours,
     latitude: r.latitude,
     longitude: r.longitude,
@@ -1125,3 +1157,183 @@ export async function searchNearbyPharmacies(options: {
 
   return { results, total };
 }
+
+export const DEMO_HOSPITALS_LIST = [
+  {
+    id: 101,
+    name: "Arogyagenie Super Specialty Hospital (Demo 1)",
+    phone: "+91 98300 11001",
+    emergencyHelpline: "108 / +91 98300 11001",
+    address: "VIP Road, Block A, Lake Town, Kolkata - 700089",
+    city: "Kolkata",
+    latitude: 22.5980,
+    longitude: 88.4020,
+    availableBeds: 48,
+    totalBeds: 120,
+    rating: 4.8,
+    openingHours: "24x7 Emergency & Inpatient Care",
+    departments: ["Emergency & Trauma", "Cardiology", "General Medicine", "Obstetrics & Gynecology", "Orthopedics"],
+    specialties: [
+      { name: "General Medicine", availableBeds: 18, totalBeds: 40 },
+      { name: "Cardiology & ICU", availableBeds: 12, totalBeds: 30 },
+      { name: "Gynecology & Maternity", availableBeds: 10, totalBeds: 25 },
+      { name: "Orthopedics", availableBeds: 8, totalBeds: 25 },
+    ],
+  },
+  {
+    id: 102,
+    name: "Arogyagenie City Care Hospital (Demo 2)",
+    phone: "+91 98300 11002",
+    emergencyHelpline: "108 / +91 98300 11002",
+    address: "Sector V, Salt Lake Electronics Complex, Kolkata - 700091",
+    city: "Kolkata",
+    latitude: 22.5830,
+    longitude: 88.4310,
+    availableBeds: 35,
+    totalBeds: 90,
+    rating: 4.7,
+    openingHours: "24x7 Emergency & Critical Care",
+    departments: ["Cardiology", "General Physician", "Pediatrics", "Critical Care ICU"],
+    specialties: [
+      { name: "General Physician", availableBeds: 14, totalBeds: 35 },
+      { name: "Cardiology", availableBeds: 9, totalBeds: 25 },
+      { name: "Pediatrics & Neonatal", availableBeds: 12, totalBeds: 30 },
+    ],
+  },
+  {
+    id: 103,
+    name: "Arogyagenie Metro Health Institute (Demo 3)",
+    phone: "+91 98300 11003",
+    emergencyHelpline: "108 / +91 98300 11003",
+    address: "Park Street Extension, Central Kolkata - 700016",
+    city: "Kolkata",
+    latitude: 22.5540,
+    longitude: 88.3520,
+    availableBeds: 62,
+    totalBeds: 160,
+    rating: 4.9,
+    openingHours: "24x7 Level-1 Trauma & Multispecialty",
+    departments: ["General Medicine", "Cardiology & CCU", "Neurology", "Obstetrics & Gynecology"],
+    specialties: [
+      { name: "General Physician", availableBeds: 25, totalBeds: 60 },
+      { name: "Cardiology & CCU", availableBeds: 15, totalBeds: 40 },
+      { name: "Neurology & Stroke Unit", availableBeds: 10, totalBeds: 30 },
+      { name: "Gynecology", availableBeds: 12, totalBeds: 30 },
+    ],
+  },
+  {
+    id: 104,
+    name: "Arogyagenie Riverside Medical Center (Demo 4)",
+    phone: "+91 98300 11004",
+    emergencyHelpline: "108 / +91 98300 11004",
+    address: "Grand Trunk Road South, Howrah - 711101",
+    city: "Howrah",
+    latitude: 22.5920,
+    longitude: 88.3240,
+    availableBeds: 28,
+    totalBeds: 75,
+    rating: 4.6,
+    openingHours: "24x7 Emergency & General Healthcare",
+    departments: ["General Medicine", "Emergency & Trauma", "Pulmonology"],
+    specialties: [
+      { name: "General Medicine", availableBeds: 12, totalBeds: 30 },
+      { name: "Emergency & Trauma", availableBeds: 8, totalBeds: 20 },
+      { name: "Pulmonology & Respiratory", availableBeds: 8, totalBeds: 25 },
+    ],
+  },
+  {
+    id: 105,
+    name: "Arogyagenie Apex Multispecialty Hospital (Demo 5)",
+    phone: "+91 98300 11005",
+    emergencyHelpline: "108 / +91 98300 11005",
+    address: "Jessore Road, Near Cantonment, Dum Dum - 700028",
+    city: "Kolkata",
+    latitude: 22.6450,
+    longitude: 88.4190,
+    availableBeds: 54,
+    totalBeds: 140,
+    rating: 4.8,
+    openingHours: "24x7 Comprehensive Multispecialty Hospital",
+    departments: ["General Physician", "Cardiology", "Nephrology & Dialysis", "Gynecology"],
+    specialties: [
+      { name: "General Physician", availableBeds: 20, totalBeds: 50 },
+      { name: "Cardiology", availableBeds: 14, totalBeds: 40 },
+      { name: "Nephrology & Dialysis", availableBeds: 10, totalBeds: 25 },
+      { name: "Gynecology", availableBeds: 10, totalBeds: 25 },
+    ],
+  },
+];
+
+export async function searchNearbyHospitals(options: {
+  lat: number;
+  lng: number;
+  radiusKm: number;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ results: NearbyHospitalResult[]; total: number }> {
+  const { lat, lng, radiusKm, search, limit = 50, offset = 0 } = options;
+
+  function calcHaversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c * 10) / 10;
+  }
+
+  let mapped: NearbyHospitalResult[] = DEMO_HOSPITALS_LIST.map((h) => {
+    const dist = calcHaversine(lat, lng, h.latitude, h.longitude);
+    return {
+      id: h.id,
+      type: "hospital",
+      name: h.name,
+      phone: h.phone,
+      emergencyHelpline: h.emergencyHelpline,
+      address: h.address,
+      city: h.city,
+      openingHours: h.openingHours,
+      rating: h.rating,
+      availableBeds: h.availableBeds,
+      totalBeds: h.totalBeds,
+      departments: h.departments,
+      specialties: h.specialties,
+      latitude: h.latitude,
+      longitude: h.longitude,
+      distanceKm: dist,
+      distanceType: "straight_line_geographic",
+    };
+  });
+
+  if (search && search.trim()) {
+    const s = search.toLowerCase().trim();
+    mapped = mapped.filter(
+      (h) =>
+        h.name.toLowerCase().includes(s) ||
+        (h.address && h.address.toLowerCase().includes(s)) ||
+        (h.city && h.city.toLowerCase().includes(s)) ||
+        (h.departments && h.departments.some((d) => d.toLowerCase().includes(s))) ||
+        (h.specialties && h.specialties.some((sp) => sp.name.toLowerCase().includes(s))),
+    );
+  }
+
+  // Filter within radiusKm (if none inside radius, fallback to all matching sorted by distance)
+  let filtered = mapped.filter((h) => h.distanceKm <= radiusKm);
+  if (filtered.length === 0 && mapped.length > 0) {
+    filtered = mapped;
+  }
+
+  filtered.sort((a, b) => a.distanceKm - b.distanceKm);
+
+  const total = filtered.length;
+  const paginated = filtered.slice(offset, offset + limit);
+
+  return { results: paginated, total };
+}
+

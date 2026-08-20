@@ -5,6 +5,7 @@ import {
   searchNearbyDoctors,
   searchNearbyDiagnosticCenters,
   searchNearbyPharmacies,
+  searchNearbyHospitals,
   resolveProviderCoordinates,
   MIN_RADIUS_KM,
   MAX_RADIUS_KM,
@@ -38,13 +39,13 @@ router.get("/geocode", async (req, res): Promise<void> => {
 
 /**
  * GET /nearby
- * Discover nearby verified Doctors, Diagnostic Centers, and Pharmacies/Medicines.
+ * Discover nearby verified Doctors, Diagnostic Centers, Pharmacies/Medicines, and Hospitals.
  *
  * Query parameters:
  *   lat        - Patient latitude (required, between -90 and 90)
  *   lng        - Patient longitude (required, between -180 and 180)
  *   radius     - Search radius in km (enforced range: 0 km min to 18 km max, default: 10 km)
- *   type       - 'all' | 'doctor' | 'pharmacy' | 'diagnostic_center' (default: 'all')
+ *   type       - 'all' | 'doctor' | 'pharmacy' | 'diagnostic_center' | 'hospital' (default: 'all')
  *   specialty  - Optional doctor specialty filter (e.g., 'Cardiologist', 'General Physician')
  *   service    - Optional diagnostic center service filter (e.g., 'Blood Test', 'MRI')
  *   medicine   - Optional medicine name filter (only returns pharmacies stocking that medicine)
@@ -97,7 +98,7 @@ router.get("/nearby", async (req, res): Promise<void> => {
       );
     }
 
-    // 2. Diagnostic Centers
+    // 2. Diagnostic Centers / Labs
     if (type === "all" || type === "diagnostic_center") {
       promises.push(
         searchNearbyDiagnosticCenters({
@@ -124,6 +125,20 @@ router.get("/nearby", async (req, res): Promise<void> => {
           limit,
           offset,
         }).then((r) => ({ type: "pharmacy", ...r })),
+      );
+    }
+
+    // 4. Hospitals
+    if (type === "all" || type === "hospital") {
+      promises.push(
+        searchNearbyHospitals({
+          lat: coords.lat,
+          lng: coords.lng,
+          radiusKm,
+          search,
+          limit,
+          offset,
+        }).then((r) => ({ type: "hospital", ...r })),
       );
     }
 

@@ -65,7 +65,6 @@ export function PatientDoctors() {
     isSearchingAddress,
   } = useUserLocation();
 
-  const [providerType, setProviderType] = useState<"all" | "doctor" | "diagnostic_center">("all");
   const [customAddressInput, setCustomAddressInput] = useState("");
   const [showAddressBox, setShowAddressBox] = useState(false);
   const [radiusKm, setRadiusKm] = useState(10); // 2 km to 18 km
@@ -76,7 +75,7 @@ export function PatientDoctors() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Doctor search quick suggestions
+  // Doctor search quick suggestions (strictly doctors)
   const DOCTOR_SUGGESTIONS = useMemo(() => [
     { title: "General Physician", category: "Specialty", subtitle: "Fever, cold, routine care & general health", icon: "🩺" },
     { title: "Cardiologist", category: "Specialty", subtitle: "Heart checkup, chest pain & blood pressure", icon: "🫀" },
@@ -84,8 +83,8 @@ export function PatientDoctors() {
     { title: "Pediatrician", category: "Specialty", subtitle: "Child healthcare, vaccinations & growth", icon: "👶" },
     { title: "Orthopedic", category: "Specialty", subtitle: "Bone fractures, joint pain & arthritis", icon: "🦴" },
     { title: "Neurologist", category: "Specialty", subtitle: "Migraines, headaches & nerve disorders", icon: "🧠" },
-    { title: "Complete Blood Count (CBC)", category: "Diagnostic Lab", subtitle: "Pathology blood tests & infection check", icon: "🔬" },
-    { title: "MRI / Digital X-Ray", category: "Diagnostic Lab", subtitle: "Radiology scan & imaging centers", icon: "🩻" },
+    { title: "Gynecologist", category: "Specialty", subtitle: "Women's reproductive & pregnancy health", icon: "🌸" },
+    { title: "ENT Specialist", category: "Specialty", subtitle: "Ear, nose, throat & sinus issues", icon: "👂" },
   ], []);
 
   const filteredSuggestions = useMemo(() => {
@@ -129,7 +128,7 @@ export function PatientDoctors() {
     [hookSelectQuickCity],
   );
 
-  // Fetch nearby providers for Map View from backend PostGIS
+  // Fetch nearby doctors strictly for Map View from backend PostGIS
   const fetchNearbyDoctors = useCallback(async () => {
     setLoadingNearby(true);
     setNearbyFetchError(null);
@@ -138,7 +137,7 @@ export function PatientDoctors() {
         lat: userLoc.lat.toString(),
         lng: userLoc.lng.toString(),
         radius: radiusKm.toString(),
-        type: providerType,
+        type: "doctor",
         ...(specialty !== "all" ? { specialty } : {}),
         ...(search ? { search } : {}),
       });
@@ -146,17 +145,17 @@ export function PatientDoctors() {
       setNearbyDocs(data?.results || []);
     } catch (err: any) {
       setNearbyDocs([]);
-      setNearbyFetchError(err?.message || "Failed to fetch nearby medical providers. Please ensure the backend server is running.");
+      setNearbyFetchError(err?.message || "Failed to fetch nearby doctors. Please ensure the backend server is running.");
     } finally {
       setLoadingNearby(false);
     }
-  }, [userLoc.lat, userLoc.lng, radiusKm, providerType, specialty, search]);
+  }, [userLoc.lat, userLoc.lng, radiusKm, specialty, search]);
 
   useEffect(() => {
     if (viewMode === "map") {
       fetchNearbyDoctors();
     }
-  }, [viewMode, userLoc.lat, userLoc.lng, radiusKm, providerType, specialty, search, fetchNearbyDoctors]);
+  }, [viewMode, userLoc.lat, userLoc.lng, radiusKm, specialty, search, fetchNearbyDoctors]);
 
   const handleSelectDoctor = useCallback((doc: MapProviderItem | null) => {
     setSelectedDocId(doc ? doc.id : null);
@@ -312,44 +311,13 @@ export function PatientDoctors() {
         {/* ── View Toggle: Map vs Grid ────────────────────────────────────────── */}
         {viewMode === "map" ? (
           <div className="space-y-4">
-            {/* Radius & Location Settings Bar */}
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3.5">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                {/* Provider Type Filter Tabs */}
-                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setProviderType("all")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      providerType === "all"
-                        ? "bg-white text-slate-900 shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    ✨ All Care ({nearbyDocs.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setProviderType("doctor")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      providerType === "doctor"
-                        ? "bg-violet-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-violet-700"
-                    }`}
-                  >
-                    🩺 Doctors
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setProviderType("diagnostic_center")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      providerType === "diagnostic_center"
-                        ? "bg-sky-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-sky-700"
-                    }`}
-                  >
-                    🔬 Diagnostic Labs
-                  </button>
+                {/* Doctor Results Count Badge */}
+                <div className="flex items-center gap-2">
+                  <span className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200/80 flex items-center gap-1.5 shadow-2xs">
+                    🩺 Verified Doctors ({nearbyDocs.length})
+                  </span>
                 </div>
 
                 {/* Location Display & Live GPS Controls */}
@@ -399,28 +367,27 @@ export function PatientDoctors() {
                     min={0}
                     max={18}
                     step={1}
-                    onValueChange={(v) => setRadiusKm(v[0])}
+                    onValueChange={(vals) => setRadiusKm(vals[0])}
                     className="flex-1"
                   />
-                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">18 km max</span>
+                  <span className="text-[11px] font-semibold text-slate-400 shrink-0">18 km</span>
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-semibold text-slate-400">Quick Range:</span>
+                <div className="flex items-center gap-1">
                   {[
-                    { label: "2 km (Near Me)", val: 2 },
+                    { label: "2 km", val: 2 },
                     { label: "5 km", val: 5 },
                     { label: "10 km", val: 10 },
-                    { label: "18 km (Full Area)", val: 18 },
+                    { label: "18 km", val: 18 },
                   ].map((m) => (
                     <button
                       key={m.val}
                       type="button"
                       onClick={() => setRadiusKm(m.val)}
-                      className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold transition-all border ${
+                      className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition-all border ${
                         radiusKm === m.val
                           ? "bg-violet-600 text-white border-violet-600 shadow-2xs"
-                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-violet-50 hover:text-violet-700"
+                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
                       {m.label}
@@ -429,33 +396,49 @@ export function PatientDoctors() {
                 </div>
               </div>
 
+              {/* Location Selector Popup Box */}
               {showAddressBox && (
-                <div className="pt-3 border-t border-slate-100 space-y-2 animate-in fade-in duration-150">
-                  <div className="flex gap-2">
-                    <input
-                      placeholder="Enter city or area (e.g. Salt Lake, Kolkata)..."
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Change Search Location</span>
+                    <button
+                      onClick={() => setShowAddressBox(false)}
+                      className="text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (customAddressInput.trim()) {
+                        searchAddress(customAddressInput.trim());
+                      }
+                    }}
+                    className="flex gap-2"
+                  >
+                    <Input
+                      placeholder="Search area (e.g. Salt Lake Sector V, Kolkata)..."
+                      className="text-xs h-9 bg-white flex-1"
                       value={customAddressInput}
                       onChange={(e) => setCustomAddressInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") searchAddress(customAddressInput);
-                      }}
-                      className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-violet-400 bg-slate-50"
                     />
                     <Button
+                      type="submit"
                       size="sm"
-                      onClick={() => searchAddress(customAddressInput)}
                       disabled={isSearchingAddress || !customAddressInput.trim()}
-                      className="h-8 text-xs font-bold bg-violet-600 text-white rounded-xl"
+                      className="text-xs h-9"
                     >
-                      {isSearchingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set Location"}
+                      {isSearchingAddress ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                      Set
                     </Button>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                    <span className="text-[11px] font-semibold text-slate-400">Quick Select:</span>
+                  </form>
+                  <div className="flex flex-wrap gap-1 items-center">
+                    <span className="text-[10px] text-slate-400 font-semibold mr-1">Quick:</span>
                     {QUICK_CITIES.map((c) => (
                       <button
                         key={c.name}
+                        type="button"
                         onClick={() => selectQuickCity(c)}
                         className="text-[11px] font-medium px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-violet-100 hover:text-violet-700 transition-all border border-slate-200/60"
                       >
@@ -469,11 +452,11 @@ export function PatientDoctors() {
 
             {/* Split List & Google Map View */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[560px] lg:h-[560px]">
-              {/* Doctor / Lab List Column */}
+              {/* Doctor List Column */}
               <div className="lg:col-span-5 max-h-[380px] lg:max-h-full overflow-y-auto pr-1 space-y-3">
                 <div className="p-3 border-b border-slate-100 bg-white rounded-xl flex items-center justify-between shadow-2xs sticky top-0 z-10">
                   <p className="text-xs font-bold text-slate-700">
-                    Providers within {radiusKm} km ({nearbyDocs.length})
+                    Doctors within {radiusKm} km ({nearbyDocs.length})
                   </p>
                   <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
                     <MousePointerClick className="h-3 w-3" /> Click pin to inspect
@@ -483,7 +466,7 @@ export function PatientDoctors() {
                 {loadingNearby ? (
                   <div className="py-16 text-center text-xs text-slate-400 flex flex-col items-center gap-2 bg-white rounded-2xl border border-slate-100">
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    <span className="font-medium">Searching verified healthcare providers near you...</span>
+                    <span className="font-medium">Searching verified doctors near you...</span>
                   </div>
                 ) : nearbyFetchError ? (
                   <div className="p-6 rounded-2xl bg-white border border-rose-200 text-center space-y-2 shadow-2xs">
@@ -504,7 +487,7 @@ export function PatientDoctors() {
                     <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
                       <MapPin className="w-5 h-5" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-800">No medical providers found within {radiusKm} km</p>
+                    <p className="text-sm font-semibold text-slate-800">No doctors found within {radiusKm} km</p>
                     <p className="text-xs text-slate-500 max-w-xs mx-auto">
                       Try expanding the search radius slider up to 18 km or selecting a different location.
                     </p>
@@ -523,7 +506,6 @@ export function PatientDoctors() {
                 ) : (
                   nearbyDocs.map((doc) => {
                     const isSelected = selectedDocId === doc.id;
-                    const isDoctor = doc.type === "doctor";
                     const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLoc.lat},${userLoc.lng}&destination=${doc.latitude},${doc.longitude}`;
 
                     return (
@@ -533,23 +515,15 @@ export function PatientDoctors() {
                         onClick={() => handleSelectDoctor(doc)}
                         className={`p-3.5 rounded-xl cursor-pointer transition-all border ${
                           isSelected
-                            ? isDoctor
-                              ? "bg-red-50/80 border-red-500 shadow-xs ring-2 ring-red-500/20"
-                              : "bg-sky-50/80 border-sky-500 shadow-xs ring-2 ring-sky-500/20"
+                            ? "bg-red-50/80 border-red-500 shadow-xs ring-2 ring-red-500/20"
                             : "bg-white border-slate-200/80 hover:border-slate-300 shadow-2xs"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="flex items-center gap-1.5 mb-1">
-                              <span
-                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                  isDoctor
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-sky-100 text-sky-700"
-                                }`}
-                              >
-                                {isDoctor ? "🩺 Doctor" : "🔬 Diagnostic Lab"}
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                                🩺 Doctor
                               </span>
                             </div>
                             <h4 className="font-bold text-sm text-slate-900">{doc.name}</h4>
@@ -592,17 +566,11 @@ export function PatientDoctors() {
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (isDoctor) {
-                                  setLocation(`/patient/appointments?doctorId=${doc.id}`);
-                                } else {
-                                  setLocation(`/patient/diagnostic-bookings?centerId=${doc.id}`);
-                                }
+                                setLocation(`/patient/appointments?doctorId=${doc.id}`);
                               }}
-                              className={`h-7 text-xs font-semibold rounded-lg px-3 text-white ${
-                                isDoctor ? "bg-red-600 hover:bg-red-700" : "bg-sky-600 hover:bg-sky-700"
-                              }`}
+                              className="h-7 text-xs font-semibold rounded-lg px-3 text-white bg-red-600 hover:bg-red-700"
                             >
-                              {isDoctor ? "Book Visit" : "Book Test"}
+                              Book Visit
                             </Button>
                           </div>
                         </div>

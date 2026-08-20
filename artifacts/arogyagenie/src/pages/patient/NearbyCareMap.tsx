@@ -5,7 +5,7 @@ import {
   MapPin, Stethoscope, Pill, TestTube, Locate, AlertCircle,
   Navigation, ExternalLink, Phone, Star, Search, X,
   Loader2, Calendar, Edit3, Check, CheckCircle2, ChevronRight,
-  Sliders, ShieldCheck, Sparkles, Building2,
+  Sliders, ShieldCheck, Sparkles, Building2, Bed,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,7 @@ import { useUserLocation, QUICK_CITIES, fmtDist } from "@/hooks/useUserLocation"
 import { GoogleMapView, type MapProviderItem } from "@/components/map/GoogleMapView";
 import { RequestMedicineModal } from "@/components/delivery/RequestMedicineModal";
 
-
-
-type FilterType = "all" | "doctor" | "pharmacy" | "diagnostic_center";
+type FilterType = "all" | "doctor" | "hospital" | "diagnostic_center" | "pharmacy";
 
 const TYPE_CONFIG = {
   doctor: {
@@ -26,6 +24,12 @@ const TYPE_CONFIG = {
     emoji: "🩺",
     color: "bg-red-50 text-red-700 border-red-200",
     badgeColor: "bg-red-600 text-white",
+  },
+  hospital: {
+    label: "Hospital",
+    emoji: "🏥",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    badgeColor: "bg-emerald-600 text-white",
   },
   diagnostic_center: {
     label: "Diagnostic Lab",
@@ -36,14 +40,8 @@ const TYPE_CONFIG = {
   pharmacy: {
     label: "Pharmacy",
     emoji: "💊",
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    badgeColor: "bg-emerald-600 text-white",
-  },
-  hospital: {
-    label: "Hospital",
-    emoji: "🏥",
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    badgeColor: "bg-emerald-600 text-white",
+    color: "bg-teal-50 text-teal-700 border-teal-200",
+    badgeColor: "bg-teal-600 text-white",
   },
 };
 
@@ -83,7 +81,6 @@ export function NearbyCareMap() {
   const [orderPharmacy, setOrderPharmacy] = useState<{ id: number; name: string; medicine?: string } | null>(null);
   const cardListRef = useRef<HTMLDivElement | null>(null);
 
-
   // Discovery quick options catalog
   const NEARBY_SUGGESTIONS = useMemo(() => ({
     doctor: [
@@ -92,6 +89,13 @@ export function NearbyCareMap() {
       { title: "Dermatologist", category: "Specialty", subtitle: "Skin rash, acne & allergies", icon: "🧴", type: "doctor" },
       { title: "Pediatrician", category: "Specialty", subtitle: "Child healthcare & wellness", icon: "👶", type: "doctor" },
       { title: "Orthopedic", category: "Specialty", subtitle: "Bone fractures & joint pain", icon: "🦴", type: "doctor" },
+    ],
+    hospital: [
+      { title: "Emergency & Trauma Care", category: "Emergency", subtitle: "24x7 Ambulance, ICU & urgent admission", icon: "🚨", type: "hospital" },
+      { title: "Cardiology & CCU", category: "Specialty Hospital", subtitle: "Cardiac care, heart surgery & CCU beds", icon: "🫀", type: "hospital" },
+      { title: "General Medicine & Inpatient", category: "Beds Available", subtitle: "Round-the-clock hospital admission & ward care", icon: "🏥", type: "hospital" },
+      { title: "Obstetrics & Maternity", category: "Maternity", subtitle: "Delivery suites, NICU & labor rooms", icon: "👶", type: "hospital" },
+      { title: "Neurology & Stroke Unit", category: "Specialty Hospital", subtitle: "Advanced neuro care & emergency stroke ICU", icon: "🧠", type: "hospital" },
     ],
     diagnostic_center: [
       { title: "Complete Blood Count (CBC)", category: "Lab Test", subtitle: "Hemoglobin, platelets & infections", icon: "🩸", type: "diagnostic_center" },
@@ -116,11 +120,13 @@ export function NearbyCareMap() {
 
     let pool: Array<{ title: string; category: string; subtitle: string; icon: string; type: string }> = [];
     if (filterType === "doctor") pool = NEARBY_SUGGESTIONS.doctor;
+    else if (filterType === "hospital") pool = NEARBY_SUGGESTIONS.hospital;
     else if (filterType === "diagnostic_center") pool = NEARBY_SUGGESTIONS.diagnostic_center;
     else if (filterType === "pharmacy") pool = NEARBY_SUGGESTIONS.pharmacy;
     else {
       pool = [
         ...NEARBY_SUGGESTIONS.doctor.slice(0, 2),
+        ...NEARBY_SUGGESTIONS.hospital.slice(0, 2),
         ...NEARBY_SUGGESTIONS.diagnostic_center.slice(0, 2),
         ...NEARBY_SUGGESTIONS.pharmacy.slice(0, 2),
       ];
@@ -228,7 +234,7 @@ export function NearbyCareMap() {
               Nearest Healthcare Discovery
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Locate verified doctors, diagnostic centers, and medicine-stocked pharmacies within {radiusKm} km.
+              Locate verified doctors, hospitals, diagnostic labs, and medicine-stocked pharmacies within {radiusKm} km.
             </p>
           </div>
 
@@ -329,7 +335,7 @@ export function NearbyCareMap() {
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-4">
           {/* Category Tabs */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
               <button
                 type="button"
                 onClick={() => setFilterType("all")}
@@ -350,6 +356,15 @@ export function NearbyCareMap() {
               </button>
               <button
                 type="button"
+                onClick={() => setFilterType("hospital")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  filterType === "hospital" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-emerald-700"
+                }`}
+              >
+                🏥 Hospitals
+              </button>
+              <button
+                type="button"
                 onClick={() => setFilterType("diagnostic_center")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                   filterType === "diagnostic_center" ? "bg-sky-600 text-white shadow-xs" : "text-slate-600 hover:text-sky-700"
@@ -361,7 +376,7 @@ export function NearbyCareMap() {
                 type="button"
                 onClick={() => setFilterType("pharmacy")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  filterType === "pharmacy" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-emerald-700"
+                  filterType === "pharmacy" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 hover:text-teal-700"
                 }`}
               >
                 💊 Pharmacies & Medicines
@@ -378,9 +393,11 @@ export function NearbyCareMap() {
                       ? "Search medicine (e.g. Paracetamol 650, Amoxicillin)..."
                       : filterType === "doctor"
                       ? "Search doctor name or specialty (e.g. Cardiology)..."
+                      : filterType === "hospital"
+                      ? "Search hospital, emergency or departments (e.g. ICU, Trauma)..."
                       : filterType === "diagnostic_center"
                       ? "Search test or center (e.g. Blood Test, MRI)..."
-                      : "Search any doctor, lab, or medicine..."
+                      : "Search any doctor, hospital, lab, or medicine..."
                   }
                   value={filterType === "pharmacy" ? medicineQuery : searchQuery}
                   onChange={(e) => {
@@ -462,11 +479,13 @@ export function NearbyCareMap() {
             </span>
             {(filterType === "pharmacy"
               ? ["Paracetamol 650", "Dolo 650", "Amoxicillin 500mg", "Pantoprazole 40mg", "Cetirizine 10mg"]
+              : filterType === "hospital"
+              ? ["Emergency & Trauma", "Cardiology & ICU", "General Medicine", "Gynecology & Maternity", "Orthopedics"]
               : filterType === "diagnostic_center"
               ? ["Complete Blood Count (CBC)", "Lipid Profile", "Thyroid Profile", "MRI Scan", "X-Ray"]
               : filterType === "doctor"
               ? ["General Physician", "Cardiologist", "Dermatologist", "Pediatrician", "Orthopedic"]
-              : ["General Physician", "Complete Blood Count", "Paracetamol 650", "Cardiologist", "Dolo 650"]
+              : ["General Physician", "Emergency & Trauma", "Complete Blood Count", "Paracetamol 650", "Cardiologist"]
             ).map((opt) => {
               const isActive = (filterType === "pharmacy" ? medicineQuery : searchQuery) === opt;
               return (
@@ -484,6 +503,8 @@ export function NearbyCareMap() {
                     isActive
                       ? filterType === "doctor"
                         ? "bg-red-600 text-white border-red-600 shadow-xs"
+                        : filterType === "hospital"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
                         : "bg-primary text-white border-primary shadow-xs"
                       : "bg-white text-slate-600 border-slate-200 hover:border-red-300 hover:bg-red-50/50"
                   }`}
@@ -600,9 +621,11 @@ export function NearbyCareMap() {
                       isSelected
                         ? p.type === "doctor"
                           ? "border-red-500 shadow-md ring-2 ring-red-500/20 bg-red-50/20"
+                          : p.type === "hospital"
+                          ? "border-emerald-500 shadow-md ring-2 ring-emerald-500/20 bg-emerald-50/20"
                           : p.type === "diagnostic_center"
                           ? "border-sky-500 shadow-md ring-2 ring-sky-500/20 bg-sky-50/20"
-                          : "border-emerald-500 shadow-md ring-2 ring-emerald-500/20 bg-emerald-50/20"
+                          : "border-teal-500 shadow-md ring-2 ring-teal-500/20 bg-teal-50/20"
                         : "border-slate-200/90 hover:border-slate-300 shadow-2xs hover:shadow-xs"
                     }`}
                   >
@@ -631,6 +654,30 @@ export function NearbyCareMap() {
                       <p className="text-xs text-red-700 font-semibold mb-1">{p.specialty}</p>
                     )}
 
+                    {/* Hospital Bed Availability Badge */}
+                    {p.type === "hospital" && typeof p.availableBeds === "number" && (
+                      <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg font-medium mb-2 border border-emerald-200/60">
+                        <Bed className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span><strong>{p.availableBeds}</strong> Available Beds {p.totalBeds ? `(out of ${p.totalBeds})` : ""}</span>
+                      </div>
+                    )}
+
+                    {/* Hospital Departments */}
+                    {p.type === "hospital" && p.departments && p.departments.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2.5">
+                        {p.departments.slice(0, 3).map((dept) => (
+                          <span key={dept} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium">
+                            {dept}
+                          </span>
+                        ))}
+                        {p.departments.length > 3 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-medium">
+                            +{p.departments.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {p.address && (
                       <p className="text-xs text-slate-500 flex items-start gap-1 mb-2">
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
@@ -640,13 +687,13 @@ export function NearbyCareMap() {
 
                     {/* Matched Medicine Badge for Pharmacy */}
                     {p.matchedMedicine && (
-                      <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 mb-2.5 flex items-center justify-between">
+                      <div className="p-2 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-800 mb-2.5 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 font-semibold">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                           <span>In Stock: {p.matchedMedicine.medicineName}</span>
                         </div>
                         {p.matchedMedicine.price && (
-                          <span className="font-bold text-emerald-900">₹{p.matchedMedicine.price}</span>
+                          <span className="font-bold text-teal-900">₹{p.matchedMedicine.price}</span>
                         )}
                       </div>
                     )}
@@ -665,6 +712,33 @@ export function NearbyCareMap() {
                         >
                           Book Appointment
                         </Button>
+                      )}
+
+                      {p.type === "hospital" && (
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLocation(`/patient/hospitals`);
+                            }}
+                            className="h-8 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 flex-1"
+                          >
+                            View Hospital
+                          </Button>
+                          {(p.emergencyHelpline || p.phone) && (
+                            <a
+                              href={`tel:${p.emergencyHelpline || p.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 text-xs font-semibold shrink-0"
+                              title="Call Emergency Helpline"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-red-600" />
+                              Helpline
+                            </a>
+                          )}
+                        </div>
                       )}
 
                       {p.type === "diagnostic_center" && (
@@ -693,7 +767,7 @@ export function NearbyCareMap() {
                               medicine: p.matchedMedicine?.medicineName || "",
                             });
                           }}
-                          className="h-8 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 flex-1"
+                          className="h-8 text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 flex-1"
                         >
                           Order Medicine
                         </Button>
