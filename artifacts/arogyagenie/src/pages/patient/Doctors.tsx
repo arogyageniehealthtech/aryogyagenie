@@ -142,7 +142,8 @@ export function PatientDoctors() {
         ...(search ? { search } : {}),
       });
       const data = await customFetch<{ results: MapProviderItem[] }>(`/api/nearby?${params}`);
-      setNearbyDocs(data?.results || []);
+      const doctorResults = (data?.results || []).filter((r) => r.type === "doctor");
+      setNearbyDocs(doctorResults);
     } catch (err: any) {
       setNearbyDocs([]);
       setNearbyFetchError(err?.message || "Failed to fetch nearby doctors. Please ensure the backend server is running.");
@@ -586,6 +587,7 @@ export function PatientDoctors() {
                   userLoc={userLoc}
                   radiusKm={radiusKm}
                   providers={nearbyDocs}
+                  category="doctor"
                   selectedId={selectedDocId}
                   onSelectProvider={handleSelectDoctor}
                   onMapClick={handleMapClick}

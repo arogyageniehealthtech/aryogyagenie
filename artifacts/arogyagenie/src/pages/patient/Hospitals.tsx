@@ -445,6 +445,7 @@ export function PatientHospitals() {
               userLoc={userLoc}
               radiusKm={radiusKm}
               providers={mapProviders}
+              category="hospital"
               selectedId={selectedHospitalId}
               onSelectProvider={(p) => handleSelectHospital(p)}
               onMapClick={handleMapClick}

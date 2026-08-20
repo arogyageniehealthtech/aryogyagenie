@@ -798,6 +798,7 @@ export function NearbyCareMap() {
               userLoc={userLoc}
               radiusKm={radiusKm}
               providers={providers}
+              category={filterType}
               selectedId={selectedId}
               onSelectProvider={handleSelectProvider}
               onMapClick={handleMapClick}

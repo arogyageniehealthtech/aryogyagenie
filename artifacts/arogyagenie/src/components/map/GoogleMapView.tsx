@@ -41,6 +41,7 @@ interface GoogleMapViewProps {
   onSelectProvider: (provider: MapProviderItem | null) => void;
   onMapClick?: (lat: number, lng: number) => void;
   className?: string;
+  category?: "doctor" | "hospital" | "diagnostic_center" | "pharmacy" | "all";
 }
 
 const TYPE_CONFIG = {
@@ -173,6 +174,7 @@ export function GoogleMapView({
   onSelectProvider,
   onMapClick,
   className = "w-full h-full min-h-[400px]",
+  category = "all",
 }: GoogleMapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
@@ -183,6 +185,14 @@ export function GoogleMapView({
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Strictly filter providers matching active category context
+  const visibleProviders = React.useMemo(() => {
+    if (!category || category === "all") {
+      return providers;
+    }
+    return providers.filter((p) => p.type === category);
+  }, [providers, category]);
 
   const apiKey = getGoogleMapsApiKey();
 
@@ -299,10 +309,10 @@ export function GoogleMapView({
     if (!map || !mapLoaded || typeof google === "undefined") return;
 
     // Disambiguate positions for overlapping / identical coordinates
-    const disambiguatedPositions = computeDisambiguatedPositions(providers);
+    const disambiguatedPositions = computeDisambiguatedPositions(visibleProviders);
 
-    // Composite keys (type_id) to avoid collision between doctor, pharmacy, and diagnostic center
-    const currentKeys = new Set(providers.map((p) => `${p.type || "doctor"}_${p.id}`));
+    // Composite keys (type_id) to avoid collision between doctor, pharmacy, diagnostic center, hospital
+    const currentKeys = new Set(visibleProviders.map((p) => `${p.type || "doctor"}_${p.id}`));
     providerMarkersRef.current.forEach((marker, key) => {
       if (!currentKeys.has(key)) {
         marker.setMap(null);
@@ -311,7 +321,7 @@ export function GoogleMapView({
     });
 
     // Add or update provider markers
-    providers.forEach((p) => {
+    visibleProviders.forEach((p) => {
       const markerKey = `${p.type || "doctor"}_${p.id}`;
       const pos = disambiguatedPositions.get(markerKey);
       if (!pos) return;
@@ -349,7 +359,7 @@ export function GoogleMapView({
         marker.setZIndex(isSelected ? 1000 : (p.type === "hospital" ? 60 : p.type === "doctor" ? 50 : 10));
       }
     });
-  }, [mapLoaded, providers, selectedId, onSelectProvider]);
+  }, [mapLoaded, visibleProviders, selectedId, onSelectProvider]);
 
   // Auto-Fit Bounds to frame user and all providers within radius
   useEffect(() => {
@@ -363,7 +373,7 @@ export function GoogleMapView({
     bounds.extend(new google.maps.LatLng(userLoc.lat, userLoc.lng));
 
     let validCount = 0;
-    providers.forEach((p) => {
+    visibleProviders.forEach((p) => {
       const lat = typeof p.latitude === "number" ? p.latitude : parseFloat(String(p.latitude));
       const lng = typeof p.longitude === "number" ? p.longitude : parseFloat(String(p.longitude));
       if (!isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0)) {
@@ -380,7 +390,7 @@ export function GoogleMapView({
         left: 50,
       });
 
-      // Prevent over-zooming when patient and doctor are at identical or very close coordinates
+      // Prevent over-zooming when patient and provider are at identical or very close coordinates
       const listener = google.maps.event.addListenerOnce(map, "idle", () => {
         const currentZoom = map.getZoom();
         if (currentZoom !== undefined && currentZoom > 15) {
@@ -395,7 +405,7 @@ export function GoogleMapView({
       map.setZoom(13);
       return undefined;
     }
-  }, [mapLoaded, userLoc.lat, userLoc.lng, providers, selectedId, radiusKm]);
+  }, [mapLoaded, userLoc.lat, userLoc.lng, visibleProviders, selectedId, radiusKm]);
 
   // Handle Selected Provider (Pan to location & open InfoWindow)
   useEffect(() => {
@@ -403,10 +413,10 @@ export function GoogleMapView({
     const infoWindow = infoWindowRef.current;
     if (!map || !infoWindow || !mapLoaded || selectedId === null || typeof google === "undefined") return;
 
-    const selectedProvider = providers.find((p) => p.id === selectedId);
+    const selectedProvider = visibleProviders.find((p) => p.id === selectedId);
     if (!selectedProvider) return;
 
-    const disambiguatedPositions = computeDisambiguatedPositions(providers);
+    const disambiguatedPositions = computeDisambiguatedPositions(visibleProviders);
     const markerKey = `${selectedProvider.type || "doctor"}_${selectedProvider.id}`;
     const pos = disambiguatedPositions.get(markerKey) || { lat: selectedProvider.latitude, lng: selectedProvider.longitude };
 
@@ -418,6 +428,8 @@ export function GoogleMapView({
     const bookHref =
       selectedProvider.type === "doctor"
         ? `/patient/appointments?doctorId=${selectedProvider.id}`
+        : selectedProvider.type === "hospital"
+        ? `/patient/hospitals`
         : selectedProvider.type === "diagnostic_center"
         ? `/patient/diagnostic-bookings?centerId=${selectedProvider.id}`
         : `/patient/prescriptions`;
@@ -425,6 +437,8 @@ export function GoogleMapView({
     const bookLabel =
       selectedProvider.type === "doctor"
         ? "Book Appointment"
+        : selectedProvider.type === "hospital"
+        ? "View Hospital"
         : selectedProvider.type === "diagnostic_center"
         ? "Book Lab Test"
         : "Order Medicine";
@@ -432,7 +446,7 @@ export function GoogleMapView({
     const contentString = `
       <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; max-width: 280px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-          <span style="font-size: 11px; font-weight: 700; color: ${typeCfg.pinColor}; text-transform: uppercase; background: ${selectedProvider.type === "doctor" ? "#fee2e2" : "#f1f5f9"}; padding: 2px 6px; border-radius: 4px;">
+          <span style="font-size: 11px; font-weight: 700; color: ${typeCfg.pinColor}; text-transform: uppercase; background: ${selectedProvider.type === "doctor" ? "#fee2e2" : selectedProvider.type === "hospital" ? "#d1fae5" : "#f1f5f9"}; padding: 2px 6px; border-radius: 4px;">
             ${typeCfg.emoji} ${typeCfg.label}
           </span>
           <span style="font-size: 11px; font-weight: 700; color: #475569; background: #f8fafc; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
@@ -445,6 +459,13 @@ export function GoogleMapView({
         ${
           selectedProvider.specialty
             ? `<div style="font-size: 12px; font-weight: 600; color: #dc2626; margin-bottom: 4px;">${selectedProvider.specialty}</div>`
+            : ""
+        }
+        ${
+          selectedProvider.type === "hospital" && typeof selectedProvider.availableBeds === "number"
+            ? `<div style="font-size: 11px; background: #ecfdf5; color: #065f46; padding: 4px 6px; border-radius: 4px; margin-bottom: 6px; font-weight: 600;">
+                🛏️ ${selectedProvider.availableBeds} Available Beds ${selectedProvider.totalBeds ? `(out of ${selectedProvider.totalBeds})` : ""}
+              </div>`
             : ""
         }
         ${
@@ -475,7 +496,7 @@ export function GoogleMapView({
     infoWindow.setContent(contentString);
     infoWindow.setPosition(pos);
     infoWindow.open(map);
-  }, [selectedId, providers, userLoc, mapLoaded]);
+  }, [selectedId, visibleProviders, userLoc, mapLoaded]);
 
   // Center on patient location handler
   const handleCenterOnUser = useCallback(() => {
