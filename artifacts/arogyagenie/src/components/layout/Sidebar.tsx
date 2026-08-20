@@ -40,18 +40,18 @@ export function Sidebar({ onNavigate, className = "" }: SidebarProps = {}) {
 
   if (role === "patient") {
     navItems = [
-      { href: "/patient/dashboard",          label: "Dashboard",       icon: Home },
-      { href: "/patient/appointments",        label: "Appointments",    icon: Calendar },
-      { href: "/patient/doctors",             label: "Find Doctors",    icon: Stethoscope },
-      { href: "/patient/hospitals",           label: "Hospital",        icon: Building2 },
-      { href: "/patient/nearby",              label: "Nearest Care Map", icon: MapPin },
-      { href: "/patient/prescriptions",       label: "Prescriptions",   icon: Clipboard },
-      { href: "/patient/lab-reports",         label: "Lab Reports",     icon: FileText },
-      { href: "/patient/diagnostic-bookings", label: "Tests & Diagnostics", icon: TestTube },
-      { href: "/patient/medicine-reminders",  label: "Medicines",       icon: Pill },
-      { href: "/patient/timeline",            label: "Health Timeline", icon: Clock },
-      { href: "/patient/symptom-check",       label: "Symptom Checker", icon: Activity },
-      { href: "/patient/profile",             label: "Profile",         icon: User },
+      { href: "/patient/dashboard",          label: "Dashboard",          icon: Home },
+      { href: "/patient/appointments",       label: "Appointments",       icon: Calendar },
+      { href: "/patient/doctors",            label: "Find Doctors",       icon: Stethoscope },
+      { href: "/patient/hospitals",          label: "Hospitals",          icon: Building2 },
+      { href: "/patient/prescriptions",      label: "Prescription",       icon: Clipboard },
+      { href: "/patient/diagnostic-bookings",label: "Tests & Diagnostic", icon: TestTube },
+      { href: "/patient/lab-reports",        label: "Lab Reports",        icon: FileText },
+      { href: "/patient/nearby",             label: "Nearest Care Map",   icon: MapPin },
+      { href: "/patient/medicine-reminders", label: "Medicine",           icon: Pill },
+      { href: "/patient/timeline",           label: "Health Timeline",    icon: Clock },
+      { href: "/patient/symptom-check",      label: "Symptom Checker",    icon: Activity },
+      { href: "/patient/profile",            label: "Profile",            icon: User },
     ];
   } else if (role === "doctor") {
     navItems = [
