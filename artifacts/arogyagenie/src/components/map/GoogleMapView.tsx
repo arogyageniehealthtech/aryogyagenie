@@ -427,18 +427,18 @@ export function GoogleMapView({
 
     const bookHref =
       selectedProvider.type === "doctor"
-        ? `/patient/appointments?doctorId=${selectedProvider.id}`
+        ? `/patient/appointments?type=doctor&doctorId=${selectedProvider.id}`
         : selectedProvider.type === "hospital"
-        ? `/patient/hospitals`
+        ? `/patient/appointments?type=clinic&hospitalId=${selectedProvider.id}`
         : selectedProvider.type === "diagnostic_center"
-        ? `/patient/diagnostic-bookings?centerId=${selectedProvider.id}`
+        ? `/patient/appointments?type=lab&centerId=${selectedProvider.id}`
         : `/patient/prescriptions`;
 
     const bookLabel =
       selectedProvider.type === "doctor"
         ? "Book Appointment"
         : selectedProvider.type === "hospital"
-        ? "View Hospital"
+        ? "Book Hospital Visit"
         : selectedProvider.type === "diagnostic_center"
         ? "Book Lab Test"
         : "Order Medicine";

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from "react";
+import { useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Building2,
@@ -40,6 +41,7 @@ const SPECIALTY_FILTERS = [
 ];
 
 export function PatientHospitals() {
+  const [, setLocation] = useLocation();
   // Location hook
   const {
     userLoc,
@@ -406,27 +408,27 @@ export function PatientHospitals() {
                       </a>
 
                       <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/patient/appointments?type=clinic&hospitalId=${hospital.id}`);
+                          }}
+                          className="h-8 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                        >
+                          Book Visit
+                        </Button>
+
                         <a
                           href={`https://www.google.com/maps/dir/?api=1&destination=${hospital.latitude},${hospital.longitude}`}
                           target="_blank"
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                          className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors border border-slate-200"
                           title="Get directions on Google Maps"
                         >
                           <Navigation className="h-4 w-4" />
                         </a>
-
-                        <Button
-                          size="sm"
-                          variant={isSelected ? "default" : "outline"}
-                          className={`h-8 px-2.5 text-xs font-bold rounded-xl gap-1 ${
-                            isSelected ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""
-                          }`}
-                        >
-                          {isSelected ? "Focused" : "View Map"}
-                          <ChevronRight className="h-3 w-3" />
-                        </Button>
                       </div>
                     </div>
                   </div>

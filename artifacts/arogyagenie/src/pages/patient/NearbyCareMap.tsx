@@ -706,7 +706,7 @@ export function NearbyCareMap() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLocation(`/patient/appointments?doctorId=${p.id}`);
+                            setLocation(`/patient/appointments?type=doctor&doctorId=${p.id}`);
                           }}
                           className="h-8 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 flex-1"
                         >
@@ -721,11 +721,11 @@ export function NearbyCareMap() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setLocation(`/patient/hospitals`);
+                              setLocation(`/patient/appointments?type=clinic&hospitalId=${p.id}`);
                             }}
                             className="h-8 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 flex-1"
                           >
-                            View Hospital
+                            Book Visit
                           </Button>
                           {(p.emergencyHelpline || p.phone) && (
                             <a
@@ -747,7 +747,7 @@ export function NearbyCareMap() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLocation(`/patient/diagnostic-bookings?centerId=${p.id}`);
+                            setLocation(`/patient/appointments?type=lab&centerId=${p.id}`);
                           }}
                           className="h-8 text-xs font-semibold bg-sky-600 text-white hover:bg-sky-700 flex-1"
                         >

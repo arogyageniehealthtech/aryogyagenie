@@ -567,7 +567,7 @@ export function PatientDoctors() {
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setLocation(`/patient/appointments?doctorId=${doc.id}`);
+                                setLocation(`/patient/appointments?type=doctor&doctorId=${doc.id}`);
                               }}
                               className="h-7 text-xs font-semibold rounded-lg px-3 text-white bg-red-600 hover:bg-red-700"
                             >
@@ -702,7 +702,7 @@ export function PatientDoctors() {
                         <span className="font-bold text-slate-900 text-base">₹{fee}</span>
                       </div>
                       <Button
-                        onClick={() => setLocation(`/patient/appointments?doctorId=${doc.id}`)}
+                        onClick={() => setLocation(`/patient/appointments?type=doctor&doctorId=${doc.id}`)}
                         size="sm"
                         className="rounded-xl gap-1.5 font-semibold text-xs h-9 px-4 shadow-2xs"
                         style={{
