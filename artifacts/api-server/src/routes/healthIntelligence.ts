@@ -73,14 +73,15 @@ import { strictAiRateLimiter } from "../middlewares/rateLimiter";
 
 // POST /ai/health-assistant
 router.post("/ai/health-assistant", requireAuth, strictAiRateLimiter, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { query } = req.body;
+  const { query, history } = req.body;
   if (!query) {
     res.status(400).json({ error: "Query string is required" });
     return;
   }
 
   const queryStr = typeof query === "string" ? query : String(query);
-  const response = await answerLongitudinalAssistant(req.userId!, queryStr);
+  const historyArray = Array.isArray(history) ? history : undefined;
+  const response = await answerLongitudinalAssistant(req.userId!, queryStr, historyArray);
   res.json(response);
 });
 

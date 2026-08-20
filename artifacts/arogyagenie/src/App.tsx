@@ -38,6 +38,7 @@ const PatientDoctors = lazyNamed(() => import("./pages/patient/Doctors"), "Patie
 const PatientPrescriptions = lazyNamed(() => import("./pages/patient/Prescriptions"), "PatientPrescriptions");
 const PatientLabReports = lazyNamed(() => import("./pages/patient/LabReports"), "PatientLabReports");
 const PatientDiagnosticBookings = lazyNamed(() => import("./pages/patient/DiagnosticBookings"), "PatientDiagnosticBookings");
+const PatientMedicalHistory = lazyNamed(() => import("./pages/patient/MedicalHistory"), "PatientMedicalHistory");
 const PatientMedicineReminders = lazyNamed(() => import("./pages/patient/MedicineReminders"), "PatientMedicineReminders");
 const PatientTimeline = lazyNamed(() => import("./pages/patient/Timeline"), "PatientTimeline");
 const PatientSymptomCheck = lazyNamed(() => import("./pages/patient/SymptomCheck"), "PatientSymptomCheck");
@@ -309,6 +310,12 @@ function ClerkProviderWithRoutes() {
                 <Route path="/patient/prescriptions">
                   <ProtectedRoute component={PatientPrescriptions} allowedRoles={["patient"]} />
                 </Route>
+                <Route path="/patient/order-medicine">
+                  <ProtectedRoute component={PatientPrescriptions} allowedRoles={["patient"]} />
+                </Route>
+                <Route path="/patient/medical-history">
+                  <ProtectedRoute component={PatientMedicalHistory} allowedRoles={["patient"]} />
+                </Route>
                 <Route path="/patient/lab-reports">
                   <ProtectedRoute component={PatientLabReports} allowedRoles={["patient"]} />
                 </Route>
@@ -316,7 +323,7 @@ function ClerkProviderWithRoutes() {
                   <ProtectedRoute component={PatientDiagnosticBookings} allowedRoles={["patient"]} />
                 </Route>
                 <Route path="/patient/medicine-reminders">
-                  <ProtectedRoute component={PatientMedicineReminders} allowedRoles={["patient"]} />
+                  <ProtectedRoute component={PatientMedicalHistory} allowedRoles={["patient"]} />
                 </Route>
                 <Route path="/patient/timeline">
                   <ProtectedRoute component={PatientTimeline} allowedRoles={["patient"]} />

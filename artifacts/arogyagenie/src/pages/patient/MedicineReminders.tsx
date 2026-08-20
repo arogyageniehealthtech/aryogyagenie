@@ -17,6 +17,7 @@ import {
   Truck,
   Sparkles,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   AlertCircle,
   Flame,
@@ -280,8 +281,8 @@ export function PatientMedicineReminders() {
         {/* ── Header ────────────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>My Medicines & Purchases</span>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
+              <span>Medical History</span>
               <Badge className="bg-emerald-600 text-white font-bold text-xs">
                 {allPatientMedicines.length} Medicines on Record
               </Badge>
@@ -292,9 +293,9 @@ export function PatientMedicineReminders() {
           </div>
 
           <Link href="/patient/prescriptions">
-            <Button className="rounded-xl font-bold text-xs gap-1.5 shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white self-start">
-              <FileText className="h-4 w-4" />
-              Prescription & Order Center
+            <Button className="rounded-xl font-bold text-xs gap-2 shadow-xs bg-slate-900 hover:bg-slate-800 text-white self-start sm:self-auto shrink-0 h-10 px-4 transition-all">
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Order Medicine</span>
             </Button>
           </Link>
         </div>
@@ -420,7 +421,7 @@ export function PatientMedicineReminders() {
             <Link href="/patient/prescriptions">
               <Button className="rounded-xl gap-2 font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
                 <FileText className="h-4 w-4" />
-                Go to Prescriptions & Request Deliveries
+                Go to Order Medicine & Request Deliveries
               </Button>
             </Link>
           </div>
@@ -594,3 +595,5 @@ export function PatientMedicineReminders() {
     </DashboardLayout>
   );
 }
+
+export const PatientMedicalHistory = PatientMedicineReminders;

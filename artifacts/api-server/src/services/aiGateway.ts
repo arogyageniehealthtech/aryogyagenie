@@ -78,7 +78,10 @@ export interface AIAssessmentResponse {
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3:8b";
-const OLLAMA_TIMEOUT_MS = 30_000;
+const OLLAMA_TIMEOUT_MS = process.env.OLLAMA_TIMEOUT_MS ? parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) : 4_000;
+
+let lastOllamaFailedTime = 0;
+const OLLAMA_FAILURE_CACHE_MS = 20_000;
 
 // Gemini configuration (used when GEMINI_API_KEY is set — production / Render)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
@@ -148,6 +151,10 @@ export async function callLLM(prompt: string, maxTokens: number = 450): Promise<
   }
 
   // Ollama path (local development fallback)
+  if (Date.now() - lastOllamaFailedTime < OLLAMA_FAILURE_CACHE_MS) {
+    return null; // Skip fast if Ollama service was recently offline
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
   try {
@@ -165,9 +172,11 @@ export async function callLLM(prompt: string, maxTokens: number = 450): Promise<
     if (response.ok) {
       const data = (await response.json()) as { response?: string };
       if (data.response) return data.response;
+    } else {
+      lastOllamaFailedTime = Date.now();
     }
   } catch (_err) {
-    // Fallthrough to null on Ollama error
+    lastOllamaFailedTime = Date.now();
   } finally {
     clearTimeout(timer);
   }

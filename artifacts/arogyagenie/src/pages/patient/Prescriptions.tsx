@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { Link } from "wouter";
 import { useListPrescriptions, customFetch } from "@workspace/api-client-react";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import {
@@ -20,6 +21,7 @@ import {
   Store,
   ArrowRight,
   ShieldCheck,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -287,8 +289,8 @@ export function PatientPrescriptions() {
         {/* ── Page Header ──────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Prescriptions & Medicines</h1>
-            <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Order Medicine</h1>
+            <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
               <span>Official digital prescriptions and instant 1-click doorstep medicine delivery</span>
               <span className="text-slate-300">•</span>
               <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
@@ -297,6 +299,15 @@ export function PatientPrescriptions() {
               </span>
             </p>
           </div>
+
+          <Link href="/patient/medical-history">
+            <Button
+              className="rounded-xl font-bold text-xs sm:text-sm gap-2 shadow-xs bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white h-10 px-4 self-start sm:self-auto shrink-0 transition-all duration-200"
+            >
+              <History className="h-4 w-4" />
+              <span>Medical History</span>
+            </Button>
+          </Link>
         </div>
 
         {/* ── Quick Multi-Select & Camera Upload Card ────────────────────────── */}

@@ -23,7 +23,10 @@ const OLLAMA_EMBEDDING_MODEL =
   process.env.OLLAMA_EMBEDDING_MODEL ?? "nomic-embed-text";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
 const GEMINI_EMBEDDING_MODEL = "text-embedding-004"; // 768-dim — same as nomic-embed-text
-const EMBEDDING_TIMEOUT_MS = 15_000;
+const EMBEDDING_TIMEOUT_MS = 2_500;
+
+let lastOllamaEmbedFailedTime = 0;
+const OLLAMA_EMBED_FAILURE_CACHE_MS = 20_000;
 
 // ─── Provider Detection ────────────────────────────────────────────────────────
 
@@ -148,6 +151,10 @@ interface OllamaEmbedResponse {
 }
 
 async function generateOllamaEmbedding(text: string): Promise<number[]> {
+  if (Date.now() - lastOllamaEmbedFailedTime < OLLAMA_EMBED_FAILURE_CACHE_MS) {
+    throw new Error(`Ollama embedding service recently offline. Skipping.`);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), EMBEDDING_TIMEOUT_MS);
 
@@ -176,6 +183,7 @@ async function generateOllamaEmbedding(text: string): Promise<number[]> {
     });
 
     if (!fallbackResponse.ok) {
+      lastOllamaEmbedFailedTime = Date.now();
       throw new Error(`Ollama embedding endpoint returned status ${fallbackResponse.status}`);
     }
 
@@ -186,6 +194,7 @@ async function generateOllamaEmbedding(text: string): Promise<number[]> {
 
     throw new Error("Ollama returned an empty embedding vector payload");
   } catch (err: unknown) {
+    lastOllamaEmbedFailedTime = Date.now();
     const errorMsg = err instanceof Error ? err.message : String(err);
     throw new Error(`Ollama Embedding Failure (${OLLAMA_EMBEDDING_MODEL}): ${errorMsg}`);
   } finally {

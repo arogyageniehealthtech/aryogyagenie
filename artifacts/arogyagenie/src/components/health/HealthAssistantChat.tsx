@@ -476,10 +476,16 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
 
     setMessages((prev) => [...prev, userMessage]);
     if (!queryText) setInputQuery("");
-    setAttachedFile(null);
+    const historyPayload = messages
+      .filter((m) => m.id !== "welcome" && !m.id.startsWith("welcome-"))
+      .slice(-6)
+      .map((m) => ({
+        sender: m.sender,
+        text: m.text,
+      }));
 
     askAssistant.mutate(
-      { data: { query: textToSend } },
+      { data: { query: textToSend, history: historyPayload } as any },
       {
         onSuccess: (data) => {
           const aiMessage: ChatMessage = {

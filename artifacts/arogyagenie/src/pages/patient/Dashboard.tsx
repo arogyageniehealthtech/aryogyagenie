@@ -178,7 +178,7 @@ export function PatientDashboard() {
       gradient: "linear-gradient(135deg, hsl(158,60%,38%), hsl(158,55%,32%))",
       iconColor: "hsl(158,60%,36%)",
       accentColor: "hsl(158,60%,36%)",
-      href: "/patient/medicine-reminders",
+      href: "/patient/medical-history",
     },
     {
       label: "Lab Reports",
@@ -190,7 +190,7 @@ export function PatientDashboard() {
       href: "/patient/lab-reports",
     },
     {
-      label: "Prescriptions",
+      label: "Order Medicine",
       value: dashboard.totalPrescriptions,
       icon: Clipboard,
       gradient: "linear-gradient(135deg, hsl(26,80%,52%), hsl(26,75%,44%))",
@@ -464,7 +464,7 @@ export function PatientDashboard() {
                 <h3 className="font-bold text-slate-900 text-sm">Medicine Reminders</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Active prescriptions & schedules</p>
               </div>
-              <Link href="/patient/medicine-reminders">
+              <Link href="/patient/medical-history">
                 <span className="text-xs font-semibold flex items-center gap-1 hover:opacity-80 transition-opacity" style={{ color: "hsl(238,53%,49%)" }}>
                   View all <ArrowRight className="h-3 w-3" />
                 </span>
@@ -475,7 +475,7 @@ export function PatientDashboard() {
                 <div className="text-center py-8">
                   <Pill className="h-8 w-8 mx-auto mb-2 text-slate-300" />
                   <p className="text-sm text-slate-400">No active reminders.</p>
-                  <Link href="/patient/medicine-reminders">
+                  <Link href="/patient/medical-history">
                     <span className="text-xs font-semibold mt-1 inline-block hover:opacity-80" style={{ color: "hsl(238,53%,49%)" }}>
                       View prescribed medicines →
                     </span>
