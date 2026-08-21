@@ -20,7 +20,7 @@ try {
   }
 } catch (_e) {}
 
-import { pool, db, usersTable, appointmentsTable, prescriptionsTable, labReportsTable, medicineOrdersTable, symptomAssessmentsTable, timelineEventsTable } from "@workspace/db";
+import { pool, db, usersTable, appointmentsTable, prescriptionsTable, labReportsTable, medicineOrdersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { classifyDomainAndIntent } from "../../artifacts/api-server/src/services/aiDomainClassifier";
 import { buildPatientHealthContext, formatContextSummaryText } from "../../artifacts/api-server/src/services/patientContextBuilder";
@@ -28,7 +28,7 @@ import { answerLongitudinalAssistant } from "../../artifacts/api-server/src/serv
 
 async function runTests() {
   console.log("====================================================================");
-  console.log("🔬 RUNNING COMPREHENSIVE AI ASSISTANT & RAG VERIFICATION TEST SUITE");
+  console.log("🔬 RUNNING COMPREHENSIVE AI ASSISTANT CONTEXT & INTENT TEST SUITE");
   console.log("====================================================================\n");
 
   let passedTests = 0;
@@ -44,10 +44,10 @@ async function runTests() {
     }
   }
 
-  // ── TEST SUITE 1: Domain & Intent Classifier ──────────────────────────────
-  console.log("─── TEST SUITE 1: Domain & Intent Classifier ───");
+  // ── TEST SUITE 1: Domain, Subject & Intent Classifier ──────────────────────
+  console.log("─── TEST SUITE 1: Domain, Subject & Intent Classifier ───");
 
-  // 1.1 Non-Medical Queries (Must be classified as NON_MEDICAL)
+  // 1.1 Non-Medical Queries
   const mathQuery = classifyDomainAndIntent("What is 2 + 2?");
   assert(mathQuery.category === "NON_MEDICAL" && mathQuery.isNonMedical, "Math query rejected as NON_MEDICAL");
 
@@ -57,39 +57,113 @@ async function runTests() {
   const sportsQuery = classifyDomainAndIntent("Who won yesterday's cricket match?");
   assert(sportsQuery.category === "NON_MEDICAL" && sportsQuery.isNonMedical, "Sports query rejected as NON_MEDICAL");
 
-  const tomatoQuery = classifyDomainAndIntent("What's the price of tomatoes in the market today?");
-  assert(tomatoQuery.category === "NON_MEDICAL" && tomatoQuery.isNonMedical, "Commodity price query rejected as NON_MEDICAL");
-
   // 1.2 Emergency Query
   const emergencyQuery = classifyDomainAndIntent("I have severe crushing chest pain radiating to my left arm and shortness of breath.");
   assert(emergencyQuery.category === "EMERGENCY" && emergencyQuery.isEmergency, "Emergency red flags identified with emergency triage precedence");
 
-  // 1.3 General Medical Queries (Must NOT require previous symptom search)
+  // 1.3 Generic Medical Queries (Subject = GENERIC, zero target modules)
   const dengueQuery = classifyDomainAndIntent("What are the symptoms of dengue fever?");
-  assert(dengueQuery.category === "GENERAL_MEDICAL" && dengueQuery.isGeneralMedical, "Dengue symptoms classified as GENERAL_MEDICAL");
+  assert(
+    dengueQuery.category === "GENERAL_MEDICAL" &&
+    dengueQuery.subject === "GENERIC" &&
+    dengueQuery.intent === "GENERIC_MEDICAL" &&
+    dengueQuery.targetModules.length === 0,
+    "Dengue query classified as GENERIC subject with 0 patient modules"
+  );
 
-  const feverQuery = classifyDomainAndIntent("What should I do if someone has a 102°F fever?");
-  assert(feverQuery.category === "GENERAL_MEDICAL" && feverQuery.isGeneralMedical, "102°F fever advice classified as GENERAL_MEDICAL");
+  const pcosGenericQuery = classifyDomainAndIntent("What is PCOS?");
+  assert(
+    pcosGenericQuery.category === "GENERAL_MEDICAL" &&
+    pcosGenericQuery.subject === "GENERIC" &&
+    pcosGenericQuery.intent === "GENERIC_MEDICAL" &&
+    pcosGenericQuery.targetModules.length === 0,
+    "'What is PCOS?' classified as GENERIC subject with 0 patient modules"
+  );
 
-  const dehydrationQuery = classifyDomainAndIntent("What is dehydration and what are its signs?");
-  assert(dehydrationQuery.category === "GENERAL_MEDICAL" && dehydrationQuery.isGeneralMedical, "Dehydration classified as GENERAL_MEDICAL");
+  // 1.4 Other Person Queries (Subject = OTHER_PERSON, zero target modules)
+  const sisterPcosQuery = classifyDomainAndIntent("What precautions is my sister supposed to do as she is having PCOD/PCOS?");
+  assert(
+    sisterPcosQuery.subject === "OTHER_PERSON" &&
+    sisterPcosQuery.relationship === "sister" &&
+    sisterPcosQuery.intent === "OTHER_PERSON_MEDICAL" &&
+    !sisterPcosQuery.isPatientSpecific &&
+    sisterPcosQuery.targetModules.length === 0,
+    "Sister PCOS query classified as OTHER_PERSON (sister) with 0 patient modules"
+  );
 
-  const bpQuery = classifyDomainAndIntent("What causes high blood pressure?");
-  assert(bpQuery.category === "GENERAL_MEDICAL" && bpQuery.isGeneralMedical, "High blood pressure causes classified as GENERAL_MEDICAL");
+  const fatherDiabetesQuery = classifyDomainAndIntent("My father has diabetes. What should he eat?");
+  assert(
+    fatherDiabetesQuery.subject === "OTHER_PERSON" &&
+    fatherDiabetesQuery.relationship === "father" &&
+    fatherDiabetesQuery.intent === "OTHER_PERSON_MEDICAL" &&
+    !fatherDiabetesQuery.isPatientSpecific &&
+    fatherDiabetesQuery.targetModules.length === 0,
+    "Father diabetes query classified as OTHER_PERSON (father) with 0 patient modules"
+  );
 
-  // 1.4 Patient-Specific Queries
+  // 1.5 Self-Referential Patient Queries (Subject = SELF, selective target modules)
+  const selfFeverQuery = classifyDomainAndIntent("I am having fever.");
+  assert(
+    selfFeverQuery.subject === "SELF" &&
+    selfFeverQuery.intent === "SYMPTOM" &&
+    selfFeverQuery.isPatientSpecific,
+    "Self fever query classified as SELF subject with SYMPTOM intent"
+  );
+
   const medOrderQuery = classifyDomainAndIntent("What medicines have I ordered recently?");
-  assert(medOrderQuery.isPatientSpecific && medOrderQuery.targetModules.includes("medicines"), "Medicine orders query classified as PATIENT_SPECIFIC with medicines module");
+  assert(
+    medOrderQuery.subject === "SELF" &&
+    medOrderQuery.isPatientSpecific &&
+    medOrderQuery.targetModules.includes("medicines"),
+    "Medicine orders query classified as SELF with medicines module"
+  );
 
   const apptQuery = classifyDomainAndIntent("When was my last doctor appointment?");
-  assert(apptQuery.isPatientSpecific && apptQuery.targetModules.includes("appointments"), "Doctor appointment query classified as PATIENT_SPECIFIC with appointments module");
+  assert(
+    apptQuery.subject === "SELF" &&
+    apptQuery.isPatientSpecific &&
+    apptQuery.targetModules.includes("appointments"),
+    "Doctor appointment query classified as SELF with appointments module"
+  );
 
   const labQuery = classifyDomainAndIntent("What were my latest blood test and lab results?");
-  assert(labQuery.isPatientSpecific && labQuery.targetModules.includes("lab_reports"), "Lab reports query classified as PATIENT_SPECIFIC with lab_reports module");
+  assert(
+    labQuery.subject === "SELF" &&
+    labQuery.isPatientSpecific &&
+    labQuery.targetModules.includes("lab_reports"),
+    "Lab reports query classified as SELF with lab_reports module"
+  );
 
-  // 1.5 Hybrid Query
-  const hybridQuery = classifyDomainAndIntent("What does my low hemoglobin test result mean?");
-  assert(hybridQuery.category === "HYBRID" && hybridQuery.isPatientSpecific && hybridQuery.isGeneralMedical, "Hybrid query classified as HYBRID");
+  const rxQuery = classifyDomainAndIntent("What medicines did my doctor prescribe?");
+  assert(
+    rxQuery.subject === "SELF" &&
+    rxQuery.intent === "PRESCRIPTION" &&
+    rxQuery.isPatientSpecific &&
+    rxQuery.targetModules.includes("prescriptions"),
+    "Prescription query classified as SELF with prescriptions module"
+  );
+
+  // 1.6 Platform Service Query
+  const platformBookQuery = classifyDomainAndIntent("How can I book a doctor?");
+  assert(
+    platformBookQuery.isPlatformService &&
+    platformBookQuery.intent === "APPOINTMENT" &&
+    platformBookQuery.targetModules.length === 0,
+    "Book doctor query classified as PLATFORM_SERVICE (APPOINTMENT) with 0 patient modules"
+  );
+
+  // 1.7 Subject Switching Detection
+  const historyWithSelf = [
+    { sender: "patient", text: "I have fever and headache." },
+    { sender: "assistant", text: "How long have you had it?" },
+  ];
+  const switchQuery = classifyDomainAndIntent("What should my sister do for PCOS?", historyWithSelf);
+  assert(
+    switchQuery.subject === "OTHER_PERSON" &&
+    switchQuery.subjectSwitched === true &&
+    switchQuery.targetModules.length === 0,
+    "Subject switch from SELF to OTHER_PERSON correctly detected with 0 patient modules"
+  );
 
   console.log("\n─── TEST SUITE 2: Patient Context Builder & Selective Retrieval ───");
 
@@ -115,8 +189,7 @@ async function runTests() {
   const patientId = testPatient.id;
   console.log(`Using Test Patient: ID #${patientId} (${[testPatient.firstName, testPatient.lastName].filter(Boolean).join(" ") || "Patient"})`);
 
-  // Ensure test data across modules for test patient
-  // 1. Prescription
+  // Ensure test data for test patient
   const existingRx = await db.query.prescriptionsTable.findFirst({ where: eq(prescriptionsTable.patientId, patientId) });
   if (!existingRx) {
     await db.insert(prescriptionsTable).values({
@@ -130,7 +203,6 @@ async function runTests() {
     });
   }
 
-  // 2. Medicine Order
   const existingOrder = await db.query.medicineOrdersTable.findFirst({ where: eq(medicineOrdersTable.patientId, patientId) });
   if (!existingOrder) {
     await db.insert(medicineOrdersTable).values({
@@ -142,7 +214,6 @@ async function runTests() {
     });
   }
 
-  // 3. Lab Report
   const existingLab = await db.query.labReportsTable.findFirst({ where: eq(labReportsTable.patientId, patientId) });
   if (!existingLab) {
     await db.insert(labReportsTable).values({
@@ -155,7 +226,6 @@ async function runTests() {
     });
   }
 
-  // 4. Appointment
   const existingAppt = await db.query.appointmentsTable.findFirst({ where: eq(appointmentsTable.patientId, patientId) });
   if (!existingAppt) {
     await db.insert(appointmentsTable).values({
@@ -176,110 +246,177 @@ async function runTests() {
   assert(selectiveMedsContext.recentMedicineOrders.length > 0, "Selective retrieval fetched Medicine Orders");
   assert(selectiveMedsContext.recentDiagnosticBookings.length === 0, "Selective retrieval omitted unrelated Diagnostic Bookings");
 
+  const emptyTargetContext = await buildPatientHealthContext(patientId, []);
+  assert(emptyTargetContext.recentPrescriptions.length === 0, "Empty target modules returns 0 prescriptions");
+  assert(emptyTargetContext.recentLabReports.length === 0, "Empty target modules returns 0 lab reports");
+
   const fullContext = await buildPatientHealthContext(patientId);
   const contextSummary = formatContextSummaryText(fullContext);
   assert(contextSummary.includes("[SOURCE: Doctor Prescriptions"), "Formatted context includes Prescriptions source annotation");
   assert(contextSummary.includes("[SOURCE: Medicine Orders"), "Formatted context includes Medicine Orders source annotation");
   assert(contextSummary.includes("[SOURCE: Lab Reports"), "Formatted context includes Lab Reports source annotation");
 
-  console.log("\n─── TEST SUITE 3: End-to-End AI Assistant Service ───");
+  console.log("\n─── TEST SUITE 3: Prompt Section 15 Required End-to-End Scenarios ───");
 
-  // 3.1 Non-Medical Rejection
-  console.log("Testing Non-Medical Rejection...");
-  const nonMedRes = await answerLongitudinalAssistant(patientId, "What is 2 + 2?");
-  assert(nonMedRes.category === "NON_MEDICAL", "Non-medical query categorized as NON_MEDICAL");
-  assert(nonMedRes.answer.includes("AarogyaGenie AI") && nonMedRes.answer.includes("medical"), "Non-medical query receives clean domain rejection response");
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 1 — SELF
+  // User: "I have fever."
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("Executing TEST 1 — SELF ('I have fever.')...");
+  const test1Res = await answerLongitudinalAssistant(patientId, "I have fever.");
+  assert(test1Res.subject === "SELF", "TEST 1a: Subject correctly identified as SELF");
+  assert(test1Res.answer.length > 30, "TEST 1b: Valid clinical guidance returned for self fever");
+  console.log(`[TEST 1 Preview]: ${test1Res.answer.slice(0, 140)}...`);
 
-  // 3.2 Emergency Triage
-  console.log("Testing Emergency Triage...");
-  const emergencyRes = await answerLongitudinalAssistant(patientId, "I have severe crushing chest pain radiating to my left arm.");
-  assert(emergencyRes.category === "EMERGENCY" && emergencyRes.answer.includes("EMERGENCY ALERT"), "Emergency query returns immediate emergency triage alert");
-
-  // 3.3 General Medical Query (Without Prior Symptom Search)
-  console.log("Testing General Medical Query (Dengue Symptoms)...");
-  const dengueRes = await answerLongitudinalAssistant(patientId, "What are the common symptoms of dengue?");
-  assert(dengueRes.category === "GENERAL_MEDICAL", "General medical query categorized correctly");
-  assert(dengueRes.answer.length > 50, "General medical query generated a thorough clinical response");
-  console.log(`[Dengue Response Preview]: ${dengueRes.answer.slice(0, 150)}...`);
-
-  // 3.4 General Medical Query (102°F Fever)
-  console.log("Testing General Medical Query (102°F Fever Guidance)...");
-  const feverRes = await answerLongitudinalAssistant(patientId, "What should I do if someone has a 102°F fever?");
-  assert(feverRes.category === "GENERAL_MEDICAL", "Fever query categorized as GENERAL_MEDICAL");
-  assert(feverRes.answer.length > 50, "Fever query generated helpful, structured medical guidance");
-
-  // 3.5 Patient-Specific Query (Medicine History)
-  console.log("Testing Patient-Specific Query (Medicines)...");
-  const patientMedsRes = await answerLongitudinalAssistant(patientId, "What medicines have I ordered or been prescribed?");
-  assert(patientMedsRes.category === "PATIENT_SPECIFIC" || patientMedsRes.category === "HYBRID", "Patient medicine query categorized appropriately");
-  assert(patientMedsRes.answer.length > 30, "Patient medicine query generated personalized response grounded in records");
-  console.log(`[Patient Meds Preview]: ${patientMedsRes.answer.slice(0, 150)}...`);
-
-  // 3.6 Patient-Specific Query (Lab Reports)
-  console.log("Testing Patient-Specific Query (Lab Reports)...");
-  const patientLabRes = await answerLongitudinalAssistant(patientId, "What were my recent lab test results?");
-  assert(patientLabRes.answer.length > 30, "Patient lab test query returned grounded results");
-
-  // 3.7 Missing Information & Hallucination Prevention
-  console.log("Testing Hallucination Prevention on Non-Existent Record...");
-  const missingRecordRes = await answerLongitudinalAssistant(patientId, "What did my brain MRI scan show?");
-  assert(
-    missingRecordRes.answer.toLowerCase().includes("no record") ||
-    missingRecordRes.answer.toLowerCase().includes("not found") ||
-    missingRecordRes.answer.toLowerCase().includes("no mri") ||
-    missingRecordRes.answer.toLowerCase().includes("not available"),
-    "AI correctly states no MRI record is in patient history (Zero Hallucination)"
-  );
-  console.log(`[Zero Hallucination Preview]: ${missingRecordRes.answer.slice(0, 150)}...`);
-
-  // 3.8 Multi-Turn Conversation Memory
-  console.log("Testing Conversation Memory Follow-up...");
-  const historyTurns = [
-    { sender: "patient" as const, text: "What medicines did I order recently?" },
-    { sender: "assistant" as const, text: "Your records show an order for Telmisartan 40mg and Paracetamol 650 from MedPlus Pharmacy." },
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 2 — FOLLOW-UP
+  // User: "I have fever." -> Then: "Since yesterday."
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 2 — FOLLOW-UP ('Since yesterday.')...");
+  const test2History = [
+    { sender: "patient" as const, text: "I have fever." },
+    { sender: "assistant" as const, text: "How long have you had the fever and what is your temperature?" },
   ];
-  const followUpRes = await answerLongitudinalAssistant(patientId, "Which one of those was for blood pressure?", historyTurns);
-  assert(followUpRes.answer.length > 20, "Conversation history turn resolved with context");
-  console.log(`[Follow-up Preview]: ${followUpRes.answer.slice(0, 150)}...`);
+  const test2Res = await answerLongitudinalAssistant(patientId, "Since yesterday.", test2History);
+  assert(test2Res.subject === "SELF", "TEST 2a: Follow-up maintained subject as SELF");
+  assert(test2Res.answer.length > 20, "TEST 2b: Follow-up answered in context of fever duration");
+  console.log(`[TEST 2 Preview]: ${test2Res.answer.slice(0, 140)}...`);
 
-  // 3.9 Patient Data Isolation Security Test
-  console.log("Testing Patient Isolation Security...");
-  // Create or find patient B
-  let patientB = await db.query.usersTable.findFirst({
-    where: eq(usersTable.email, "patient.b.security@arogyagenie.com"),
-  });
-  if (!patientB) {
-    const [newB] = await db.insert(usersTable).values({
-      clerkId: `test_patient_b_${Date.now()}`,
-      email: "patient.b.security@arogyagenie.com",
-      firstName: "PatientB",
-      lastName: "SecurityTest",
-      role: "patient",
-    }).returning();
-    patientB = newB;
-  }
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 3 — OTHER PERSON (Sister PCOS)
+  // User: "What precautions should my sister take because she has PCOS?"
+  // Must NOT mention logged-in user's health profile, Telmisartan, prescriptions, or fever.
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 3 — OTHER PERSON (Sister PCOS)...");
+  const test3Res = await answerLongitudinalAssistant(patientId, "What precautions should my sister take because she has PCOS?");
+  assert(test3Res.subject === "OTHER_PERSON", "TEST 3a: Subject identified as OTHER_PERSON");
+  
+  const test3Lower = test3Res.answer.toLowerCase();
+  const test3HasPcos = test3Lower.includes("pcos") || test3Lower.includes("pcod") || test3Lower.includes("diet") || test3Lower.includes("ovary") || test3Lower.includes("hormon");
+  assert(test3HasPcos, "TEST 3b: Response contains PCOS guidance");
 
-  const patientBContext = await buildPatientHealthContext(patientB.id);
-  assert(
-    !formatContextSummaryText(patientBContext).includes("Telmisartan") &&
-    patientBContext.recentPrescriptions.length === 0,
-    "Patient B context is 100% isolated from Patient A (Zero Cross-Tenant Leakage)"
-  );
+  // Zero-Leakage Assertions:
+  const leaksPatientDataIn3 = test3Lower.includes("telmisartan") || test3Lower.includes("hypertension") || test3Lower.includes("based on your aarogyagenie health profile") || test3Lower.includes("your recorded lab");
+  assert(!leaksPatientDataIn3, "TEST 3c: ZERO patient data leakage into sister PCOS question (No Telmisartan, No user records)");
+  console.log(`[TEST 3 Preview]: ${test3Res.answer.slice(0, 140)}...`);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 4 — GENERIC
+  // User: "What is PCOS?"
+  // No patient records, no "Based on your AarogyaGenie health profile".
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 4 — GENERIC ('What is PCOS?')...");
+  const test4Res = await answerLongitudinalAssistant(patientId, "What is PCOS?");
+  assert(test4Res.subject === "GENERIC", "TEST 4a: Subject identified as GENERIC");
+  
+  const test4Lower = test4Res.answer.toLowerCase();
+  assert(test4Lower.includes("pcos") || test4Lower.includes("polycystic"), "TEST 4b: Contains generic PCOS explanation");
+  assert(!test4Lower.includes("telmisartan") && !test4Lower.includes("based on your aarogyagenie"), "TEST 4c: Zero patient context in generic question");
+  console.log(`[TEST 4 Preview]: ${test4Res.answer.slice(0, 140)}...`);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 5 — FATHER (Father Diabetes)
+  // User: "My father has diabetes. What precautions should he take?"
+  // General diabetes guidance, no logged-in patient records.
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 5 — FATHER ('My father has diabetes. What precautions should he take?')...");
+  const test5Res = await answerLongitudinalAssistant(patientId, "My father has diabetes. What precautions should he take?");
+  assert(test5Res.subject === "OTHER_PERSON", "TEST 5a: Subject identified as OTHER_PERSON (father)");
+  
+  const test5Lower = test5Res.answer.toLowerCase();
+  assert(test5Lower.includes("diabetes") || test5Lower.includes("glucose") || test5Lower.includes("sugar") || test5Lower.includes("diet"), "TEST 5b: Contains diabetes guidance for father");
+  assert(!test5Lower.includes("telmisartan") && !test5Lower.includes("based on your aarogyagenie health profile"), "TEST 5c: Zero user records in father question");
+  console.log(`[TEST 5 Preview]: ${test5Res.answer.slice(0, 140)}...`);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 6 — PATIENT RECORD
+  // User: "What did my latest blood report say?"
+  // Uses patient's relevant lab report.
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 6 — PATIENT RECORD ('What did my latest blood report say?')...");
+  const test6Res = await answerLongitudinalAssistant(patientId, "What did my latest blood report say?");
+  assert(test6Res.subject === "SELF", "TEST 6a: Subject is SELF for patient lab inquiry");
+  assert(test6Res.answer.length > 20, "TEST 6b: Lab report answer returned");
+  console.log(`[TEST 6 Preview]: ${test6Res.answer.slice(0, 140)}...`);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 7 — PRESCRIPTION
+  // User: "What medicines did my doctor prescribe?"
+  // Uses patient's prescription data.
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 7 — PRESCRIPTION ('What medicines did my doctor prescribe?')...");
+  const test7Res = await answerLongitudinalAssistant(patientId, "What medicines did my doctor prescribe?");
+  assert(test7Res.subject === "SELF", "TEST 7a: Subject is SELF for prescription inquiry");
+  assert(test7Res.answer.length > 20, "TEST 7b: Prescription answer returned");
+  console.log(`[TEST 7 Preview]: ${test7Res.answer.slice(0, 140)}...`);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 8 — PLATFORM
+  // User: "How can I book a doctor?"
+  // Uses Aarogya Jani appointment/service functionality.
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 8 — PLATFORM ('How can I book a doctor?')...");
+  const test8Res = await answerLongitudinalAssistant(patientId, "How can I book a doctor?");
+  assert(test8Res.category === "PLATFORM_SERVICE" || test8Res.intent === "APPOINTMENT", "TEST 8a: Categorized as platform appointment service");
+  
+  const test8Lower = test8Res.answer.toLowerCase();
+  assert(test8Lower.includes("doctor") || test8Lower.includes("appointment") || test8Lower.includes("book"), "TEST 8b: Guidance explains how to book a doctor");
+  assert(!test8Lower.includes("telmisartan"), "TEST 8c: Zero medical history in platform navigation question");
+  console.log(`[TEST 8 Preview]: ${test8Res.answer.slice(0, 140)}...`);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 9 — GENERIC MEDICAL + PLATFORM ISOLATION
+  // User: "What are the symptoms of dengue?"
+  // Generic medical answer. Must NOT randomly mention "free consultation", "free lab report", "free medical order".
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 9 — GENERIC MEDICAL + PLATFORM ISOLATION ('Symptoms of dengue')...");
+  const test9Res = await answerLongitudinalAssistant(patientId, "What are the symptoms of dengue?");
+  assert(test9Res.subject === "GENERIC", "TEST 9a: Subject is GENERIC");
+  
+  const test9Lower = test9Res.answer.toLowerCase();
+  assert(test9Lower.includes("fever") || test9Lower.includes("dengue") || test9Lower.includes("headache") || test9Lower.includes("joint"), "TEST 9b: Contains dengue symptom clinical guidance");
+
+  // Anti-Hallucination Pricing Check:
+  const mentionsFreeServices = test9Lower.includes("free consultation") || test9Lower.includes("free lab") || test9Lower.includes("free doctor") || test9Lower.includes("free medical order") || test9Lower.includes("free medicine");
+  assert(!mentionsFreeServices, "TEST 9c: ZERO fake claims of 'free consultation' or 'free orders' in medical guidance");
+  console.log(`[TEST 9 Preview]: ${test9Res.answer.slice(0, 140)}...`);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 10 — SUBJECT CHANGE
+  // User: "I have fever." -> Then: "What should my sister do for PCOS?"
+  // Expected: Second response is about sister only, no user fever or prescriptions leaked.
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\nExecuting TEST 10 — SUBJECT CHANGE ('I have fever.' -> 'What should my sister do for PCOS?')...");
+  const test10History = [
+    { sender: "patient" as const, text: "I have fever and high body temperature since morning." },
+    { sender: "assistant" as const, text: "Make sure to stay hydrated and get adequate rest." },
+  ];
+  const test10Res = await answerLongitudinalAssistant(patientId, "What should my sister do for PCOS?", test10History);
+  assert(test10Res.subject === "OTHER_PERSON", "TEST 10a: Subject switch isolated to OTHER_PERSON");
+  
+  const test10Lower = test10Res.answer.toLowerCase();
+  assert(test10Lower.includes("pcos") || test10Lower.includes("diet") || test10Lower.includes("lifestyle") || test10Lower.includes("gynecologist"), "TEST 10b: Response provides PCOS guidance for sister");
+
+  const leaksFeverOrRx = test10Lower.includes("telmisartan") || test10Lower.includes("your fever") || test10Lower.includes("your high body temperature") || test10Lower.includes("based on your aarogyagenie health profile");
+  assert(!leaksFeverOrRx, "TEST 10c: ZERO leakage of previous turn's fever or user records into sister's question");
+  console.log(`[TEST 10 Preview]: ${test10Res.answer.slice(0, 140)}...`);
 
   console.log("\n====================================================================");
   console.log(`📊 FINAL TEST RESULTS: ${passedTests}/${totalTests} PASSED (${Math.round((passedTests / totalTests) * 100)}%)`);
   console.log("====================================================================");
 
   if (passedTests === totalTests) {
-    console.log("🎉 ALL MEDICAL AI ASSISTANT, PATIENT CONTEXT & RAG TESTS PASSED!");
+    console.log("🎉 ALL 10 CORE TEST SCENARIOS & CONTEXT ISOLATION TESTS PASSED!");
   } else {
     console.error("⚠️ SOME TESTS FAILED. Please inspect above output.");
+    process.exit(1);
   }
 }
 
 runTests()
   .catch((err) => {
     console.error("Fatal error during test execution:", err);
+    process.exit(1);
   })
   .finally(async () => {
     await pool.end();

@@ -3,7 +3,7 @@ import { eq, desc } from "drizzle-orm";
 import { buildPatientHealthContext, formatContextSummaryText, type PatientHealthContextData } from "./patientContextBuilder";
 import { searchMedicalKnowledge } from "./ragService";
 import { callLLM } from "./aiGateway";
-import { classifyDomainAndIntent, type DomainCategory } from "./aiDomainClassifier";
+import { classifyDomainAndIntent, type DomainCategory, type QuerySubject, type QueryIntent } from "./aiDomainClassifier";
 
 export interface StructuredHealthSummary {
   recentHealthEvents: string[];
@@ -40,6 +40,8 @@ export interface AssistantAnswerResponse {
   answer: string;
   usedRag: boolean;
   category?: DomainCategory;
+  subject?: QuerySubject;
+  intent?: QueryIntent;
   sources: Array<{
     documentId?: string;
     title?: string;
@@ -224,7 +226,8 @@ export async function generateDoctorPatientBriefing(patientId: number, doctorId:
 
 /**
  * Main AI Assistant Entry Point:
- * Medical-domain conversational assistant with intelligent RAG and complete patient-context retrieval.
+ * Medical-domain conversational assistant with intentional personalization,
+ * strict subject & context isolation, and grounded RAG retrieval.
  */
 export async function answerLongitudinalAssistant(
   patientId: number,
@@ -233,15 +236,17 @@ export async function answerLongitudinalAssistant(
 ): Promise<AssistantAnswerResponse> {
   const queryTrimmed = query.trim();
 
-  // ── Step 1: Intelligent Intent & Domain Classification ─────────────────────
+  // ── Step 1: Intelligent Intent & Subject Classification ────────────────────
   const classification = classifyDomainAndIntent(queryTrimmed, history);
 
   // 1A. Emergency Triage Precedence
   if (classification.isEmergency) {
     return {
-      answer: classification.emergencyMessage || "🚨 EMERGENCY ALERT: Please call local emergency services immediately.",
+      answer: classification.emergencyMessage || "🚨 EMERGENCY ALERT: Please call local emergency services (112 / 911 / 108) immediately.",
       usedRag: false,
       category: "EMERGENCY",
+      subject: classification.subject,
+      intent: classification.intent,
       sources: [
         {
           title: "Emergency Medical Triage Protocol",
@@ -262,28 +267,33 @@ export async function answerLongitudinalAssistant(
       answer: classification.rejectionMessage || "I am AarogyaGenie AI, your dedicated medical assistant. Please ask medical or healthcare-related questions.",
       usedRag: false,
       category: "NON_MEDICAL",
+      subject: classification.subject,
+      intent: classification.intent,
       sources: [],
       retrieval: { topK: 0, resultsUsed: 0 },
       disclaimer: "ℹ️ AarogyaGenie AI is restricted to the medical and healthcare domain.",
     };
   }
 
-  // ── Step 2: Selective Context Retrieval ────────────────────────────────────
+  // ── Step 2: Conditional Context Retrieval ──────────────────────────────────
+  // CRITICAL RULE: Patient records are ONLY retrieved if subject is SELF and intent requires records.
+  // If the question is about an OTHER_PERSON (e.g. sister, father) or GENERIC or PLATFORM_SERVICE,
+  // targetModules is empty and NO patient records are retrieved or injected!
   let patientContextText = "";
   let patientContext: PatientHealthContextData | null = null;
 
-  if (classification.isPatientSpecific || classification.category === "HYBRID") {
+  if (classification.subject === "SELF" && classification.isPatientSpecific && classification.targetModules.length > 0) {
     // Selectively query only the relevant modules identified by query analyzer
     patientContext = await buildPatientHealthContext(patientId, classification.targetModules);
     patientContextText = formatContextSummaryText(patientContext);
   }
 
-  // Medical RAG Knowledge Search
+  // Medical RAG Knowledge Search (activated for general medical, other-person medical, or hybrid questions)
   const topK = process.env.RAG_TOP_K ? parseInt(process.env.RAG_TOP_K, 10) : 5;
   const threshold = process.env.RAG_SIMILARITY_THRESHOLD ? parseFloat(process.env.RAG_SIMILARITY_THRESHOLD) : 0.52;
 
   let matches: Awaited<ReturnType<typeof searchMedicalKnowledge>> = [];
-  if (classification.isGeneralMedical || classification.category === "HYBRID") {
+  if (classification.isGeneralMedical && !classification.isPlatformService && classification.intent !== "GENERAL_CONVERSATION") {
     matches = await searchMedicalKnowledge(queryTrimmed, topK, threshold);
   }
 
@@ -309,87 +319,162 @@ export async function answerLongitudinalAssistant(
     )
     .join("\n\n");
 
-  // Format Conversation History Context
+  // Format Conversation History Context with Subject-Switch Awareness
   let formattedHistory = "";
   if (history && history.length > 0) {
     const recentTurns = history.slice(-6); // Last 3 user/assistant turns
     formattedHistory = `RECENT CONVERSATION HISTORY:\n${recentTurns
       .map((t) => `${t.sender === "patient" || t.sender === "user" ? "Patient" : "Assistant"}: ${t.text}`)
       .join("\n")}\n\n`;
+
+    if (classification.subjectSwitched) {
+      formattedHistory += `[SUBJECT-SWITCH NOTE: The user has switched the subject of inquiry to ${classification.subject}${
+        classification.relationship ? ` (${classification.relationship})` : ""
+      }. Do NOT carry over previous patient-specific medical records, prescriptions, or symptoms into this response.]\n\n`;
+    }
   }
 
   // ── Step 3: Construct Grounded Clinical Prompt ─────────────────────────────
   let systemPrompt = "";
 
-  if (classification.category === "PATIENT_SPECIFIC") {
+  const commonSafetyRules = `CRITICAL SAFETY & ZERO-HALLUCINATION RULES:
+1. STRICT PRICING & BENEFIT RULES:
+   - NEVER claim that doctor consultations, appointments, diagnostic tests, lab reports, medicine deliveries, or orders are "free" or offer free benefits.
+   - Do NOT invent platform discounts, zero-cost promotions, or claims not verified in database context.
+   - If asked about pricing or consultation fees, state that fees depend on the specific doctor, hospital, diagnostic center, or pharmacy selected, and can be viewed directly on the platform during booking.
+2. DO NOT inject unsolicited AarogyaGenie service promotions or booking CTAs into purely clinical, medical education, or third-party questions.
+3. PERSONALIZATION IS STRICTLY INTENTIONAL:
+   - When the question is about an OTHER PERSON (e.g. sister, father, friend) or a GENERIC medical topic, do NOT refer to any logged-in patient records, prescriptions, or lab results.
+   - Do NOT start generic responses with "Based on your AarogyaGenie health profile...".
+4. MEDICAL CAUTION:
+   - Do not claim definitive diagnosis ("You have X"). Use cautious, supportive phrasing ("may suggest", "common causes include").
+   - Do not prescribe prescription-only medications or alter dosages. Encourage consulting a qualified healthcare professional.`;
+
+  if (classification.isPlatformService) {
+    systemPrompt = `You are AarogyaGenie AI, the navigation and healthcare service assistant for the AarogyaGenie platform.
+Answer the user's question about booking appointments, ordering medicines, scheduling diagnostic tests, finding healthcare providers, or navigating platform features.
+
+${formattedHistory}AAROGYAGENIE PLATFORM CAPABILITIES & NAVIGATION:
+• Doctor Appointments: Users can search doctors by specialty, location, or clinic, view availability, and book in-person or video consultations.
+• Doorstep Medicine Orders: Users can search prescription & OTC medicines from verified nearby partner pharmacies and order with quick doorstep delivery.
+• Diagnostic & Lab Tests: Users can search test packages (CBC, Blood Sugar, Lipid Profile, Thyroid, Scans) across verified diagnostic centers and book appointments.
+• Health Records & Timeline: Users can securely upload lab reports, view doctor prescriptions, and track longitudinal health metrics.
+
+USER QUESTION: "${queryTrimmed}"
+
+${commonSafetyRules}
+5. Provide clear, step-by-step guidance on how to navigate the relevant feature within AarogyaGenie.
+6. If asked about pricing or consultation fees, explain that prices are determined by the individual doctor, clinic, diagnostic lab, or pharmacy and are displayed on the booking/checkout screen.`;
+  } else if (classification.subject === "OTHER_PERSON") {
+    const relationName = classification.relationship ? classification.relationship : "another person";
+    systemPrompt = `You are AarogyaGenie AI, a trusted, empathetic, and clinically grounded medical assistant.
+The user is asking a medical or healthcare question about THEIR ${relationName.toUpperCase()} (NOT about the logged-in user).
+
+${formattedHistory}${usedRag ? `AUTHORITATIVE MEDICAL GUIDELINES (RAG EVIDENCE):\n${formattedRagEvidence}\n\n` : ""}SUBJECT OF INQUIRY: OTHER PERSON (${relationName.toUpperCase()})
+INTENT: ${classification.intent}
+
+USER QUESTION: "${queryTrimmed}"
+
+${commonSafetyRules}
+5. STRICT CONTEXT ISOLATION:
+   - This question is about the user's ${relationName}, NOT the logged-in patient.
+   - Do NOT reference any logged-in user health records, prescriptions, lab reports, or prior personal symptoms.
+   - Do NOT start with "Based on your AarogyaGenie health profile...".
+6. Provide comprehensive, accurate, and practical medical guidance, precautions, dietary/lifestyle measures, and warning signs for the condition discussed.
+7. Maintain an empathetic, professional tone and advise that their ${relationName} consult a qualified healthcare provider or specialist for individualized clinical evaluation.`;
+  } else if (classification.subject === "SELF" && classification.intent === "PRESCRIPTION" && patientContext) {
     systemPrompt = `You are AarogyaGenie AI, the patient's personal healthcare companion.
-You are answering a question specifically regarding the patient's recorded medical history, orders, prescriptions, doctors, visits, lab tests, or health timeline on the AarogyaGenie platform.
+The patient is asking specifically about their doctor prescriptions recorded on the AarogyaGenie platform.
+
+${formattedHistory}AUTHORIZED PATIENT PRESCRIPTION RECORDS FROM DATABASE:
+${patientContextText}
+
+PATIENT QUESTION: "${queryTrimmed}"
+
+${commonSafetyRules}
+5. ONLY reference prescription information explicitly stated in the database records above.
+6. Provide prescribing doctor names, dates, diagnoses, medicines, dosages, and instructions clearly using bullet points.
+7. If the requested prescription or medicine does not exist in the records, state that clearly without guessing.`;
+  } else if (classification.subject === "SELF" && classification.intent === "LAB_REPORT" && patientContext) {
+    systemPrompt = `You are AarogyaGenie AI, the patient's personal healthcare companion.
+The patient is asking specifically about their lab test reports or diagnostic results recorded on the AarogyaGenie platform.
+
+${formattedHistory}AUTHORIZED PATIENT LAB RECORDS FROM DATABASE:
+${patientContextText}
+
+PATIENT QUESTION: "${queryTrimmed}"
+
+${commonSafetyRules}
+5. ONLY reference lab tests and results explicitly stated in the database records above.
+6. Provide test names, dates, values, reference status (e.g. normal/abnormal), and findings clearly.
+7. If the user asks about a specific test (e.g. MRI, CT scan, X-Ray) that is not in the records, state clearly: "According to your recorded AarogyaGenie health records, there is no record of [test] on file." Never fabricate results.`;
+  } else if (classification.subject === "SELF" && classification.category === "PATIENT_SPECIFIC" && patientContext) {
+    systemPrompt = `You are AarogyaGenie AI, the patient's personal healthcare companion.
+You are answering a question specifically regarding the patient's personal recorded medical history, orders, prescriptions, doctors, visits, lab tests, or health timeline on AarogyaGenie.
 
 ${formattedHistory}AUTHORIZED PATIENT HEALTHCARE RECORDS FROM DATABASE:
 ${patientContextText}
 
 PATIENT QUESTION: "${queryTrimmed}"
 
-CRITICAL GROUNDING & ZERO-HALLUCINATION RULES:
-1. ONLY reference information that is explicitly stated in the AUTHORIZED PATIENT HEALTHCARE RECORDS above.
-2. If the user asks about a specific scan, test (such as MRI, CT scan, X-Ray), surgery, medication, or appointment, FIRST verify if that exact test or item name exists in the records above.
-3. If that specific scan or item does NOT appear in the records above (even if other unrelated lab tests exist), you MUST explicitly state:
-   "According to your recorded AarogyaGenie health records, there is no record of [test/scan/item] on file."
-   NEVER assume that an unrelated record is the requested scan. NEVER fabricate or assume test results.
-4. When answering about orders, prescriptions, or doctor visits, provide relevant dates, doctor names, clinics, and statuses from the records clearly.
-5. Support temporal reasoning: If the user asks for "last", "recent", "latest", or "in August", refer to the actual dates and chronological ordering in the records.
-6. Support cross-module connections: If the user asks about what happened after a visit or what tests followed an appointment, connect the timeline accurately.
-7. Provide a warm, clear, professional, and well-structured response (use bullet points where appropriate).`;
-  } else if (classification.category === "HYBRID") {
+${commonSafetyRules}
+5. ONLY reference information that is explicitly stated in the AUTHORIZED PATIENT HEALTHCARE RECORDS above.
+6. If the user asks about a specific scan, test (such as MRI, CT scan, X-Ray), surgery, or appointment, first verify if it exists in the records above. If not found, explicitly state that no record exists on file.
+7. Support temporal reasoning (latest, recent, previous) referencing actual dates in the records.`;
+  } else if (classification.subject === "SELF" && classification.category === "HYBRID" && patientContext) {
     systemPrompt = `You are AarogyaGenie AI, an intelligent clinical health assistant.
-The patient is asking a question that relates to their own health records while also seeking medical guidance or clinical interpretation.
+The patient is asking a personal health question regarding their own symptoms, medications, or test results while also seeking medical guidance or clinical interpretation.
 
 ${formattedHistory}${usedRag ? `AUTHORITATIVE MEDICAL GUIDELINES (RAG EVIDENCE):\n${formattedRagEvidence}\n\n` : ""}AUTHORIZED PATIENT HEALTHCARE RECORDS:
 ${patientContextText}
 
 PATIENT QUESTION: "${queryTrimmed}"
 
-CRITICAL GROUNDING RULES:
-1. Address the patient's specific recorded results, prescriptions, or symptoms (e.g. "Your recorded lab test on [date] showed...").
-2. Integrate clinical medical knowledge to explain what the condition, finding, or medication means clinically (causes, significance, dietary/lifestyle measures, discussion points for their doctor).
-3. Distinguish clearly between patient facts ("Your records show...") and general medical information ("Generally, clinical guidelines note...").
-4. If a specific reading or test is not in their records, gently mention it while still providing the medical explanation of what that test or condition means.
-5. Highlight warning signs or red flags if applicable, and advise consulting their doctor for personalized medical evaluation.`;
+${commonSafetyRules}
+5. Address the patient's specific recorded results, prescriptions, or symptoms accurately.
+6. Distinguish clearly between the patient's specific facts ("Your records show...") and general medical information ("Generally, clinical guidelines note...").
+7. Highlight warning signs or red flags if applicable, and advise consulting their doctor for personalized medical evaluation.`;
   } else {
-    // GENERAL_MEDICAL
+    // GENERIC_MEDICAL or GENERAL_CONVERSATION
     systemPrompt = `You are AarogyaGenie AI, a trusted, empathetic, and clinically grounded medical AI assistant.
-Answer the user's general medical or health question thoroughly, accurately, and compassionately.
+Answer the user's general medical or health education question thoroughly, accurately, and compassionately.
 
 ${formattedHistory}${usedRag ? `AUTHORITATIVE MEDICAL GUIDELINES (RAG EVIDENCE):\n${formattedRagEvidence}\n\n` : ""}PATIENT HEALTH QUESTION: "${queryTrimmed}"
 
-CRITICAL MEDICAL RESPONSE GUIDELINES:
-1. Provide a comprehensive, medically accurate, and easy-to-understand explanation.
-2. Structure your response clearly:
+${commonSafetyRules}
+5. Provide a comprehensive, medically accurate, and easy-to-understand explanation.
+6. Structure your response clearly:
    - Direct explanation / Overview of the condition, symptom, or topic
    - Common causes / mechanisms
-   - Practical home care, self-care, or relief measures (where appropriate)
+   - Practical precautions, self-care, or relief measures (where appropriate)
    - Important warning signs (red flags) and when to see a healthcare professional
-3. If important information is missing (e.g., patient's age, symptom duration, accompanying signs), ask relevant clarifying questions.
-4. If the question asks about potential emergencies (e.g., high fever in infants, severe pain), prioritize safety guidance.
-5. Do NOT make definitive medical diagnoses or prescribe specific prescription-only medications.
-6. Maintain an empathetic, professional, and supportive tone.`;
+7. Do NOT refer to logged-in user health records or prescriptions (this is a generic inquiry).
+8. Maintain an empathetic, professional, and supportive tone.`;
   }
 
   // ── Step 4: Call Gemini LLM (with retry & backoff) ─────────────────────────
   try {
     const rawAnswer = await callLLM(systemPrompt, 650);
     if (rawAnswer && rawAnswer.trim().length > 0) {
+      let finalAnswer = rawAnswer.trim();
+
+      // Post-processing safety filter: catch any accidental "free consultation" hallucinations
+      finalAnswer = finalAnswer
+        .replace(/\b(free doctor consultation|free consultation|free lab report|free lab test|free medicine delivery|free medicine order|free medical order)\b/gi, "doctor consultation / healthcare service");
+
       return {
-        answer: rawAnswer.trim(),
+        answer: finalAnswer,
         usedRag,
         category: classification.category,
+        subject: classification.subject,
+        intent: classification.intent,
         sources: sourcesMeta,
         retrieval: {
           topK,
           resultsUsed: matches.length,
         },
         disclaimer:
-          classification.category === "PATIENT_SPECIFIC"
+          classification.subject === "SELF" && classification.isPatientSpecific
             ? "⚠️ Answer grounded in your AarogyaGenie database records. Consult your doctor for medical decisions."
             : "⚠️ Informational medical guidance based on clinical reference standards. Not a substitute for professional medical diagnosis or treatment.",
       };
@@ -400,7 +485,66 @@ CRITICAL MEDICAL RESPONSE GUIDELINES:
 
   // ── Step 5: Deterministic Fallback Engine ──────────────────────────────────
   let fallbackAnswer = "";
-  if (classification.isPatientSpecific && patientContext) {
+
+  if (classification.isPlatformService) {
+    if (classification.intent === "APPOINTMENT" || classification.intent === "DOCTOR") {
+      fallbackAnswer = "To book a doctor appointment on AarogyaGenie:\n1. Navigate to the 'Doctors' or 'Appointments' section in the sidebar.\n2. Search by specialty (e.g. Cardiologist, Dermatologist, General Physician) or doctor name.\n3. Choose your preferred doctor and select an available consultation time slot.\n4. Confirm your appointment details. Consultation fees vary by doctor and clinic.";
+    } else if (classification.intent === "LAB") {
+      fallbackAnswer = "To book a diagnostic lab test on AarogyaGenie:\n1. Go to the 'Diagnostics' or 'Lab Tests' tab.\n2. Select your required test or health checkup package (e.g., CBC, Lipid Profile, Thyroid, Blood Glucose).\n3. Choose a verified partner diagnostic center and schedule your preferred slot.";
+    } else if (classification.intent === "PHARMACY") {
+      fallbackAnswer = "To order medicines on AarogyaGenie:\n1. Open the 'Pharmacy' section.\n2. Search for prescribed or OTC medications, or upload your doctor's prescription.\n3. Add items to your cart and enter your delivery address for doorstep delivery from partner pharmacies.";
+    } else {
+      fallbackAnswer = "AarogyaGenie is an integrated healthcare platform providing AI health assistance, doctor appointment bookings, doorstep pharmacy deliveries, diagnostic lab test scheduling, and secure longitudinal medical records tracking.";
+    }
+  } else if (classification.subject === "OTHER_PERSON") {
+    const relName = classification.relationship || "other person";
+    const qLower = queryTrimmed.toLowerCase();
+
+    if (/\b(pcod|pcos|polycystic)\b/i.test(qLower)) {
+      fallbackAnswer = `For someone managing PCOS / PCOD (such as your ${relName}), here are key clinical precautions and management guidelines:
+
+1. Dietary & Lifestyle Measures:
+   • Focus on a balanced, low-glycemic index (GI) diet with complex carbohydrates, lean proteins, and fiber to help regulate insulin levels.
+   • Engage in regular moderate physical activity (at least 150 minutes per week) such as brisk walking, swimming, or strength training.
+   • Maintain a consistent sleep schedule and manage stress through relaxation techniques.
+
+2. Medical Monitoring & Follow-up:
+   • Consult a Gynecologist or Endocrinologist for comprehensive evaluation, hormonal profiling, and pelvic ultrasound if needed.
+   • Track menstrual cycle frequency and regularity.
+   • Monitor metabolic markers including fasting blood glucose, HbA1c, and lipid profile periodically.
+
+3. When to See a Doctor:
+   • Unusually heavy, painful, or absent menstrual bleeding.
+   • Significant unexplained weight changes or difficulty managing blood sugar.
+   • Always consult a healthcare professional before starting any supplements or medications.`;
+    } else if (/\b(diabetes|sugar|glucose)\b/i.test(qLower)) {
+      fallbackAnswer = `For someone managing diabetes (such as your ${relName}), standard precautions and lifestyle recommendations include:
+
+1. Dietary Management:
+   • Emphasize fiber-rich foods, non-starchy vegetables, whole grains, and lean proteins.
+   • Limit refined carbohydrates, sugary beverages, and processed snacks.
+   • Maintain regular meal timings to prevent blood sugar spikes and dips.
+
+2. Blood Sugar Monitoring:
+   • Regularly monitor blood glucose as recommended by their physician.
+   • Track HbA1c levels every 3 to 6 months.
+
+3. Daily Care & Physical Activity:
+   • Engage in daily light-to-moderate physical activity (e.g. 30 minutes of walking).
+   • Practice daily foot inspection and stay well-hydrated.
+   • Follow their prescribing doctor's medication schedule strictly and consult their diabetologist for personalized care.`;
+    } else if (/\b(fever|temp|temperature)\b/i.test(qLower)) {
+      fallbackAnswer = `For managing fever in another person (such as your ${relName}):
+• Ensure adequate rest and plenty of fluids (water, clear broths, oral rehydration solutions).
+• Keep them in a cool, well-ventilated room with light clothing.
+• Use a cool damp cloth on the forehead for comfort if body temperature is elevated.
+• Seek immediate medical attention if fever exceeds 103°F (39.4°C), lasts more than 3 days, or is accompanied by difficulty breathing, confusion, severe headache, or rash.`;
+    } else {
+      fallbackAnswer = `Here is general healthcare guidance regarding your inquiry for your ${relName}:
+• For specific symptoms or medical conditions, maintaining adequate hydration, rest, and a balanced diet is recommended.
+• Consult a qualified doctor or relevant medical specialist for an individualized clinical diagnosis and tailored treatment plan.`;
+    }
+  } else if (classification.subject === "SELF" && classification.isPatientSpecific && patientContext) {
     const qLower = queryTrimmed.toLowerCase();
     
     // Check if query is looking for a specific procedure/test/scan not present in records
@@ -418,6 +562,8 @@ CRITICAL MEDICAL RESPONSE GUIDELINES:
           answer: `According to your recorded AarogyaGenie health profile, no records were found for ${requestedTerm.toUpperCase()}. You currently have no ${requestedTerm.toUpperCase()} reports or diagnostic bookings on file.`,
           usedRag: false,
           category: classification.category,
+          subject: classification.subject,
+          intent: classification.intent,
           sources: sourcesMeta,
           retrieval: { topK, resultsUsed: matches.length },
           disclaimer: "⚠️ Grounded in your AarogyaGenie database records.",
@@ -426,46 +572,124 @@ CRITICAL MEDICAL RESPONSE GUIDELINES:
     }
 
     const sections: string[] = [];
-    const isMedsQuery = /\b(medicine|med|meds|order|ordered|pharmacy|prescription|prescribed|dose|tablet|pill)\b/i.test(qLower);
-    const isApptQuery = /\b(doctor|dr|appointment|appointments|visit|consultation|clinic|hospital)\b/i.test(qLower);
-    const isLabQuery = /\b(lab|labs|test|tests|report|reports|result|results|blood|hemoglobin|glucose)\b/i.test(qLower);
-    const isSymptomQuery = /\b(symptom|symptoms|fever|cough|pain|headache)\b/i.test(qLower);
+    const isMedsQuery = classification.intent === "PRESCRIPTION" || classification.intent === "MEDICATION" || /\b(medicine|med|meds|order|ordered|pharmacy|prescription|prescribed|dose|tablet|pill)\b/i.test(qLower);
+    const isApptQuery = classification.intent === "APPOINTMENT" || classification.intent === "DOCTOR" || /\b(doctor|dr|appointment|appointments|visit|consultation|clinic|hospital)\b/i.test(qLower);
+    const isLabQuery = classification.intent === "LAB_REPORT" || /\b(lab|labs|test|tests|report|reports|result|results|blood|hemoglobin|glucose)\b/i.test(qLower);
+    const isSymptomQuery = classification.intent === "SYMPTOM" || /\b(symptom|symptoms|fever|cough|pain|headache)\b/i.test(qLower);
 
-    if ((isMedsQuery || !isApptQuery && !isLabQuery && !isSymptomQuery) && patientContext.recentPrescriptions.length > 0) {
+    if (isMedsQuery && patientContext.recentPrescriptions.length > 0) {
       sections.push(`Doctor Prescriptions:\n${patientContext.recentPrescriptions.map((p) => `• ${p.date}: ${p.diagnosis} by ${p.doctorName} (Medicines: ${p.medicines})`).join("\n")}`);
     }
-    if ((isMedsQuery || !isApptQuery && !isLabQuery && !isSymptomQuery) && patientContext.recentMedicineOrders.length > 0) {
+    if (isMedsQuery && patientContext.recentMedicineOrders.length > 0) {
       sections.push(`Medicine Orders:\n${patientContext.recentMedicineOrders.map((o) => `• Order #${o.id} on ${o.date} (${o.status.toUpperCase()}): ${o.medicines}${o.pharmacyName ? ` from ${o.pharmacyName}` : ""}`).join("\n")}`);
     }
-    if ((isLabQuery || !isMedsQuery && !isApptQuery && !isSymptomQuery) && patientContext.recentLabReports.length > 0) {
+    if (isLabQuery && patientContext.recentLabReports.length > 0) {
       sections.push(`Lab Reports & Test Results:\n${patientContext.recentLabReports.map((l) => `• ${l.date}: ${l.testName} (${l.results || "Completed"})${l.aiSummary ? ` - ${l.aiSummary}` : ""}`).join("\n")}`);
     }
-    if ((isApptQuery || !isMedsQuery && !isLabQuery && !isSymptomQuery) && patientContext.recentAppointments.length > 0) {
+    if (isApptQuery && patientContext.recentAppointments.length > 0) {
       sections.push(`Doctor Consultations:\n${patientContext.recentAppointments.map((a) => `• ${a.appointmentDate}: ${a.doctorName}${a.specialty ? ` (${a.specialty})` : ""} - Status: ${a.status.toUpperCase()}`).join("\n")}`);
     }
-    if ((isSymptomQuery || !isMedsQuery && !isApptQuery && !isLabQuery) && patientContext.recentSymptoms.length > 0) {
+    if (isSymptomQuery && patientContext.recentSymptoms.length > 0) {
       sections.push(`Reported Symptoms:\n${patientContext.recentSymptoms.map((s) => `• ${s.date}: ${s.symptoms}${s.severity ? ` (Severity: ${s.severity})` : ""}`).join("\n")}`);
     }
 
     if (sections.length > 0) {
-      fallbackAnswer = `Based on your recorded AarogyaGenie health profile:\n\n${sections.join("\n\n")}`;
+      fallbackAnswer = `Your recorded AarogyaGenie health records show:\n\n${sections.join("\n\n")}`;
     } else {
       fallbackAnswer = "According to your recorded AarogyaGenie health profile, no matching records were found for this inquiry.";
     }
   } else {
-    fallbackAnswer =
-      "I am AarogyaGenie AI, your medical assistant. For specific health concerns, please consult a verified doctor or healthcare professional.";
+    // Generic Medical Question Fallback
+    const qLower = queryTrimmed.toLowerCase();
+    if (/\b(dengue)\b/i.test(qLower)) {
+      fallbackAnswer = `Dengue fever is a mosquito-borne viral infection caused by the dengue virus and transmitted primarily by Aedes mosquitoes.
+
+Common Symptoms:
+• Sudden high fever (104°F / 40°C)
+• Severe headache and intense pain behind the eyes
+• Joint, muscle, and body aches ("breakbone fever")
+• Nausea, vomiting, and fatigue
+• Mild skin rash appearing 2–5 days after fever onset
+
+Key Precautions & Home Care:
+• Maintain strict hydration with water, oral rehydration solutions (ORS), coconut water, and clear soups.
+• Get adequate bed rest.
+• Avoid NSAIDs such as Ibuprofen or Aspirin as they can increase bleeding risk; Paracetamol may be used for fever reduction under medical guidance.
+
+Warning Signs (Seek Urgent Care):
+• Severe abdominal pain, persistent vomiting, mucosal bleeding (nose or gums), or rapid platelet drop. Consult a doctor immediately.`;
+    } else if (/\b(pcod|pcos|polycystic)\b/i.test(qLower)) {
+      fallbackAnswer = `PCOS (Polycystic Ovary Syndrome) / PCOD is a common hormonal condition that affects how the ovaries function.
+
+Common Characteristics & Symptoms:
+• Irregular, infrequent, or prolonged menstrual cycles
+• Elevated androgen levels (leading to facial hair, acne, or male-pattern hair thinning)
+• Polycystic ovaries (enlarged ovaries with multiple small follicles visible on ultrasound)
+• Weight management challenges and insulin resistance
+
+General Precautions & Management:
+• Nutrition: Adopt a low-glycemic, balanced diet rich in vegetables, lean proteins, and fiber to support insulin sensitivity.
+• Physical Activity: Regular exercise (at least 30 minutes of moderate activity daily) helps regulate hormones and metabolism.
+• Medical Care: Consult a Gynecologist or Endocrinologist for individualized hormonal evaluation and regular health monitoring.`;
+    } else if (/\b(anemia|hemoglobin|iron deficiency|ferritin|low hb)\b/i.test(qLower)) {
+      fallbackAnswer = `Hemoglobin is an iron-rich protein in red blood cells that transports oxygen throughout your body.
+
+Common Causes of Low Hemoglobin & Anemia:
+• Iron deficiency (due to insufficient dietary iron intake or poor absorption)
+• Vitamin B12 or folate deficiencies
+• Blood loss (from heavy menstrual bleeding, gastrointestinal bleeding, or injury)
+• Chronic conditions affecting red blood cell production
+
+Warning Signs & Symptoms:
+• Persistent fatigue, weakness, and reduced stamina
+• Pale or yellowish skin, brittle nails
+• Dizziness, lightheadedness, or shortness of breath on mild exertion
+• Cold hands and feet
+
+General Recommendations:
+• Increase intake of iron-rich foods (leafy greens, beans, lentils, fortified cereals, lean meats) combined with Vitamin C for better absorption.
+• Consult your doctor for a Complete Blood Count (CBC) and serum ferritin evaluation before taking iron supplements.`;
+    } else if (/\b(hypertension|high blood pressure|high bp|blood pressure)\b/i.test(qLower)) {
+      fallbackAnswer = `Hypertension (high blood pressure) occurs when the pressure of blood against arterial walls is consistently elevated (generally ≥ 130/80 mmHg).
+
+Key Causes & Contributing Factors:
+• High dietary sodium (salt) intake and low potassium
+• Sedentary lifestyle, physical inactivity, and obesity
+• Chronic emotional stress and inadequate sleep
+• Genetic predisposition and family history
+
+Lifestyle & Management Guidelines:
+• Adopt the DASH diet (rich in fruits, vegetables, whole grains, and low-fat dairy with reduced sodium).
+• Aim for at least 30 minutes of moderate aerobic exercise daily.
+• Monitor blood pressure regularly and consult a physician for personalized cardiovascular risk evaluation.`;
+    } else if (/\b(diabetes|blood sugar|glucose|hba1c)\b/i.test(qLower)) {
+      fallbackAnswer = `Diabetes Mellitus is a metabolic condition characterized by elevated blood glucose levels due to insulin deficiency or insulin resistance.
+
+Key Management Guidelines:
+• Dietary Balance: Focus on fiber-rich, low-glycemic foods, lean proteins, and complex carbohydrates; limit refined sugars.
+• Physical Activity: Regular moderate aerobic and resistance exercise helps improve insulin sensitivity.
+• Monitoring: Track fasting and post-prandial blood glucose as directed, with HbA1c testing every 3 to 6 months.
+• Consult an Endocrinologist or Diabetologist for personalized medication and lifestyle planning.`;
+    } else {
+      fallbackAnswer =
+        "I am AarogyaGenie AI, your medical assistant. For specific health concerns or personalized diagnoses, please consult a verified doctor or healthcare professional.";
+    }
   }
 
   return {
     answer: fallbackAnswer,
     usedRag,
     category: classification.category,
+    subject: classification.subject,
+    intent: classification.intent,
     sources: sourcesMeta,
     retrieval: {
       topK,
       resultsUsed: matches.length,
     },
-    disclaimer: "⚠️ Informational response grounded in verified database records.",
+    disclaimer:
+      classification.subject === "SELF" && classification.isPatientSpecific
+        ? "⚠️ Answer grounded in your AarogyaGenie database records. Consult your doctor for medical decisions."
+        : "⚠️ Informational medical guidance based on clinical reference standards. Not a substitute for professional medical diagnosis or treatment.",
   };
 }
