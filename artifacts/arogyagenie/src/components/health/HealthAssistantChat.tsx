@@ -267,50 +267,8 @@ function GlowingBotAvatar({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
     </div>
   );
 }
-
-const QUICK_ACTIONS = [
-  {
-    id: "symptoms",
-    title: "Check Symptoms",
-    desc: "Describe your symptoms and get AI insights",
-    icon: Stethoscope,
-    color: "from-purple-500/20 to-indigo-500/10 border-purple-500/40 text-purple-300",
-    iconColor: "text-purple-400",
-    arrowColor: "group-hover:border-purple-400 text-purple-400",
-    query: "I'd like to evaluate some symptoms I've been experiencing. Can you ask me guiding questions to assess them?",
-  },
-  {
-    id: "medicine",
-    title: "Understand Medicine",
-    desc: "Know uses, side effects and precautions",
-    icon: Pill,
-    color: "from-cyan-500/20 to-blue-500/10 border-cyan-500/40 text-cyan-300",
-    iconColor: "text-cyan-400",
-    arrowColor: "group-hover:border-cyan-400 text-cyan-400",
-    query: "Can you help me understand a medication? What are its uses, dosage considerations, side effects, and precautions?",
-  },
-  {
-    id: "report",
-    title: "Explain Report",
-    desc: "Upload your reports and get explanation",
-    icon: FileText,
-    color: "from-emerald-500/20 to-teal-500/10 border-emerald-500/40 text-emerald-300",
-    iconColor: "text-emerald-400",
-    arrowColor: "group-hover:border-emerald-400 text-emerald-400",
-    query: "Can you help explain the key clinical metrics, abnormal ranges, and findings in a lab or diagnostic test report?",
-  },
-  {
-    id: "doctor",
-    title: "Find Doctor",
-    desc: "Find specialists near you and book appointment",
-    icon: User,
-    color: "from-rose-500/20 to-pink-500/10 border-rose-500/40 text-rose-300",
-    iconColor: "text-rose-400",
-    arrowColor: "group-hover:border-rose-400 text-rose-400",
-    query: "I would like to find verified medical specialists and doctors for a consultation. What specialty should I look for?",
-    actionUrl: "/patient/doctors",
-  },
-];
+const SYMPTOM_CHECK_QUERY =
+  "I'd like to evaluate some symptoms I've been experiencing. Can you ask me guiding questions to assess them?";
 
 const INITIAL_WELCOME_TEXT = `Hello! 👋
 I'm AarogyaGenie AI, your health assistant.
@@ -782,13 +740,13 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                     </div>
                   </div>
 
-                  {/* Welcome Message Card (Reference Image 2) */}
+                  {/* Welcome Message Card with embedded Symptom Checker */}
                   <div className="flex gap-3.5 max-w-[95%] sm:max-w-[85%]">
                     <GlowingBotAvatar size="md" />
 
                     {/* Card Content */}
                     <div className="space-y-1 flex-1">
-                      <div className="p-4 sm:p-5 rounded-3xl rounded-tl-sm bg-[#0d1030]/90 border border-indigo-500/35 text-slate-100 shadow-[0_10px_30px_rgba(10,14,40,0.5)] backdrop-blur-xl">
+                      <div className="p-4 sm:p-5 rounded-3xl rounded-tl-sm bg-[#0d1030]/90 border border-indigo-500/35 text-slate-100 shadow-[0_10px_30px_rgba(10,14,40,0.5)] backdrop-blur-xl space-y-4">
                         <div className="space-y-2 text-sm sm:text-[15px] leading-relaxed">
                           <p className="font-bold text-white text-base">Hello! 👋</p>
                           <p>
@@ -799,50 +757,40 @@ export function HealthAssistantChat({ className = "", onClose }: HealthAssistant
                           </p>
                           <p className="text-purple-300 font-bold pt-1">How can I help you today?</p>
                         </div>
+
+                        {/* Long Rectangular Symptom Checker Button inside the chatbot */}
+                        <button
+                          type="button"
+                          onClick={() => handleSend(SYMPTOM_CHECK_QUERY)}
+                          className="w-full p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-purple-950/70 via-indigo-950/60 to-[#0e1338]/90 hover:from-purple-900/90 hover:via-indigo-900/80 hover:to-indigo-950/90 border border-purple-500/40 hover:border-purple-400/80 text-white flex items-center justify-between gap-3 shadow-lg shadow-purple-950/30 transition-all duration-300 group cursor-pointer text-left hover:scale-[1.006] active:scale-[0.99]"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-purple-600/25 border border-purple-400/40 flex items-center justify-center text-purple-300 group-hover:bg-purple-600 group-hover:text-white transition-colors shrink-0 shadow-inner">
+                              <Stethoscope className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm sm:text-base text-white group-hover:text-purple-200 transition-colors">
+                                  Check Symptoms
+                                </span>
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                  AI Guided
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-300 truncate font-normal">
+                                Describe your symptoms and get AI clinical insights
+                              </p>
+                            </div>
+                          </div>
+                          <div className="w-8 h-8 rounded-full border border-purple-500/30 group-hover:border-purple-400 group-hover:bg-purple-600/30 flex items-center justify-center transition-all shrink-0">
+                            <ArrowRight className="h-4 w-4 text-purple-300 group-hover:translate-x-0.5 transition-transform" />
+                          </div>
+                        </button>
                       </div>
                       <span className="text-[10px] text-slate-400 font-medium px-2 block">
                         {messages[0]?.timestamp || "10:30 AM"}
                       </span>
                     </div>
-                  </div>
-
-                  {/* 2. Four Interactive Quick Action Cards (Reference Image 2) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-1">
-                    {QUICK_ACTIONS.map((action) => {
-                      const Icon = action.icon;
-                      return (
-                        <div
-                          key={action.id}
-                          onClick={() => {
-                            if (action.actionUrl) {
-                              if (onClose) onClose();
-                              setLocation(action.actionUrl);
-                            } else {
-                              handleSend(action.query);
-                            }
-                          }}
-                          className={`group p-4 rounded-2xl bg-gradient-to-br ${action.color} border hover:border-purple-400/80 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-purple-950/40 hover:-translate-y-0.5 flex flex-col justify-between space-y-3`}
-                        >
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Icon className={`h-4 w-4 ${action.iconColor}`} />
-                                <span className="font-bold text-sm text-white group-hover:text-purple-200 transition-colors">
-                                  {action.title}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-xs text-slate-300 leading-relaxed font-normal">{action.desc}</p>
-                          </div>
-
-                          <div className="flex justify-end pt-1">
-                            <div className="w-6 h-6 rounded-full border border-slate-700 group-hover:border-purple-400 group-hover:bg-purple-600/30 flex items-center justify-center transition-all">
-                              <ArrowRight className="h-3 w-3 text-slate-400 group-hover:text-purple-300 group-hover:translate-x-0.5 transition-transform" />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
 
