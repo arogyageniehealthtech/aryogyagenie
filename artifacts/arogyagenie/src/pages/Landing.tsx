@@ -17,6 +17,7 @@ export function Landing() {
           <a href="#features" className="hover:text-primary transition-colors">Features</a>
           <a href="#roles" className="hover:text-primary transition-colors">Who is it for?</a>
           <a href="#security" className="hover:text-primary transition-colors">Security</a>
+          <Link href="/contact" className="hover:text-primary transition-colors">Support</Link>
         </div>
         <div className="flex items-center gap-2 sm:gap-4">
           <Link href="/sign-in">
@@ -100,11 +101,10 @@ export function Landing() {
                 <Activity className="h-6 w-6" />
               </div>
               <h3 className="text-xl font-bold mb-3">For Patients</h3>
-              <p className="text-slate-600 mb-6 line-clamp-3">Book appointments, manage prescriptions, analyze symptoms with AI, and keep your lifetime medical timeline in one secure place.</p>
+              <p className="text-slate-600 mb-6 line-clamp-3">Your complete medical timeline, digital prescriptions, lab reports, and AI health assistant in one secure place.</p>
               <ul className="space-y-2 text-sm font-medium text-slate-700">
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />AI Symptom Checker</li>
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Medicine Reminders</li>
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Lab Report Storage</li>
+                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />AI Health Companion</li>
+                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Instant Doctor Booking</li>
               </ul>
             </div>
 
@@ -114,11 +114,10 @@ export function Landing() {
                 <Stethoscope className="h-6 w-6" />
               </div>
               <h3 className="text-xl font-bold mb-3">For Doctors</h3>
-              <p className="text-slate-600 mb-6 line-clamp-3">Manage appointments, write digital prescriptions, access patient histories, and streamline your clinic's workflow effortlessly.</p>
+              <p className="text-slate-600 mb-6 line-clamp-3">Streamlined practice management, digital prescription builder, longitudinal patient histories, and AI briefings.</p>
               <ul className="space-y-2 text-sm font-medium text-slate-700">
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Patient Records</li>
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Digital Prescriptions</li>
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Schedule Management</li>
+                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />AI Patient Briefings</li>
+                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Smart Prescriptions</li>
               </ul>
             </div>
 
@@ -128,11 +127,10 @@ export function Landing() {
                 <FileText className="h-6 w-6" />
               </div>
               <h3 className="text-xl font-bold mb-3">For Diagnostic Centers</h3>
-              <p className="text-slate-600 mb-6 line-clamp-3">Receive bookings, upload lab reports directly to patient profiles, and manage your testing queue with ease.</p>
+              <p className="text-slate-600 mb-6 line-clamp-3">Manage test appointments, upload digital lab reports, and connect directly with referring doctors and patients.</p>
               <ul className="space-y-2 text-sm font-medium text-slate-700">
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Direct Report Uploads</li>
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Booking Management</li>
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Service Listings</li>
+                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Digital Lab Reports</li>
+                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Online Booking Engine</li>
               </ul>
             </div>
             
@@ -142,10 +140,10 @@ export function Landing() {
                 <Pill className="h-6 w-6" />
               </div>
               <h3 className="text-xl font-bold mb-3">For Pharmacies</h3>
-              <p className="text-slate-600 mb-6 line-clamp-3">Receive digital prescriptions, track dispensed medicines, and manage inventory insights based on local demand.</p>
+              <p className="text-slate-600 mb-6 line-clamp-3">Receive digital prescriptions, manage orders, and deliver medications directly to patients' doorsteps.</p>
               <ul className="space-y-2 text-sm font-medium text-slate-700">
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Verified Prescriptions</li>
-                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Order Tracking</li>
+                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Digital Prescription Ingestion</li>
+                <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" />Order Delivery Management</li>
               </ul>
             </div>
             
@@ -196,31 +194,36 @@ export function Landing() {
       <footer className="bg-slate-950 text-slate-300 py-12 px-6 lg:px-12 mt-auto">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2 space-y-4">
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4">
               <img src={`${basePath}/logo.png`} alt="ArogyaGenie Logo" className="h-8 w-8 object-contain brightness-0 invert" />
               <span className="font-bold text-xl text-white tracking-tight">ArogyaGenie</span>
             </div>
-            <p className="text-sm max-w-sm">
-              Empowering India's healthcare ecosystem with intelligent, secure, and accessible tools for everyone.
+            <p className="text-sm max-w-sm text-slate-400">
+              Empowering India's healthcare ecosystem with intelligent, secure, and accessible tools for patients, doctors, labs, and pharmacies.
             </p>
+            <div className="pt-2 text-xs text-slate-500">
+              <p>Emergency Helplines: <strong>112 (National)</strong> • <strong>108 (Ambulance)</strong></p>
+            </div>
           </div>
           <div>
             <h4 className="font-semibold text-white mb-4">Platform</h4>
             <ul className="space-y-2 text-sm">
               <li><Link href="/sign-in" className="hover:text-white transition-colors">Sign In</Link></li>
               <li><Link href="/sign-up" className="hover:text-white transition-colors">Create Account</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Help & Support</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-4">Legal</h4>
+            <h4 className="font-semibold text-white mb-4">Legal & Privacy</h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact Us</Link></li>
             </ul>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto mt-12 pt-8 border-t border-slate-800 text-sm text-center">
-          © {new Date().getFullYear()} ArogyaGenie. All rights reserved.
+        <div className="max-w-6xl mx-auto mt-12 pt-8 border-t border-slate-800 text-sm text-center text-slate-500">
+          © {new Date().getFullYear()} ArogyaGenie. All rights reserved. Registered under Indian Digital Healthcare Guidelines.
         </div>
       </footer>
     </div>

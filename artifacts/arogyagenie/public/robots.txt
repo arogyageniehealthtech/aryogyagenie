@@ -1,2 +1,19 @@
+# ArogyaGenie Search Engine Crawling Guidelines
 User-agent: *
 Allow: /
+Allow: /sign-in
+Allow: /sign-up
+Allow: /privacy
+Allow: /terms
+Allow: /contact
+
+# Disallow indexing of private authenticated medical portals & EHR records
+Disallow: /patient/
+Disallow: /doctor/
+Disallow: /diagnostic/
+Disallow: /pharmacy/
+Disallow: /admin/
+Disallow: /onboarding
+Disallow: /provider-status
+
+Sitemap: https://arogyagenie.com/sitemap.xml

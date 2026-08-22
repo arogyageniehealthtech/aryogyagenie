@@ -25,11 +25,16 @@ function lazyNamed<T extends Record<string, any>, K extends keyof T>(
   return lazy(() => factory().then((module) => ({ default: module[name] })));
 }
 
-// Non-lazy / core pages
 import NotFound from '@/pages/not-found';
 import { SignInPage, SignUpPage } from "./pages/Auth";
 import { Onboarding } from "./pages/Onboarding";
 import { Landing } from "./pages/Landing";
+import { CookieConsentBanner } from "./components/common/CookieConsentBanner";
+
+// Public Informational & Legal Pages (Lazy loaded)
+const PrivacyPolicy = lazyNamed(() => import("./pages/PrivacyPolicy"), "PrivacyPolicy");
+const TermsOfService = lazyNamed(() => import("./pages/TermsOfService"), "TermsOfService");
+const ContactSupport = lazyNamed(() => import("./pages/ContactSupport"), "ContactSupport");
 
 // Patient Pages (Lazy loaded)
 const PatientDashboard = lazyNamed(() => import("./pages/patient/Dashboard"), "PatientDashboard");
@@ -279,6 +284,11 @@ function ClerkProviderWithRoutes() {
                 <Route path="/sign-in/*?" component={SignInPage} />
                 <Route path="/sign-up/*?" component={SignUpPage} />
                 
+                {/* Public Legal & Support Routes */}
+                <Route path="/privacy" component={PrivacyPolicy} />
+                <Route path="/terms" component={TermsOfService} />
+                <Route path="/contact" component={ContactSupport} />
+                
                 <Route path="/onboarding">
                   <Show when="signed-in">
                     <Onboarding />
@@ -417,6 +427,7 @@ function ClerkProviderWithRoutes() {
             </Suspense>
           </ErrorBoundary>
           <Toaster />
+          <CookieConsentBanner />
         </TooltipProvider>
       </QueryClientProvider>
     </ClerkProvider>
