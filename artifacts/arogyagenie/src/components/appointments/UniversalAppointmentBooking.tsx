@@ -136,7 +136,7 @@ export function UniversalAppointmentBooking({
         list.push({
           id: `doc-clinic-${d.id}`,
           name: clinicName,
-          address: d.clinicAddress || d.address || "Health Tech Center",
+          address: d.clinicAddress || "Health Tech Center",
           doctorId: d.id,
         });
       }
