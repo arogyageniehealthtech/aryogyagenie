@@ -437,24 +437,30 @@ ${commonSafetyRules}
   } else {
     // GENERIC_MEDICAL or GENERAL_CONVERSATION
     systemPrompt = `You are AarogyaGenie AI, a trusted, empathetic, and clinically grounded medical AI assistant.
-Answer the user's general medical or health education question thoroughly, accurately, and compassionately.
+Your job is to answer ANY health, medical, wellness, nutrition, fitness, mental health, or symptom-related question thoroughly, accurately, and compassionately.
 
 ${formattedHistory}${usedRag ? `AUTHORITATIVE MEDICAL GUIDELINES (RAG EVIDENCE):\n${formattedRagEvidence}\n\n` : ""}PATIENT HEALTH QUESTION: "${queryTrimmed}"
 
 ${commonSafetyRules}
-5. Provide a comprehensive, medically accurate, and easy-to-understand explanation.
-6. Structure your response clearly:
-   - Direct explanation / Overview of the condition, symptom, or topic
-   - Common causes / mechanisms
-   - Practical precautions, self-care, or relief measures (where appropriate)
-   - Important warning signs (red flags) and when to see a healthcare professional
-7. Do NOT refer to logged-in user health records or prescriptions (this is a generic inquiry).
-8. Maintain an empathetic, professional, and supportive tone.`;
+5. Provide a comprehensive, medically accurate, and easy-to-understand explanation. NEVER give a one-liner dismissal — always provide actionable, helpful information.
+6. Always structure your response clearly using these sections where relevant:
+   🔍 **Overview**: Direct explanation of the condition, symptom, medication, or health topic
+   🧬 **Common Causes / Mechanism**: Why it happens or how it works
+   🏡 **Home Care & Precautions**: Practical self-care measures, dietary tips, lifestyle adjustments
+   ⚠️ **Warning Signs (Red Flags)**: Specific symptoms that require urgent medical attention
+   👨‍⚕️ **Medical Guidance**: Which specialist to consult, what tests may be needed
+7. For medication or supplement questions: explain the drug class, common uses, typical dosage ranges (general reference only, not a prescription), and important safety cautions.
+8. For nutrition, fitness, or wellness questions: give evidence-based, practical, actionable advice with specific food examples or exercise recommendations.
+9. For mental health topics (anxiety, depression, stress, sleep disorders): provide compassionate, evidence-based guidance including coping strategies and when to seek professional help.
+10. For questions about lab test results or medical terms: explain what the test measures, normal reference ranges, and what abnormal values may suggest.
+11. Do NOT refer to logged-in user health records or prescriptions (this is a generic inquiry).
+12. Use simple, accessible language and explain medical terms in parentheses where needed.
+13. Respond in the same language the user used (English or Hindi as appropriate).`;
   }
 
   // ── Step 4: Call Gemini LLM (with retry & backoff) ─────────────────────────
   try {
-    const rawAnswer = await callLLM(systemPrompt, 650);
+    const rawAnswer = await callLLM(systemPrompt, 900);
     if (rawAnswer && rawAnswer.trim().length > 0) {
       let finalAnswer = rawAnswer.trim();
 
@@ -599,80 +605,433 @@ ${commonSafetyRules}
       fallbackAnswer = "According to your recorded AarogyaGenie health profile, no matching records were found for this inquiry.";
     }
   } else {
-    // Generic Medical Question Fallback
+    // Generic Medical Question Fallback — comprehensive multi-condition engine
     const qLower = queryTrimmed.toLowerCase();
-    if (/\b(dengue)\b/i.test(qLower)) {
-      fallbackAnswer = `Dengue fever is a mosquito-borne viral infection caused by the dengue virus and transmitted primarily by Aedes mosquitoes.
 
-Common Symptoms:
-• Sudden high fever (104°F / 40°C)
+    if (/\b(dengue)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Dengue Fever Overview**
+Dengue is a mosquito-borne viral infection transmitted primarily by Aedes aegypti mosquitoes, common in tropical and subtropical regions.
+
+**Common Symptoms:**
+• Sudden high fever (104°F / 40°C) lasting 2–7 days
 • Severe headache and intense pain behind the eyes
 • Joint, muscle, and body aches ("breakbone fever")
 • Nausea, vomiting, and fatigue
 • Mild skin rash appearing 2–5 days after fever onset
 
-Key Precautions & Home Care:
-• Maintain strict hydration with water, oral rehydration solutions (ORS), coconut water, and clear soups.
-• Get adequate bed rest.
-• Avoid NSAIDs such as Ibuprofen or Aspirin as they can increase bleeding risk; Paracetamol may be used for fever reduction under medical guidance.
+🏡 **Home Care & Precautions:**
+• Maintain strict hydration with water, ORS, coconut water, and clear soups.
+• Adequate bed rest is essential.
+• Avoid NSAIDs (Ibuprofen, Aspirin) — they increase bleeding risk. Paracetamol may be used for fever under medical guidance.
+• Use mosquito repellents and nets to prevent further spread.
 
-Warning Signs (Seek Urgent Care):
-• Severe abdominal pain, persistent vomiting, mucosal bleeding (nose or gums), or rapid platelet drop. Consult a doctor immediately.`;
+⚠️ **Warning Signs (Seek Immediate Care):**
+• Severe abdominal pain, persistent vomiting, mucosal bleeding (nose/gums), platelet drop below 100,000.
+• Difficulty breathing or blood in urine/stool — visit an emergency room immediately.`;
+
+    } else if (/\b(malaria)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Malaria Overview**
+Malaria is a life-threatening parasitic infection transmitted through the bite of infected female Anopheles mosquitoes.
+
+**Common Symptoms:**
+• Cyclic high fever with chills and rigors (shaking)
+• Profuse sweating after fever breaks
+• Severe headache, body aches, fatigue
+• Nausea, vomiting, and sometimes jaundice
+
+🏡 **Prevention & Care:**
+• Use mosquito nets (preferably insecticide-treated) and repellents.
+• Eliminate stagnant water around your home.
+• Stay hydrated and rest adequately.
+
+⚠️ **Important:** Malaria requires prompt laboratory testing (blood smear or RDT) and prescription antimalarial medication. Seek medical care immediately if fever with chills develops in a malaria-prone area.`;
+
+    } else if (/\b(typhoid)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Typhoid Fever Overview**
+Typhoid is a bacterial infection caused by Salmonella typhi, spread through contaminated food and water.
+
+**Common Symptoms:**
+• Prolonged high fever (gradually rising over days)
+• Severe abdominal pain, loss of appetite
+• Headache, weakness, and muscle aches
+• Diarrhea or constipation
+
+🏡 **Home Care:**
+• Strict oral hydration (boiled water, ORS)
+• Bland, easily digestible foods (khichdi, curd, bananas)
+• Complete rest until fever resolves
+
+⚠️ **Medical Guidance:**
+Typhoid requires a Widal test or blood culture for diagnosis and antibiotic treatment (typically Azithromycin or Ciprofloxacin under doctor prescription). Do not self-medicate antibiotics.`;
+
     } else if (/\b(pcod|pcos|polycystic)\b/i.test(qLower)) {
-      fallbackAnswer = `PCOS (Polycystic Ovary Syndrome) / PCOD is a common hormonal condition that affects how the ovaries function.
+      fallbackAnswer = `🔍 **PCOS / PCOD Overview**
+PCOS (Polycystic Ovary Syndrome) is a common hormonal condition affecting reproductive-aged women, causing hormonal imbalances and metabolic issues.
 
-Common Characteristics & Symptoms:
+**Common Symptoms:**
 • Irregular, infrequent, or prolonged menstrual cycles
-• Elevated androgen levels (leading to facial hair, acne, or male-pattern hair thinning)
-• Polycystic ovaries (enlarged ovaries with multiple small follicles visible on ultrasound)
+• Elevated androgen levels (facial hair, acne, hair thinning)
+• Enlarged ovaries with multiple small follicles (visible on ultrasound)
 • Weight management challenges and insulin resistance
 
-General Precautions & Management:
-• Nutrition: Adopt a low-glycemic, balanced diet rich in vegetables, lean proteins, and fiber to support insulin sensitivity.
-• Physical Activity: Regular exercise (at least 30 minutes of moderate activity daily) helps regulate hormones and metabolism.
-• Medical Care: Consult a Gynecologist or Endocrinologist for individualized hormonal evaluation and regular health monitoring.`;
+🏡 **Management & Precautions:**
+• Nutrition: Low-glycemic diet rich in vegetables, lean proteins, and fiber.
+• Physical Activity: 30+ minutes of moderate daily exercise helps regulate hormones.
+• Stress Management: Chronic stress worsens hormonal imbalances; yoga and mindfulness help.
+
+👨‍⚕️ **Medical Guidance:**
+Consult a Gynecologist or Endocrinologist for hormonal evaluation, pelvic ultrasound, and personalized treatment.`;
+
     } else if (/\b(anemia|hemoglobin|iron deficiency|ferritin|low hb)\b/i.test(qLower)) {
-      fallbackAnswer = `Hemoglobin is an iron-rich protein in red blood cells that transports oxygen throughout your body.
+      fallbackAnswer = `🔍 **Anemia / Low Hemoglobin Overview**
+Anemia occurs when your blood lacks enough healthy red blood cells or hemoglobin to carry adequate oxygen to body tissues.
 
-Common Causes of Low Hemoglobin & Anemia:
-• Iron deficiency (due to insufficient dietary iron intake or poor absorption)
-• Vitamin B12 or folate deficiencies
-• Blood loss (from heavy menstrual bleeding, gastrointestinal bleeding, or injury)
-• Chronic conditions affecting red blood cell production
+**Common Causes:**
+• Iron deficiency (most common — poor diet or poor absorption)
+• Vitamin B12 or folate deficiency
+• Blood loss (heavy periods, GI bleeding)
+• Chronic diseases (kidney disease, cancer, inflammation)
 
-Warning Signs & Symptoms:
-• Persistent fatigue, weakness, and reduced stamina
-• Pale or yellowish skin, brittle nails
-• Dizziness, lightheadedness, or shortness of breath on mild exertion
-• Cold hands and feet
+**Symptoms:**
+• Persistent fatigue, weakness, reduced stamina
+• Pale or yellowish skin, brittle nails, hair loss
+• Dizziness, lightheadedness, shortness of breath on mild exertion
 
-General Recommendations:
-• Increase intake of iron-rich foods (leafy greens, beans, lentils, fortified cereals, lean meats) combined with Vitamin C for better absorption.
-• Consult your doctor for a Complete Blood Count (CBC) and serum ferritin evaluation before taking iron supplements.`;
+🏡 **Dietary Recommendations:**
+• Iron-rich foods: leafy greens (spinach, methi), lentils, beans, fortified cereals, lean red meat, tofu
+• Vitamin C (citrus, amla, tomatoes) with iron-rich meals to enhance absorption
+• Vitamin B12 sources: dairy, eggs, fish, or B12 supplements if vegetarian/vegan
+
+👨‍⚕️ **Medical Guidance:**
+Get a CBC (Complete Blood Count) and serum ferritin test before starting iron supplements.`;
+
     } else if (/\b(hypertension|high blood pressure|high bp|blood pressure)\b/i.test(qLower)) {
-      fallbackAnswer = `Hypertension (high blood pressure) occurs when the pressure of blood against arterial walls is consistently elevated (generally ≥ 130/80 mmHg).
+      fallbackAnswer = `🔍 **Hypertension (High Blood Pressure) Overview**
+Hypertension is consistently elevated blood pressure (≥ 130/80 mmHg), a major risk factor for heart disease, stroke, and kidney failure.
 
-Key Causes & Contributing Factors:
-• High dietary sodium (salt) intake and low potassium
-• Sedentary lifestyle, physical inactivity, and obesity
-• Chronic emotional stress and inadequate sleep
-• Genetic predisposition and family history
+**Common Causes:**
+• High dietary sodium (salt) intake
+• Physical inactivity and obesity
+• Chronic emotional stress and poor sleep
+• Genetic predisposition and advancing age
 
-Lifestyle & Management Guidelines:
-• Adopt the DASH diet (rich in fruits, vegetables, whole grains, and low-fat dairy with reduced sodium).
-• Aim for at least 30 minutes of moderate aerobic exercise daily.
-• Monitor blood pressure regularly and consult a physician for personalized cardiovascular risk evaluation.`;
-    } else if (/\b(diabetes|blood sugar|glucose|hba1c)\b/i.test(qLower)) {
-      fallbackAnswer = `Diabetes Mellitus is a metabolic condition characterized by elevated blood glucose levels due to insulin deficiency or insulin resistance.
+🏡 **Lifestyle Management:**
+• DASH Diet: Rich in fruits, vegetables, whole grains, low-fat dairy; reduce salt to < 5g/day
+• Exercise: 30+ minutes of moderate aerobic activity most days
+• Limit alcohol, avoid smoking, and manage stress through meditation or yoga
+• Monitor BP regularly at home
 
-Key Management Guidelines:
-• Dietary Balance: Focus on fiber-rich, low-glycemic foods, lean proteins, and complex carbohydrates; limit refined sugars.
-• Physical Activity: Regular moderate aerobic and resistance exercise helps improve insulin sensitivity.
-• Monitoring: Track fasting and post-prandial blood glucose as directed, with HbA1c testing every 3 to 6 months.
-• Consult an Endocrinologist or Diabetologist for personalized medication and lifestyle planning.`;
+⚠️ **Warning Signs (Hypertensive Crisis):**
+Severe headache, blurred vision, chest pain, or BP > 180/120 mmHg — seek emergency care immediately.
+
+👨‍⚕️ Consult a physician or cardiologist if lifestyle changes are insufficient.`;
+
+    } else if (/\b(diabetes|blood sugar|glucose|hba1c|type 1|type 2)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Diabetes Mellitus Overview**
+Diabetes is a chronic metabolic condition characterized by elevated blood glucose due to insulin deficiency (Type 1) or insulin resistance (Type 2).
+
+**Key Symptoms:**
+• Frequent urination, excessive thirst and hunger
+• Unexplained weight loss (Type 1) or weight gain (Type 2)
+• Blurred vision, fatigue, slow-healing wounds
+• Tingling or numbness in hands/feet
+
+🏡 **Management Guidelines:**
+• Dietary Balance: Low-glycemic foods, fiber-rich vegetables, lean proteins; limit refined sugars and white rice
+• Exercise: 30+ minutes daily of moderate aerobic + resistance training
+• Monitoring: Fasting glucose (< 100 mg/dL), post-meal glucose (< 140 mg/dL), HbA1c (< 7% ideally)
+
+⚠️ **Diabetic Emergency Signs:**
+• Hypoglycemia: Shakiness, sweating, confusion — eat glucose immediately
+• Hyperglycemia: Extreme thirst, fruity breath, vomiting — seek emergency care
+
+👨‍⚕️ Consult an Endocrinologist or Diabetologist for personalized medication and complication screening.`;
+
+    } else if (/\b(thyroid|tsh|hypothyroid|hyperthyroid|goiter)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Thyroid Disorders Overview**
+The thyroid gland regulates metabolism, energy, and growth through thyroid hormones (T3, T4).
+
+**Hypothyroidism (underactive thyroid):**
+• Fatigue, weight gain, cold intolerance, constipation, depression, hair loss, dry skin
+• TSH elevated (> 4.5 mIU/L), T3/T4 low
+• Treatment: Levothyroxine (prescription hormone replacement)
+
+**Hyperthyroidism (overactive thyroid):**
+• Weight loss, rapid heartbeat, anxiety, heat intolerance, tremors, excessive sweating
+• TSH suppressed (< 0.5 mIU/L), T3/T4 elevated
+• Treatment: Antithyroid drugs, radioactive iodine, or surgery
+
+🏡 **Dietary Tips:**
+• Hypothyroidism: Ensure adequate iodine (iodized salt, seafood)
+• Hyperthyroidism: Avoid iodine-rich foods; calcium-rich diet to protect bones
+
+👨‍⚕️ Consult an Endocrinologist for TSH, T3, T4 testing and personalized treatment.`;
+
+    } else if (/\b(asthma|inhaler|bronchial|wheez)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Asthma Overview**
+Asthma is a chronic inflammatory airway disease causing recurrent episodes of wheezing, breathlessness, chest tightness, and cough.
+
+**Common Triggers:**
+• Allergens: dust mites, pollen, pet dander, mold
+• Respiratory infections, cold air, exercise
+• Smoke, air pollution, strong odors, emotional stress
+
+🏡 **Management & Precautions:**
+• Identify and avoid personal triggers
+• Use prescribed inhalers as directed: reliever (Salbutamol) for acute symptoms, controller (Budesonide) for daily prevention
+• Practice breathing exercises and keep windows closed during high pollen season
+
+⚠️ **Asthma Attack Warning Signs:**
+Rapid breathing, inability to speak full sentences, bluish lips — use reliever inhaler and seek emergency care immediately.
+
+👨‍⚕️ Consult a Pulmonologist for an Asthma Action Plan and spirometry lung function testing.`;
+
+    } else if (/\b(migraine|severe headache|cluster headache)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Migraine Overview**
+Migraines are intense, recurring headaches often accompanied by nausea, vomiting, and sensitivity to light and sound. They can last 4–72 hours.
+
+**Common Triggers:**
+• Stress, irregular sleep, skipped meals
+• Hormonal changes (menstrual cycle in women)
+• Certain foods: caffeine, alcohol, aged cheese, processed meats
+• Bright lights, loud noise, strong smells
+
+🏡 **Home Care:**
+• Rest in a dark, quiet room during an attack
+• Apply cold or warm compress to the head/neck
+• Stay well-hydrated and maintain a regular sleep schedule
+• Track triggers using a headache diary
+
+**Medications (consult a doctor):**
+• Mild attacks: Paracetamol, Ibuprofen, Aspirin
+• Moderate-severe attacks: Prescription triptans (e.g., Sumatriptan)
+
+⚠️ **See a Doctor if:** Headache is the worst of your life, sudden onset (thunderclap), with fever/stiff neck, or after head injury.`;
+
+    } else if (/\b(fever|temperature|pyrexia)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Fever Overview**
+Fever is a temporary rise in body temperature (above 98.6°F / 37°C), typically a sign that your immune system is fighting an infection.
+
+**Common Causes:**
+• Viral infections (flu, cold, COVID-19, dengue)
+• Bacterial infections (UTI, pneumonia, typhoid)
+• Inflammatory conditions, medications, heat exhaustion
+
+🏡 **Home Care:**
+• Stay well-hydrated (water, ORS, clear soups, coconut water)
+• Rest and light, easily digestible meals
+• Dress lightly; cool sponging of forehead if temperature is high
+• Paracetamol (as per package instructions) to reduce fever and discomfort
+
+⚠️ **Seek Immediate Medical Care if:**
+• Temperature > 104°F (40°C) or fever lasting > 3 days
+• Infant under 3 months with any fever
+• Fever with severe headache, stiff neck, rash, difficulty breathing, confusion, or seizures`;
+
+    } else if (/\b(cough|cold|sore throat|runny nose|flu|influenza)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Common Cold, Flu & Respiratory Infections**
+Viral upper respiratory infections are extremely common, especially during seasonal changes.
+
+**Distinguishing Cold vs. Flu:**
+• Cold: Gradual onset, mild fever, runny nose, sneezing, sore throat
+• Flu: Sudden onset, high fever, severe body aches, fatigue, dry cough
+
+🏡 **Home Care:**
+• Rest and adequate fluid intake (warm water, herbal teas, soups, honey-ginger-lemon)
+• Steam inhalation for nasal congestion
+• Saltwater gargles for sore throat
+• Paracetamol for fever and body aches
+
+**OTC Relief:**
+Antihistamines (Cetirizine) for runny nose, decongestants for blocked nose, throat lozenges for sore throat.
+
+⚠️ **See a Doctor if:**
+High persistent fever (> 3 days), difficulty breathing, chest pain, symptoms worsening, or yellow/green phlegm suggesting bacterial infection.`;
+
+    } else if (/\b(stomach|gastric|acidity|gerd|acid reflux|heartburn|ulcer|ibs|bloating|indigestion|constipation|diarrhea|nausea|gastroenteritis)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Gastrointestinal (Stomach) Health Overview**
+Gastric issues are among the most common health complaints, ranging from mild indigestion to chronic conditions.
+
+**Common Conditions:**
+• **Acidity/GERD**: Burning sensation in chest (heartburn) due to stomach acid reflux. Avoid spicy/fatty foods, eat smaller meals, don't lie down immediately after eating.
+• **IBS (Irritable Bowel Syndrome)**: Alternating constipation/diarrhea with cramping. Managed through diet (low-FODMAP) and stress reduction.
+• **Gastroenteritis (Stomach Flu)**: Nausea, vomiting, diarrhea — usually viral, resolves in 2–3 days with hydration.
+• **Constipation**: < 3 bowel movements/week. Increase fiber (fruits, vegetables, whole grains) and water intake.
+
+🏡 **General Digestive Health Tips:**
+• Eat slowly, chew thoroughly, maintain regular meal times
+• Stay well-hydrated (8–10 glasses of water daily)
+• Regular physical activity improves gut motility
+• Probiotics (curd, yogurt) support gut microbiome health
+
+⚠️ **Red Flags (Seek Immediate Care):**
+Blood in stool, black tarry stool, severe abdominal pain, persistent vomiting, unexplained significant weight loss.`;
+
+    } else if (/\b(kidney|renal|creatinine|uti|urinary|kidney stone|nephro)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Kidney Health Overview**
+The kidneys filter waste products, regulate blood pressure, and maintain electrolyte balance.
+
+**Common Kidney Conditions:**
+• **UTI (Urinary Tract Infection)**: Burning urination, frequent urge, cloudy urine, pelvic pain. Needs antibiotic treatment.
+• **Kidney Stones**: Severe flank pain radiating to groin, blood in urine, nausea. Small stones may pass naturally with high fluid intake.
+• **Chronic Kidney Disease (CKD)**: Elevated creatinine; managed through diet, blood pressure control, and specialist care.
+
+🏡 **Kidney Health Precautions:**
+• Drink 8–12 glasses of water daily
+• Limit sodium, processed foods, and animal protein
+• Control blood pressure and blood sugar
+• Avoid overuse of NSAIDs (Ibuprofen) as they can damage kidneys
+
+👨‍⚕️ Consult a Nephrologist if creatinine is elevated or symptoms are persistent.`;
+
+    } else if (/\b(cholesterol|lipid|triglycerides|ldl|hdl|cardiovascular|heart disease|coronary)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Cholesterol & Cardiovascular Health**
+Cholesterol is a fatty substance essential for body functions, but elevated LDL ("bad") cholesterol increases heart disease and stroke risk.
+
+**Understanding Lipid Profile:**
+• Total Cholesterol: < 200 mg/dL (desirable)
+• LDL Cholesterol: < 100 mg/dL (optimal)
+• HDL Cholesterol: > 40 mg/dL men, > 50 mg/dL women (higher is better)
+• Triglycerides: < 150 mg/dL (normal)
+
+🏡 **Lifestyle Modifications:**
+• Diet: Reduce saturated fats (ghee, butter, red meat, fried foods), trans fats; increase omega-3 rich foods (fish, flaxseeds, walnuts)
+• Exercise: 150 minutes/week of moderate aerobic activity raises HDL
+• Quit smoking, limit alcohol; increase dietary fiber (oats, beans, fruits) to reduce LDL
+
+👨‍⚕️ Consult a Cardiologist or physician if lifestyle changes are insufficient — statins (like Atorvastatin) may be prescribed.`;
+
+    } else if (/\b(anxiety|panic|stress|mental health|depression|insomnia|sleep|burnout)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Mental Health & Wellness Overview**
+Mental health conditions like anxiety, depression, stress, and insomnia are extremely common and completely treatable.
+
+**Anxiety & Stress:**
+• Symptoms: Excessive worry, restlessness, rapid heart rate, difficulty concentrating, sleep disturbances
+• Management: Deep breathing exercises (4-7-8 technique), progressive muscle relaxation, mindfulness meditation, regular exercise
+
+**Depression:**
+• Symptoms: Persistent sadness, loss of interest, fatigue, changes in appetite/sleep, feelings of worthlessness
+• Treatment: Cognitive Behavioral Therapy (CBT), medication (SSRIs/SNRIs), regular social connection, and exercise
+
+**Insomnia / Sleep Disorders:**
+• Maintain a consistent sleep schedule; avoid screens 1 hour before bed
+• Keep bedroom dark, quiet, and cool (16–19°C)
+• Avoid caffeine after 2 PM; limit alcohol
+
+🏡 **Universal Mental Wellness Tips:**
+• Regular aerobic exercise (proven antidepressant effect)
+• Strong social support network and journaling
+
+⚠️ If symptoms significantly impair daily functioning, or you have thoughts of self-harm, please consult a Psychiatrist or Psychologist immediately.`;
+
+    } else if (/\b(vitamin|supplement|zinc|calcium|magnesium|omega|b12|d3|vitamin d|vitamin c|folate|folic acid)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Vitamins & Nutritional Supplements Overview**
+Vitamins and minerals are essential micronutrients. Deficiencies are common and can cause significant health problems.
+
+**Common Deficiencies in India:**
+• **Vitamin D**: Deficiency causes bone weakness, muscle weakness, immune dysfunction. Sources: sunlight, fatty fish, fortified milk, eggs. Supplement: Vitamin D3 (1000–2000 IU/day, or as prescribed).
+• **Vitamin B12**: Deficiency causes neurological symptoms, fatigue, anemia — common in vegetarians. Sources: dairy, eggs, fish, B12 supplements.
+• **Iron**: See anemia section. Important especially for women and children.
+• **Calcium**: Essential for bone, nerve, and muscle health. Sources: dairy, leafy greens, sesame seeds.
+• **Omega-3 Fatty Acids**: Anti-inflammatory; support heart and brain health. Sources: fatty fish (salmon, mackerel), flaxseeds, walnuts.
+
+⚠️ **Important:** Get blood tests to identify specific deficiencies before starting supplements. Excessive supplementation can be harmful.`;
+
+    } else if (/\b(weight loss|obesity|overweight|bmi|diet|calorie|fat loss|weight management|keto|intermittent fasting)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Weight Management Overview**
+Healthy weight management is about sustainable lifestyle changes, not crash diets.
+
+**Understanding BMI:**
+• Underweight: < 18.5 | Normal: 18.5–24.9 | Overweight: 25–29.9 | Obese: ≥ 30
+
+**Evidence-Based Weight Loss Principles:**
+• Caloric deficit of 500–750 kcal/day leads to ~0.5–0.75 kg/week weight loss (safe and sustainable)
+• Focus on whole foods: vegetables, fruits, lean protein (chicken, fish, legumes), complex carbohydrates
+• Reduce ultra-processed foods, refined sugars, and sugary beverages
+• Protein intake (1.2–1.6 g/kg body weight) preserves muscle mass during weight loss
+
+🏡 **Exercise:**
+• Combination of cardio (150+ min/week) and resistance training is most effective
+• Even walking 10,000 steps daily significantly improves metabolic health
+
+👨‍⚕️ Consult a Nutritionist/Dietitian for a personalized meal plan. If obesity is severe, consult an Endocrinologist to rule out hormonal causes.`;
+
+    } else if (/\b(pregnancy|prenatal|antenatal|trimester|morning sickness|maternal)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Pregnancy Health Overview**
+
+**First Trimester (Weeks 1–12):**
+• Start Folic Acid (400–800 mcg/day) before conception and through first trimester to prevent neural tube defects
+• Common: morning sickness, fatigue, breast tenderness — typically improve by week 12
+• Avoid alcohol, smoking, raw/undercooked foods, excess caffeine
+
+**Important Supplements During Pregnancy:**
+• Folic acid, Iron, Calcium, Vitamin D, Iodine (as prescribed by OB/GYN)
+
+**Prenatal Care:**
+• Regular antenatal check-ups are critical
+• Ultrasound scans at 11–14 weeks (dating/NT scan), 18–20 weeks (anomaly scan)
+• Safe exercise: walking, prenatal yoga, swimming
+
+⚠️ **Red Flags (Seek Immediate Care):**
+Heavy bleeding, severe abdominal pain, reduced fetal movements, severe headache/visual disturbances, sudden swelling of face/hands/feet (preeclampsia signs).`;
+
+    } else if (/\b(skin|acne|eczema|psoriasis|rash|hives|dermatitis|pimple|fungal|ringworm|dandruff)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Skin Health Overview**
+
+**Common Skin Conditions:**
+• **Acne/Pimples**: Caused by clogged pores, bacteria, hormonal changes. Management: gentle cleansing, salicylic acid or benzoyl peroxide (topical). Severe cases: consult a Dermatologist for retinoids or antibiotics.
+• **Eczema (Atopic Dermatitis)**: Itchy, inflamed skin. Triggers: soap, detergents, dry skin, stress. Management: fragrance-free moisturizers, mild steroid creams (short-term).
+• **Psoriasis**: Scaly, red plaques. Chronic condition requiring ongoing medical management.
+• **Fungal Infections (Ringworm/Athlete's Foot)**: Antifungal creams (Clotrimazole, Terbinafine) for 2–4 weeks; keep affected area clean and dry.
+• **Dandruff**: Antifungal shampoos (Ketoconazole, Zinc Pyrithione).
+
+🏡 **General Skin Care Tips:**
+• Daily gentle cleansing with pH-balanced cleanser
+• Broad-spectrum sunscreen (SPF 30+) every morning
+• Adequate hydration and a diet rich in antioxidants
+
+👨‍⚕️ Consult a Dermatologist for persistent, spreading, or undiagnosed skin conditions.`;
+
+    } else if (/\b(back pain|spine|lumbar|neck pain|joint pain|arthritis|rheumatoid|osteoporosis|muscle pain|sprain|physiotherapy)\b/i.test(qLower)) {
+      fallbackAnswer = `🔍 **Musculoskeletal Pain Overview (Back, Joints & Muscles)**
+
+**Common Causes of Back/Joint Pain:**
+• Muscle strain or poor posture (most common)
+• Disc herniation (slipped disc) — radiating pain to legs (sciatica)
+• Arthritis (Osteoarthritis in elderly; Rheumatoid Arthritis — autoimmune)
+• Osteoporosis — reduced bone density, fracture risk
+
+🏡 **Home Care for Mild-Moderate Pain:**
+• RICE Method (Rest, Ice, Compression, Elevation) for acute injuries
+• Warm compress or heating pad for chronic muscle stiffness
+• Gentle stretching, yoga, or physiotherapy exercises
+• OTC pain relief: Paracetamol, or topical Diclofenac gel
+• Correct your sitting/standing posture; use ergonomic furniture
+
+⚠️ **See a Doctor Urgently if:**
+• Pain radiates down legs with numbness/weakness (possible nerve compression)
+• Bowel or bladder control changes with back pain
+• Pain unresponsive to medications after 2 weeks
+
+👨‍⚕️ Consult an Orthopedist, Rheumatologist, or Physiotherapist as appropriate.`;
+
     } else {
-      fallbackAnswer =
-        "I am AarogyaGenie AI, your medical assistant. For specific health concerns or personalized diagnoses, please consult a verified doctor or healthcare professional.";
+      // Ultimate generic health question fallback
+      fallbackAnswer = `Hello! I'm AarogyaGenie AI, your trusted health assistant. 👋
+
+I'm here to help you with any health-related question — symptoms, medications, conditions, nutrition, mental wellness, preventive care, or healthcare guidance.
+
+**What I can help you with:**
+• 🩺 **Symptoms & Conditions**: Understand what symptoms mean, common causes, and when to seek care
+• 💊 **Medications**: Drug information, usage, side effects, and safety guidance
+• 🥗 **Nutrition & Lifestyle**: Diet advice, weight management, exercise recommendations
+• 🧠 **Mental Health**: Anxiety, depression, stress, sleep guidance
+• 🔬 **Lab Tests**: Understanding blood reports, normal ranges, and what they mean
+• 🏥 **Healthcare Navigation**: Which specialist to see for your concern
+
+Please describe your health concern in more detail, and I'll provide comprehensive medical guidance tailored to your question.
+
+⚠️ *AarogyaGenie AI provides health education and guidance, not a medical diagnosis. Always consult a qualified healthcare professional for medical decisions.*`;
     }
   }
 

@@ -131,7 +131,29 @@ const MEDICAL_KEYWORDS = [
   "symptom", "diagnosis", "treatment", "cure", "prevention", "vaccine", "diet", "nutrition",
   "exercise", "mental health", "anxiety", "depression", "insomnia", "sleep", "vital", "timeline",
   "vitamin", "mineral", "supplement", "electrolytes", "ors", "bmi", "weight loss", "obesity",
-  "precaution", "precautions", "remedy", "remedies", "care", "home care", "blood", "blood test", "blood report"
+  "precaution", "precautions", "remedy", "remedies", "care", "home care", "blood", "blood test", "blood report",
+  // Extended health vocabulary
+  "thyroid", "hypothyroid", "hyperthyroid", "goiter", "tsh", "t3", "t4",
+  "asthma", "inhaler", "bronchitis", "wheeze", "wheezing", "copd", "lungs", "respiratory",
+  "migraine", "vertigo", "dizziness", "fainting", "seizure", "epilepsy", "neurological",
+  "kidney stone", "uti", "urinary", "bladder", "renal", "nephrology", "dialysis",
+  "cholesterol", "ldl", "hdl", "lipid profile", "triglycerides", "coronary", "cardiovascular",
+  "anxiety", "depression", "stress", "burnout", "panic", "ocd", "adhd", "autism", "bipolar",
+  "vitamin d", "vitamin b12", "iron", "calcium", "magnesium", "zinc", "folic acid", "omega",
+  "weight", "overweight", "underweight", "bmi", "metabolism", "calorie", "intermittent fasting",
+  "pregnancy", "prenatal", "antenatal", "trimester", "breastfeeding", "lactation", "menopause",
+  "skin", "acne", "eczema", "psoriasis", "dermatitis", "fungal", "ringworm", "dandruff",
+  "arthritis", "joint", "ligament", "tendon", "back pain", "sciatica", "osteoporosis", "fracture",
+  "eye", "vision", "cataract", "glaucoma", "conjunctivitis", "retina",
+  "ear", "hearing", "tinnitus", "otitis",
+  "dental", "tooth", "oral health", "gums",
+  "cancer", "tumor", "chemotherapy", "oncology", "biopsy",
+  "immune", "immunity", "autoimmune", "inflammation",
+  "surgery", "operation", "recovery", "wound", "dressing",
+  "dehydration", "electrolyte", "ors", "saline",
+  "blood sugar", "fasting", "postprandial", "insulin resistance",
+  "physiotherapy", "rehabilitation", "occupational therapy",
+  "health check", "health checkup", "annual health", "preventive care"
 ];
 
 // ── 4. Third-Person / Other Person Relative Indicators ─────────────────────────
@@ -340,11 +362,11 @@ export function classifyDomainAndIntent(
     return regex.test(qLower);
   });
 
-  const hasHealthQuestionPattern = /\b(symptom|cause|treatment|cure|remedy|prevent|precaution|precautions|contagious|safe to take|side effect|dosage of|what should i do if|when to see a doctor|home care for|meaning of|what is|how is|why do i feel|diet for|what to eat)\b/i.test(qLower);
+  const hasHealthQuestionPattern = /\b(symptom|cause|treatment|cure|remedy|prevent|precaution|precautions|contagious|safe to take|side effect|dosage of|what should i do if|when to see a doctor|home care for|meaning of|what is|how is|why do i feel|diet for|what to eat|how to reduce|how to control|how to manage|how to improve|how to treat|how to prevent|foods good for|foods that help|foods to avoid|natural remedy|home remedy|is it normal|can i take|should i eat|what causes|signs of|symptoms of|effects of|difference between|good for health|healthy food|healthy diet|bad for health|is safe|are safe|when to|how long|how much|daily intake|recommended dose|normal range|reference range|test for|checked for|risk factor|risk of|complication|early sign|warning sign|red flag|seek doctor|consult doctor|see a doctor|health benefit|nutritional|calorie in|protein in|carbohydrate|fat content)\b/i.test(qLower);
   const isGeneralMedical = hasMedicalKeywords || hasHealthQuestionPattern || subject === "SELF" || subject === "OTHER_PERSON";
 
-  // Rejection check for completely out-of-domain queries
-  if (!isGeneralMedical && !isPlatformService && intent !== "GENERAL_CONVERSATION" && q.split(/\s+/).length > 3) {
+  // Rejection check for completely out-of-domain queries — require > 4 words to avoid dismissing short health terms
+  if (!isGeneralMedical && !isPlatformService && intent !== "GENERAL_CONVERSATION" && q.split(/\s+/).length > 4) {
     return {
       category: "NON_MEDICAL",
       subject: "UNCLEAR",
