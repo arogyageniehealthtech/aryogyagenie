@@ -23,6 +23,7 @@
 export type DomainCategory =
   | "EMERGENCY"
   | "NON_MEDICAL"
+  | "GENERIC_KNOWLEDGE"
   | "PATIENT_SPECIFIC"
   | "GENERAL_MEDICAL"
   | "HYBRID"
@@ -230,17 +231,15 @@ export function classifyDomainAndIntent(
   for (const pattern of NON_MEDICAL_PATTERNS) {
     if (pattern.test(q)) {
       return {
-        category: "NON_MEDICAL",
-        subject: "UNCLEAR",
-        intent: "UNKNOWN",
+        category: "GENERIC_KNOWLEDGE",
+        subject: "GENERIC",
+        intent: "GENERAL_CONVERSATION",
         isEmergency: false,
-        isNonMedical: true,
+        isNonMedical: false,
         isPatientSpecific: false,
         isGeneralMedical: false,
         isPlatformService: false,
         targetModules: [],
-        rejectionMessage:
-          "I am AarogyaGenie AI, your dedicated medical and healthcare assistant. I can only assist with health-related questions, medical guidance, symptoms, medications, treatments, and your personal healthcare records on AarogyaGenie. For non-medical topics, please use a general assistant.",
       };
     }
   }
@@ -368,17 +367,15 @@ export function classifyDomainAndIntent(
   // Rejection check for completely out-of-domain queries — require > 4 words to avoid dismissing short health terms
   if (!isGeneralMedical && !isPlatformService && intent !== "GENERAL_CONVERSATION" && q.split(/\s+/).length > 4) {
     return {
-      category: "NON_MEDICAL",
-      subject: "UNCLEAR",
-      intent: "UNKNOWN",
+      category: "GENERIC_KNOWLEDGE",
+      subject: "GENERIC",
+      intent: "GENERAL_CONVERSATION",
       isEmergency: false,
-      isNonMedical: true,
+      isNonMedical: false,
       isPatientSpecific: false,
       isGeneralMedical: false,
       isPlatformService: false,
       targetModules: [],
-      rejectionMessage:
-        "I am AarogyaGenie AI, your dedicated medical and healthcare assistant. I can only assist with health-related questions, medical guidance, symptoms, medications, treatments, and your personal healthcare records on AarogyaGenie. For non-medical topics, please use a general assistant.",
     };
   }
 

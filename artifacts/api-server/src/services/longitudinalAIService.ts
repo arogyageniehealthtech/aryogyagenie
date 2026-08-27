@@ -261,19 +261,7 @@ export async function answerLongitudinalAssistant(
     };
   }
 
-  // 1B. Explicit Non-Medical Domain Rejection
-  if (classification.isNonMedical) {
-    return {
-      answer: classification.rejectionMessage || "I am AarogyaGenie AI, your dedicated medical assistant. Please ask medical or healthcare-related questions.",
-      usedRag: false,
-      category: "NON_MEDICAL",
-      subject: classification.subject,
-      intent: classification.intent,
-      sources: [],
-      retrieval: { topK: 0, resultsUsed: 0 },
-      disclaimer: "ℹ️ AarogyaGenie AI is restricted to the medical and healthcare domain.",
-    };
-  }
+  // 1B. Explicit Non-Medical Domain Rejection (REMOVED: Now handled as GENERIC_KNOWLEDGE)
 
   // ── Step 2: Conditional Context Retrieval ──────────────────────────────────
   // CRITICAL RULE: Patient records are ONLY retrieved if subject is SELF and intent requires records.
@@ -295,6 +283,12 @@ export async function answerLongitudinalAssistant(
   let matches: Awaited<ReturnType<typeof searchMedicalKnowledge>> = [];
   if (classification.isGeneralMedical && !classification.isPlatformService && classification.intent !== "GENERAL_CONVERSATION") {
     matches = await searchMedicalKnowledge(queryTrimmed, topK, threshold);
+  }
+
+  const explicitlyAskedForDocument = /\b(according to|document|knowledge base|uploaded|from the database)\b/i.test(queryTrimmed);
+  let emptyRagMessage = "";
+  if (explicitlyAskedForDocument && matches.length === 0) {
+    emptyRagMessage = "CRITICAL: The user explicitly asked about information from a document, but NO relevant documents were found in the knowledge base. You MUST inform the user clearly that the knowledge base does not contain this information, and do not invent an answer.";
   }
 
   const usedRag = matches.length > 0;
@@ -348,7 +342,12 @@ export async function answerLongitudinalAssistant(
    - Do NOT start generic responses with "Based on your AarogyaGenie health profile...".
 4. MEDICAL CAUTION:
    - Do not claim definitive diagnosis ("You have X"). Use cautious, supportive phrasing ("may suggest", "common causes include").
-   - Do not prescribe prescription-only medications or alter dosages. Encourage consulting a qualified healthcare professional.`;
+   - Do not prescribe prescription-only medications or alter dosages. Encourage consulting a qualified healthcare professional.
+5. RAG / HYBRID HALLUCINATION PREVENTION:
+   - Answer using the retrieved context when the question concerns the application's knowledge base. 
+   - Do not fabricate facts, sources, document contents, or citations. 
+   - If the retrieved context does not contain enough information to answer the question, clearly say that the available knowledge base does not provide sufficient information. 
+   - You may use general reasoning to explain retrieved information, but do not present unsupported information as if it came from the knowledge base.`;
 
   if (classification.isPlatformService) {
     systemPrompt = `You are AarogyaGenie AI, the navigation and healthcare service assistant for the AarogyaGenie platform.
@@ -434,12 +433,23 @@ ${commonSafetyRules}
 5. Address the patient's specific recorded results, prescriptions, or symptoms accurately.
 6. Distinguish clearly between the patient's specific facts ("Your records show...") and general medical information ("Generally, clinical guidelines note...").
 7. Highlight warning signs or red flags if applicable, and advise consulting their doctor for personalized medical evaluation.`;
+  } else if (classification.category === "GENERIC_KNOWLEDGE") {
+    systemPrompt = `You are AarogyaGenie AI, a helpful and versatile AI assistant.
+Your job is to answer general knowledge, coding, and casual conversation questions accurately and clearly.
+
+${formattedHistory}USER QUESTION: "${queryTrimmed}"
+
+${commonSafetyRules}
+6. Provide a helpful, accurate, and easy-to-understand explanation or answer.
+7. If the user asks a casual question (like a joke, coding question, or general fact), answer it naturally.
+8. Do NOT pretend to retrieve medical documents for this generic query.
+9. Respond in the same language the user used.`;
   } else {
     // GENERIC_MEDICAL or GENERAL_CONVERSATION
     systemPrompt = `You are AarogyaGenie AI, a trusted, empathetic, and clinically grounded medical AI assistant.
 Your job is to answer ANY health, medical, wellness, nutrition, fitness, mental health, or symptom-related question thoroughly, accurately, and compassionately.
 
-${formattedHistory}${usedRag ? `AUTHORITATIVE MEDICAL GUIDELINES (RAG EVIDENCE):\n${formattedRagEvidence}\n\n` : ""}PATIENT HEALTH QUESTION: "${queryTrimmed}"
+${formattedHistory}${usedRag ? `AUTHORITATIVE MEDICAL GUIDELINES (RAG EVIDENCE):\n${formattedRagEvidence}\n\n` : ""}${emptyRagMessage ? `\n\n${emptyRagMessage}\n\n` : ""}PATIENT HEALTH QUESTION: "${queryTrimmed}"
 
 ${commonSafetyRules}
 5. Provide a comprehensive, medically accurate, and easy-to-understand explanation. NEVER give a one-liner dismissal — always provide actionable, helpful information.
